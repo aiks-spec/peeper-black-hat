@@ -1,0 +1,59 @@
+# Dockerfile for OSINT Lookup Engine - Render.com compatible
+FROM node:18-slim
+
+# Install system dependencies
+RUN apt-get update && apt-get install -y \
+    python3 \
+    python3-pip \
+    python3-venv \
+    curl \
+    wget \
+    git \
+    build-essential \
+    postgresql-client \
+    libpq-dev \
+    && rm -rf /var/lib/apt/lists/*
+
+# Create tput replacement BEFORE any other operations
+RUN mkdir -p /usr/bin /usr/local/bin /bin
+RUN echo '#!/bin/bash\ncase "$1" in\n    "colors"|"lines"|"cols"|"setaf"|"setab"|"sgr0"|"reset"|"bold"|"dim"|"smul"|"rmul"|"rev"|"smso"|"rmso")\n        echo ""\n        ;;\n    *)\n        echo ""\n        ;;\nesac' > /usr/bin/tput
+RUN echo '#!/bin/bash\ncase "$1" in\n    "colors"|"lines"|"cols"|"setaf"|"setab"|"sgr0"|"reset"|"bold"|"dim"|"smul"|"rmul"|"rev"|"smso"|"rmso")\n        echo ""\n        ;;\n    *)\n        echo ""\n        ;;\nesac' > /usr/local/bin/tput
+RUN echo '#!/bin/bash\ncase "$1" in\n    "colors"|"lines"|"cols"|"setaf"|"setab"|"sgr0"|"reset"|"bold"|"dim"|"smul"|"rmul"|"rev"|"smso"|"rmso")\n        echo ""\n        ;;\n    *)\n        echo ""\n        ;;\nesac' > /bin/tput
+RUN chmod +x /usr/bin/tput /usr/local/bin/tput /bin/tput
+
+# Override colors.sh script
+RUN mkdir -p /home/render
+RUN echo '#!/bin/bash\nexit 0' > /home/render/colors.sh
+RUN chmod +x /home/render/colors.sh
+
+# Set environment variables
+ENV TERM=dumb
+ENV FORCE_COLOR=0
+ENV NO_COLOR=1
+ENV ANSI_COLORS_DISABLED=1
+ENV PYTHONUNBUFFERED=1
+ENV PYTHONIOENCODING=utf-8
+ENV RICH_NO_COLOR=1
+ENV PYTHONUTF8=1
+ENV PATH="/usr/bin:/usr/local/bin:/bin:$PATH"
+
+# Install OSINT tools
+RUN pip3 install --user sherlock-project holehe maigret ghunt
+
+# Set working directory
+WORKDIR /app
+
+# Copy package files
+COPY package*.json ./
+
+# Install Node.js dependencies
+RUN npm install
+
+# Copy application files
+COPY . .
+
+# Expose port
+EXPOSE 3000
+
+# Start the application
+CMD ["npm", "start"]
