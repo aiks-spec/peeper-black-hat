@@ -56,7 +56,7 @@ process.on('SIGINT', () => {
     process.exit(0);
 });
 
-// Cross-platform PATH handling for publishing
+// Cross-platform PATH handling for Render.com deployment
 try {
     if (process.platform === 'win32') {
         // Windows: try common Python locations
@@ -82,8 +82,29 @@ try {
             process.env.PATH = `${scriptPaths.join(';')};${process.env.PATH}`;
         }
     } else {
-        // Linux/Mac: use standard PATH
-        console.log('🌐 Running on non-Windows platform, using standard PATH');
+        // Linux/Mac/Render.com: use standard PATH and common locations
+        console.log('🌐 Running on Linux/Mac/Render.com platform');
+        
+        // Add common Python paths for Linux/Render.com
+        const linuxPaths = [
+            '/usr/local/bin',
+            '/usr/bin',
+            '/bin',
+            '/opt/python/bin',
+            '/home/render/.local/bin',
+            '/usr/local/lib/python3.11/bin',
+            '/usr/local/lib/python3.10/bin',
+            '/usr/local/lib/python3.9/bin'
+        ];
+        
+        const existingPath = process.env.PATH || '';
+        const pathSeparator = process.platform === 'win32' ? ';' : ':';
+        const newPaths = linuxPaths.filter(p => fs.existsSync(p));
+        
+        if (newPaths.length > 0) {
+            process.env.PATH = `${newPaths.join(pathSeparator)}${pathSeparator}${existingPath}`;
+            console.log('✅ Added Linux Python paths to PATH');
+        }
     }
 } catch (error) {
     console.log('⚠️ PATH expansion failed, using default:', error.message);
@@ -132,12 +153,29 @@ db.serialize(() => {
     )`);
 });
 
-// Visitor tracking middleware
+// Visitor tracking middleware - FIXED FOR RENDER.COM
 app.use((req, res, next) => {
-    const ip = req.ip || req.connection.remoteAddress;
-    const userAgent = req.get('User-Agent');
+    // Get real IP address (Render.com uses proxy headers)
+    const ip = req.headers['x-forwarded-for'] || 
+               req.headers['x-real-ip'] || 
+               req.connection.remoteAddress || 
+               req.socket.remoteAddress ||
+               (req.connection.socket ? req.connection.socket.remoteAddress : null) ||
+               '127.0.0.1';
     
-    db.run('INSERT INTO visitors (ip, user_agent) VALUES (?, ?)', [ip, userAgent]);
+    const userAgent = req.get('User-Agent') || 'Unknown';
+    
+    // Only track unique visitors (not every request)
+    if (req.path === '/' || req.path.includes('/api/')) {
+        db.run('INSERT INTO visitors (ip, user_agent) VALUES (?, ?)', [ip, userAgent], (err) => {
+            if (err) {
+                console.log('❌ Visitor tracking error:', err.message);
+            } else {
+                console.log('✅ Visitor tracked:', ip);
+            }
+        });
+    }
+    
     next();
 });
 
@@ -1174,21 +1212,37 @@ app.post('/api/ip-lookup', async (req, res) => {
     }
 });
 
-// Stats endpoint
+// Stats endpoint - FIXED FOR RENDER.COM
 app.get('/api/stats', (req, res) => {
-    db.get('SELECT COUNT(DISTINCT ip) as visitors FROM visitors', (err, visitorResult) => {
+    // Get unique visitors (last 24 hours)
+    const oneDayAgo = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
+    
+    db.get('SELECT COUNT(DISTINCT ip) as visitors FROM visitors WHERE timestamp > ?', [oneDayAgo], (err, visitorResult) => {
         if (err) {
+            console.log('❌ Visitor stats error:', err.message);
             return res.status(500).json({ error: 'Database error' });
         }
         
+        // Get total searches
         db.get('SELECT COUNT(*) as searches FROM searches', (err, searchResult) => {
             if (err) {
+                console.log('❌ Search stats error:', err.message);
                 return res.status(500).json({ error: 'Database error' });
             }
             
-            res.json({
-                visitors: visitorResult.visitors || 0,
-                searches: searchResult.searches || 0
+            // Get total unique visitors ever
+            db.get('SELECT COUNT(DISTINCT ip) as total_visitors FROM visitors', (err, totalVisitorResult) => {
+                if (err) {
+                    console.log('❌ Total visitor stats error:', err.message);
+                    return res.status(500).json({ error: 'Database error' });
+                }
+                
+                res.json({
+                    visitors_today: visitorResult.visitors || 0,
+                    total_visitors: totalVisitorResult.total_visitors || 0,
+                    searches: searchResult.searches || 0,
+                    timestamp: new Date().toISOString()
+                });
             });
         });
     });
@@ -1250,25 +1304,11 @@ async function isCommandAvailable(cmd) {
 function resolveToolCommand(cmd) {
     // If directly available, return as-is
     return isCommandAvailable(cmd).then((ok) => {
-        // For ghunt.exe, prefer direct execution
-        if (cmd === 'ghunt.exe') {
-            if (ok) return { command: cmd, viaPython: false };
-            // Try to find ghunt.exe in Python Scripts
-            if (process.platform === 'win32') {
-                const pathParts = (process.env.PATH || '').split(';').filter(Boolean);
-                for (const p of pathParts) {
-                    try {
-                        const exe = path.join(p, 'ghunt.exe');
-                        if (fs.existsSync(exe)) return { command: exe, viaPython: false };
-                    } catch {}
-                }
-            }
-            // Fallback to python -m ghunt
-            return { command: 'python', viaPython: '-m ghunt' };
-        }
         if (ok) return { command: cmd, viaPython: false };
-        // Try Windows Scripts folders
+        
+        // Cross-platform tool resolution
         if (process.platform === 'win32') {
+            // Windows: try Scripts folders
             const pathParts = (process.env.PATH || '').split(';').filter(Boolean);
             for (const p of pathParts) {
                 try {
@@ -1277,15 +1317,36 @@ function resolveToolCommand(cmd) {
                     if (fs.existsSync(exe)) return { command: exe, viaPython: false };
                     const bare = path.join(p, cmd);
                     if (fs.existsSync(bare)) {
-                        // Use python to run script without extension
-                        const python = 'python';
-                        return { command: python, viaPython: bare };
+                        return { command: 'python', viaPython: bare };
+                    }
+                } catch {}
+            }
+        } else {
+            // Linux/Mac/Render.com: try common locations
+            const pathParts = (process.env.PATH || '').split(':').filter(Boolean);
+            for (const p of pathParts) {
+                try {
+                    const toolPath = path.join(p, cmd);
+                    if (fs.existsSync(toolPath)) {
+                        return { command: toolPath, viaPython: false };
+                    }
+                } catch {}
+            }
+            
+            // Try Python module execution for Render.com
+            const pythonCommands = ['python3', 'python', 'py'];
+            for (const pythonCmd of pythonCommands) {
+                try {
+                    if (fs.existsSync(pythonCmd) || isCommandAvailable(pythonCmd)) {
+                        return { command: pythonCmd, viaPython: `-m ${cmd}` };
                     }
                 } catch {}
             }
         }
+        
         // Final fallback: try python -m <module>
-        return { command: 'python', viaPython: `-m ${cmd}` };
+        const pythonCmd = process.platform === 'win32' ? 'python' : 'python3';
+        return { command: pythonCmd, viaPython: `-m ${cmd}` };
     });
 }
 
