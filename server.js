@@ -105,6 +105,13 @@ try {
             process.env.PATH = `${newPaths.join(pathSeparator)}${pathSeparator}${existingPath}`;
             console.log('✅ Added Linux Python paths to PATH');
         }
+        
+        // Set environment variables to prevent tput errors
+        process.env.TERM = process.env.TERM || 'xterm-256color';
+        process.env.FORCE_COLOR = '0';
+        process.env.NO_COLOR = '1';
+        process.env.CLICOLOR = '0';
+        process.env.CLICOLOR_FORCE = '0';
     }
 } catch (error) {
     console.log('⚠️ PATH expansion failed, using default:', error.message);
@@ -272,11 +279,11 @@ app.post('/api/aggregate', async (req, res) => {
             tasks.push(scrapePhoneNumberApiHtml(trimmed));
             // Also try social media search with phone number
             const phoneUsername = trimmed.replace(/[^a-zA-Z0-9+]/g, '');
-            tasks.push(runToolIfAvailable('sherlock', [phoneUsername, '--print-found'], parseSherlock));
-                         tasks.push(runToolIfAvailable('maigret', [phoneUsername], parseMaigretSimple));
+            tasks.push(runToolIfAvailable('sherlock', [phoneUsername, '--print-found', '--no-color'], parseSherlock));
+                         tasks.push(runToolIfAvailable('maigret', [phoneUsername, '--no-color'], parseMaigretSimple));
         }
         if (qtype === 'email') {
-            tasks.push(runToolIfAvailable('holehe', [trimmed, '-C'], parseHolehe));
+            tasks.push(runToolIfAvailable('holehe', [trimmed, '-C', '--no-color'], parseHolehe));
                                                    // For aggregate endpoint, use proper Docker GHunt implementation
              const outputFile = `ghunt_aggregate_${Date.now()}.json`;
              
@@ -368,8 +375,8 @@ app.post('/api/aggregate', async (req, res) => {
             })());
         }
         if (qtype === 'username') {
-            tasks.push(runToolIfAvailable('sherlock', [trimmed, '--print-found'], parseSherlock));
-                         tasks.push(runToolIfAvailable('maigret', [trimmed], parseMaigretSimple));
+            tasks.push(runToolIfAvailable('sherlock', [trimmed, '--print-found', '--no-color'], parseSherlock));
+                         tasks.push(runToolIfAvailable('maigret', [trimmed, '--no-color'], parseMaigretSimple));
         }
 
         const results = await Promise.all(tasks.map(p => p.catch(() => null)));
@@ -667,10 +674,10 @@ app.post('/api/email-lookup', async (req, res) => {
             console.log('❌ GHunt failed:', error.message);
         }
         
-        // 3. Holehe (email breach checker)
-        try {
-            console.log('🔍 Running Holehe...');
-            const holeheResult = await runToolIfAvailable('holehe', [email, '-C'], async (stdout, stderr) => {
+                 // 3. Holehe (email breach checker)
+         try {
+             console.log('🔍 Running Holehe...');
+             const holeheResult = await runToolIfAvailable('holehe', [email, '-C', '--no-color'], async (stdout, stderr) => {
                 // Wait a bit for the CSV file to be written
                 await new Promise(resolve => setTimeout(resolve, 8000));
                 
@@ -716,7 +723,7 @@ app.post('/api/email-lookup', async (req, res) => {
              console.log('🔍 Username extracted:', username);
              
              // First run Sherlock for general search
-             const sherlockResult = await runToolIfAvailable('sherlock', [username, '--print-found'], (stdout) => {
+             const sherlockResult = await runToolIfAvailable('sherlock', [username, '--print-found', '--no-color'], (stdout) => {
                 console.log('🔍 Sherlock raw output length:', stdout.length);
                 console.log('🔍 Sherlock raw output preview:', stdout.substring(0, 300) + '...');
                 try {
@@ -787,7 +794,7 @@ app.post('/api/email-lookup', async (req, res) => {
         try {
             console.log('🔍 Running Maigret...');
             const username = email.split('@')[0];
-            const maigretResult = await runToolIfAvailable('maigret', [username], parseMaigretSimple);
+            const maigretResult = await runToolIfAvailable('maigret', [username, '--no-color'], parseMaigretSimple);
             
             if (maigretResult && maigretResult.socialProfiles) {
                 console.log('✅ Maigret data received, social profiles:', maigretResult.socialProfiles.length);
@@ -1105,7 +1112,7 @@ app.post('/api/phone-lookup', async (req, res) => {
              console.log('🔍 Running Maigret...');
              // For phone numbers, try both with and without + symbol
              const username = phone.replace(/[^a-zA-Z0-9+]/g, '');
-             const maigretResult = await runToolIfAvailable('maigret', [username], parseMaigretSimple);
+             const maigretResult = await runToolIfAvailable('maigret', [username, '--no-color'], parseMaigretSimple);
             
             if (maigretResult && maigretResult.socialProfiles) {
                 console.log('✅ Maigret data received, social profiles:', maigretResult.socialProfiles.length);
