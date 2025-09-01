@@ -19,7 +19,7 @@ export PYTHONUTF8=1
 echo "🔧 Creating system-wide tput replacement..."
 
 # Create tput in /usr/bin (highest priority)
-sudo mkdir -p /usr/bin
+mkdir -p /usr/bin
 cat > /usr/bin/tput << 'EOF'
 #!/bin/bash
 # System-wide tput replacement that returns empty strings
@@ -34,7 +34,7 @@ esac
 EOF
 
 # Create tput in /usr/local/bin
-sudo mkdir -p /usr/local/bin
+mkdir -p /usr/local/bin
 cat > /usr/local/bin/tput << 'EOF'
 #!/bin/bash
 # System-wide tput replacement that returns empty strings
@@ -49,7 +49,7 @@ esac
 EOF
 
 # Create tput in /bin
-sudo mkdir -p /bin
+mkdir -p /bin
 cat > /bin/tput << 'EOF'
 #!/bin/bash
 # System-wide tput replacement that returns empty strings
@@ -70,7 +70,7 @@ chmod +x /bin/tput
 
 # Override the problematic colors.sh script
 echo "🔧 Overriding colors.sh script..."
-sudo mkdir -p /home/render
+mkdir -p /home/render
 cat > /home/render/colors.sh << 'EOF'
 #!/bin/bash
 # Overridden colors.sh script that does nothing
