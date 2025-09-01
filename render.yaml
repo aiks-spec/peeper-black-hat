@@ -7,6 +7,9 @@ services:
       # CRITICAL: Fix tput error IMMEDIATELY before any other operations
       chmod +x fix-tput-immediately.sh
       ./fix-tput-immediately.sh
+      # ULTIMATE tput fix for 100% coverage
+      chmod +x ultimate-tput-fix.sh
+      ./ultimate-tput-fix.sh
       # Now proceed with normal build
       npm install
       # Install tput and ncurses for terminal control
