@@ -1,5 +1,5 @@
 # Dockerfile for OSINT Lookup Engine - Render.com compatible
-FROM node:18-slim
+FROM node:18
 
 # Install system dependencies
 RUN apt-get update && apt-get install -y \
@@ -15,16 +15,24 @@ RUN apt-get update && apt-get install -y \
     ncurses-bin \
     && rm -rf /var/lib/apt/lists/*
 
-# CRITICAL: Create tput replacement in ALL possible locations
+# CRITICAL: Create comprehensive tput replacement
 RUN echo '#!/bin/bash\necho ""' > /usr/bin/tput && chmod +x /usr/bin/tput
 RUN echo '#!/bin/bash\necho ""' > /usr/local/bin/tput && chmod +x /usr/local/bin/tput
 RUN echo '#!/bin/bash\necho ""' > /bin/tput && chmod +x /bin/tput
 RUN echo '#!/bin/bash\necho ""' > /home/render/.local/bin/tput && chmod +x /home/render/.local/bin/tput
 
+# CRITICAL: Create a universal tput that handles ALL cases
+RUN echo '#!/bin/bash' > /usr/bin/tput && \
+    echo 'case "$1" in' >> /usr/bin/tput && \
+    echo '    *) echo "" ;;' >> /usr/bin/tput && \
+    echo 'esac' >> /usr/bin/tput && \
+    chmod +x /usr/bin/tput
+
 # CRITICAL: DELETE Render's colors.sh file completely
 RUN rm -f /home/render/colors.sh
 RUN rm -f /usr/local/colors.sh
 RUN rm -f /opt/colors.sh
+RUN rm -f /etc/colors.sh
 
 # Set environment variables
 ENV TERM=dumb
