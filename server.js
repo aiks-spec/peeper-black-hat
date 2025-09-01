@@ -1332,10 +1332,37 @@ function resolveToolCommand(cmd) {
             const pythonCommands = ['python3', 'python', 'py'];
             for (const pythonCmd of pythonCommands) {
                 try {
-                    if (fs.existsSync(pythonCmd) || isCommandAvailable(pythonCmd)) {
+                    // Check if python command exists
+                    const pythonPath = path.join(p, pythonCmd);
+                    if (fs.existsSync(pythonPath) || isCommandAvailable(pythonCmd)) {
                         return { command: pythonCmd, viaPython: `-m ${cmd}` };
                     }
                 } catch {}
+            }
+            
+            // Try direct Python module execution with different module names
+            if (cmd === 'sherlock') {
+                return { command: 'python3', viaPython: '-m sherlock' };
+            } else if (cmd === 'holehe') {
+                return { command: 'python3', viaPython: '-m holehe' };
+            } else if (cmd === 'maigret') {
+                return { command: 'python3', viaPython: '-m maigret' };
+            } else if (cmd === 'ghunt') {
+                return { command: 'python3', viaPython: '-m ghunt' };
+            }
+            
+            // Try alternative module names
+            const moduleMap = {
+                'sherlock': ['sherlock', 'sherlock-project'],
+                'holehe': ['holehe'],
+                'maigret': ['maigret'],
+                'ghunt': ['ghunt']
+            };
+            
+            if (moduleMap[cmd]) {
+                for (const moduleName of moduleMap[cmd]) {
+                    return { command: 'python3', viaPython: `-m ${moduleName}` };
+                }
             }
         }
         
@@ -1402,6 +1429,7 @@ async function runPhoneInfogaDocker(phone) {
 async function runToolIfAvailable(cmd, args, parseFn) {
     console.log(`🔧 Running tool: ${cmd} with args:`, args);
     const resolved = await resolveToolCommand(cmd);
+    console.log(`🔍 Tool resolution result:`, resolved);
     if (!resolved.command) {
         console.log(`❌ Tool ${cmd} not available`);
         return null;
@@ -1410,6 +1438,8 @@ async function runToolIfAvailable(cmd, args, parseFn) {
     const spawnArgs = resolved.viaPython
         ? (resolved.viaPython.startsWith('-m ')
             ? ['-m', resolved.viaPython.replace('-m ', ''), ...args]
+            : resolved.viaPython.startsWith('-m')
+            ? [resolved.viaPython, ...args]
             : [resolved.viaPython, ...args])
         : args;
     console.log(`🔧 Executing: ${spawnCmd} ${spawnArgs.join(' ')}`);
