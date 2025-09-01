@@ -24,6 +24,13 @@ RUN apt-get update && apt-get install -y \
     libpq-dev \
     && rm -rf /var/lib/apt/lists/*
 
+# Install Python OSINT tools
+RUN pip3 install --no-cache-dir \
+    sherlock-project \
+    maigret \
+    holehe \
+    ghunt
+
 # Install Node.js
 RUN curl -fsSL https://deb.nodesource.com/setup_18.x | bash - \
     && apt-get install -y nodejs
