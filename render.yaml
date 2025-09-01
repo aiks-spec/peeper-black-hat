@@ -3,7 +3,7 @@ services:
     name: osint-lookup-engine
     env: node
     plan: starter
-    buildCommand: |
+    buildCommand:
       npm install
       pip3 install --user sherlock-project 
       pip3 install --user holehe 
@@ -27,6 +27,8 @@ services:
         value: python3
       - key: PATH
         value: /home/render/.local/bin:$PATH
+      - key: postgresql://peeper_aiks_database_user:kUs7g6cBDJTW6DPkaRebaMPa3E5Z6aGg@dpg-d2qnqep5pdvs738e09cg-a/peeper_aiks_database
+        value: sqlite:///opt/render/project/src/osint.db
     healthCheckPath: /
     autoDeploy: true
     branch: main
@@ -35,3 +37,4 @@ services:
       name: osint-data
       mountPath: /opt/render/project/src
       sizeGB: 1
+
