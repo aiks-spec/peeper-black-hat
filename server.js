@@ -95,6 +95,7 @@ try {
             '/bin',
             '/opt/python/bin',
             '/home/render/.local/bin',
+            '/root/.local/bin',
             '/usr/local/lib/python3.11/bin',
             '/usr/local/lib/python3.10/bin',
             '/usr/local/lib/python3.9/bin'
