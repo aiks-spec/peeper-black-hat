@@ -4,19 +4,20 @@ services:
     env: node
     plan: starter
     buildCommand: |
-      # CRITICAL: Fix tput error IMMEDIATELY before any other operations
-      chmod +x fix-tput-immediately.sh
-      ./fix-tput-immediately.sh
-      # ULTIMATE tput fix for 100% coverage
-      chmod +x ultimate-tput-fix.sh
-      ./ultimate-tput-fix.sh
+      # CRITICAL: Fix tput and colors.sh IMMEDIATELY
+      apt-get update && apt-get install -y ncurses-bin
+      # Create tput replacement in ALL locations
+      echo '#!/bin/bash\necho ""' > /usr/bin/tput && chmod +x /usr/bin/tput
+      echo '#!/bin/bash\necho ""' > /usr/local/bin/tput && chmod +x /usr/local/bin/tput
+      echo '#!/bin/bash\necho ""' > /bin/tput && chmod +x /bin/tput
+      # Override the problematic colors.sh script
+      mkdir -p /home/render
+      echo '#!/bin/bash\nexit 0' > /home/render/colors.sh && chmod +x /home/render/colors.sh
+      # Set environment variables
+      export TERM=dumb && export FORCE_COLOR=0 && export NO_COLOR=1 && export ANSI_COLORS_DISABLED=1
       # Now proceed with normal build
       npm install
-      # Install tput and ncurses for terminal control
-      apt-get update && apt-get install -y ncurses-bin
-      # Run comprehensive color disabling script
-      chmod +x disable-colors.sh
-      ./disable-colors.sh
+      # Install OSINT tools
       # Install OSINT tools with no color dependencies
       pip3 install --user sherlock-project 
       pip3 install --user holehe 
