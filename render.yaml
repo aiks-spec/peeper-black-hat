@@ -22,18 +22,6 @@ services:
         value: python3
       - key: PATH
         value: /home/render/.local/bin:/usr/bin:$PATH
-      - key: TERM
-        value: dumb
-      - key: FORCE_COLOR
-        value: "0"
-      - key: NO_COLOR
-        value: "1"
-      - key: CLICOLOR
-        value: "0"
-      - key: CLICOLOR_FORCE
-        value: "0"
-      - key: ANSI_COLORS_DISABLED
-        value: "1"
       - key: DATABASE_URL
         value: postgresql://peeper_aiks_database_user:kUs7g6cBDJTW6DPkaRebaMPa3E5Z6aGg@dpg-d2qnqep5pdvs738e09cg-a/peeper_aiks_database
       - key: DB_TYPE
