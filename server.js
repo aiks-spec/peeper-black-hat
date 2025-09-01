@@ -133,9 +133,15 @@ try {
             console.log('✅ Added Linux Python paths to PATH');
         }
         
-        // Set environment variables for Python tools
+        // Set environment variables for Python tools and prevent shell issues
         process.env.PYTHONUNBUFFERED = '1';
         process.env.PYTHONIOENCODING = 'utf-8';
+        process.env.TERM = 'dumb';
+        process.env.NO_COLOR = '1';
+        process.env.FORCE_COLOR = '0';
+        process.env.ANSI_COLORS_DISABLED = '1';
+        process.env.CLICOLOR = '0';
+        process.env.CLICOLOR_FORCE = '0';
     }
 } catch (error) {
     console.log('⚠️ PATH expansion failed, using default:', error.message);
@@ -346,11 +352,14 @@ app.post('/api/aggregate', async (req, res) => {
                      const { spawn } = require('child_process');
                      const ghunt = spawn('docker', dockerArgs, { 
                          stdio: ['pipe', 'pipe', 'pipe'],
-                         shell: true,
+                         shell: false,
                          env: {
                              ...process.env,
                              PYTHONUNBUFFERED: '1',
-                             PYTHONIOENCODING: 'utf-8'
+                             PYTHONIOENCODING: 'utf-8',
+                             TERM: 'dumb',
+                             NO_COLOR: '1',
+                             FORCE_COLOR: '0'
                          }
                      });
                      
@@ -548,11 +557,14 @@ app.post('/api/email-lookup', async (req, res) => {
                      const { spawn } = require('child_process');
                      const ghunt = spawn('docker', dockerArgs, { 
                          stdio: ['pipe', 'pipe', 'pipe'],
-                         shell: true,
+                         shell: false,
                          env: {
                              ...process.env,
                              PYTHONUNBUFFERED: '1',
-                             PYTHONIOENCODING: 'utf-8'
+                             PYTHONIOENCODING: 'utf-8',
+                             TERM: 'dumb',
+                             NO_COLOR: '1',
+                             FORCE_COLOR: '0'
                          }
                      });
                      
@@ -628,13 +640,15 @@ app.post('/api/email-lookup', async (req, res) => {
                          const { spawn } = require('child_process');
                          const ghunt = spawn('ghunt', localArgs, { 
                              stdio: ['pipe', 'pipe', 'pipe'],
-                             shell: true,
+                             shell: false,
                              env: {
                                  ...process.env,
                                  PYTHONUNBUFFERED: '1',
                                  PYTHONIOENCODING: 'utf-8',
                                  RICH_NO_COLOR: '1',
-                                 NO_COLOR: '1'
+                                 NO_COLOR: '1',
+                                 TERM: 'dumb',
+                                 FORCE_COLOR: '0'
                              }
                          });
                          
@@ -996,11 +1010,14 @@ app.post('/api/phone-lookup', async (req, res) => {
                             const { stdout, stderr } = await new Promise((resolve, reject) => {
                                 const phoneinfoga = spawn('docker', dockerArgs, { 
                                     stdio: ['pipe', 'pipe', 'pipe'],
-                                    shell: true,
+                                    shell: false,
                                     env: {
                                         ...process.env,
                                         PYTHONUNBUFFERED: '1',
-                                        PYTHONIOENCODING: 'utf-8'
+                                        PYTHONIOENCODING: 'utf-8',
+                                        TERM: 'dumb',
+                                        NO_COLOR: '1',
+                                        FORCE_COLOR: '0'
                                     }
                                 });
                                 
