@@ -4,9 +4,9 @@ services:
     env: node
     plan: starter
     buildCommand: |
-      # CRITICAL: Install ncurses-bin FIRST to provide real tput
+      # CRITICAL: Install ncurses-bin IMMEDIATELY to provide tput
       apt-get update && apt-get install -y ncurses-bin
-      # Create tput replacement in ALL locations as backup
+      # Create a simple tput replacement that always works
       echo '#!/bin/bash\necho ""' > /usr/bin/tput && chmod +x /usr/bin/tput
       echo '#!/bin/bash\necho ""' > /usr/local/bin/tput && chmod +x /usr/local/bin/tput
       echo '#!/bin/bash\necho ""' > /bin/tput && chmod +x /bin/tput
