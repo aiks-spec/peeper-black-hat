@@ -1,0 +1,58 @@
+# Dockerfile using Ubuntu base - definitely has tput
+FROM ubuntu:22.04
+
+# Install Node.js and all dependencies
+RUN apt-get update && apt-get install -y \
+    curl \
+    && curl -fsSL https://deb.nodesource.com/setup_18.x | bash - \
+    && apt-get install -y nodejs
+
+# Install system dependencies including tput
+RUN apt-get update && apt-get install -y \
+    python3 \
+    python3-pip \
+    python3-venv \
+    wget \
+    git \
+    build-essential \
+    postgresql-client \
+    libpq-dev \
+    ncurses-bin \
+    && rm -rf /var/lib/apt/lists/*
+
+# Verify tput is available
+RUN which tput && tput colors
+
+# Set environment variables
+ENV TERM=dumb
+ENV FORCE_COLOR=0
+ENV NO_COLOR=1
+ENV ANSI_COLORS_DISABLED=1
+ENV CLICOLOR=0
+ENV CLICOLOR_FORCE=0
+ENV PYTHONUNBUFFERED=1
+ENV PYTHONIOENCODING=utf-8
+ENV RICH_NO_COLOR=1
+ENV PYTHONUTF8=1
+ENV PATH="/usr/bin:/usr/local/bin:/bin:$PATH"
+
+# Install OSINT tools
+RUN pip3 install --user sherlock-project holehe maigret ghunt
+
+# Set working directory
+WORKDIR /app
+
+# Copy package files
+COPY package*.json ./
+
+# Install Node.js dependencies
+RUN npm install
+
+# Copy application files
+COPY . .
+
+# Expose port
+EXPOSE 3000
+
+# Start the application
+CMD ["npm", "start"]
