@@ -21,9 +21,10 @@ RUN echo '#!/bin/bash\necho ""' > /usr/local/bin/tput && chmod +x /usr/local/bin
 RUN echo '#!/bin/bash\necho ""' > /bin/tput && chmod +x /bin/tput
 RUN echo '#!/bin/bash\necho ""' > /home/render/.local/bin/tput && chmod +x /home/render/.local/bin/tput
 
-# CRITICAL: Override Render's colors.sh system
-RUN mkdir -p /home/render
-RUN echo '#!/bin/bash\nexit 0' > /home/render/colors.sh && chmod +x /home/render/colors.sh
+# CRITICAL: DELETE Render's colors.sh file completely
+RUN rm -f /home/render/colors.sh
+RUN rm -f /usr/local/colors.sh
+RUN rm -f /opt/colors.sh
 
 # Set environment variables
 ENV TERM=dumb
