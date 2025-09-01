@@ -15,6 +15,13 @@ const execFileAsync = promisify(execFile);
 // File cleanup system for publishing
 const cleanupQueue = new Map(); // Track files to cleanup
 
+// Ensure temp directory exists for Render.com
+const tempDir = path.join(process.cwd(), 'temp');
+if (!fs.existsSync(tempDir)) {
+    fs.mkdirSync(tempDir, { recursive: true });
+    console.log(`📁 Created temp directory: ${tempDir}`);
+}
+
 function scheduleFileCleanup(filePath, delayMs = 30 * 60 * 1000) { // 30 minutes default
     if (cleanupQueue.has(filePath)) {
         clearTimeout(cleanupQueue.get(filePath));
@@ -53,6 +60,22 @@ process.on('SIGINT', async () => {
             console.log(`❌ Error cleaning up ${filePath}:`, error.message);
         }
     });
+    
+    // Clean up temp directory
+    try {
+        if (fs.existsSync(tempDir)) {
+            const tempFiles = fs.readdirSync(tempDir);
+            for (const file of tempFiles) {
+                const filePath = path.join(tempDir, file);
+                fs.unlinkSync(filePath);
+                console.log(`🗑️ Cleaned up temp file: ${filePath}`);
+            }
+            fs.rmdirSync(tempDir);
+            console.log(`🗑️ Cleaned up temp directory: ${tempDir}`);
+        }
+    } catch (error) {
+        console.log(`❌ Error cleaning up temp directory:`, error.message);
+    }
     
     // Close database connection
     await dbManager.cleanup();
@@ -144,10 +167,34 @@ app.use(express.static('public'));
 // Database setup
 const dbManager = new DatabaseManager();
 
+// Auto-cleanup expired files every 5 minutes
+cron.schedule('*/5 * * * *', async () => {
+    try {
+        console.log('🧹 Running auto-cleanup for expired files...');
+        const deletedFiles = await dbManager.cleanupExpiredFiles();
+        if (deletedFiles.length > 0) {
+            console.log(`🗑️ Cleaned up ${deletedFiles.length} expired files:`, deletedFiles);
+        }
+    } catch (error) {
+        console.error('❌ Auto-cleanup failed:', error.message);
+    }
+});
+
 // Initialize database connection
-dbManager.connect().then((connected) => {
+dbManager.connect().then(async (connected) => {
     if (connected) {
         console.log('✅ Database connection established');
+        
+        // Reset counts for production deployment (uncomment when deploying)
+        if (process.env.NODE_ENV === 'production' && process.env.RESET_COUNTS === 'true') {
+            try {
+                console.log('🔄 Resetting counts for production deployment...');
+                await dbManager.resetCounts();
+                console.log('✅ Counts reset successfully');
+            } catch (error) {
+                console.error('❌ Failed to reset counts:', error.message);
+            }
+        }
     } else {
         console.log('❌ Database connection failed, using fallback');
     }
@@ -280,7 +327,7 @@ app.post('/api/aggregate', async (req, res) => {
         if (qtype === 'email') {
             tasks.push(runToolIfAvailable('holehe', [trimmed, '-C', '--no-color'], parseHolehe));
                                                    // For aggregate endpoint, use proper Docker GHunt implementation
-             const outputFile = `ghunt_aggregate_${Date.now()}.json`;
+             const outputFile = path.join(tempDir, `ghunt_aggregate_${Date.now()}.json`);
              
              console.log('🔍 Using Docker GHunt for aggregate');
              
@@ -397,8 +444,8 @@ app.post('/api/email-lookup', async (req, res) => {
             });
         }
         
-        // Log search
-        dbManager.insertSearch(email, 'email', null);
+        // Log search and get search ID for tracking
+        const searchId = await dbManager.insertSearch(email, 'email', null);
         
         console.log(`🔍 Starting email lookup for: ${email}`);
         
@@ -478,7 +525,7 @@ app.post('/api/email-lookup', async (req, res) => {
          try {
              console.log('🔍 Running GHunt with Docker...');
              
-             const outputFile = `ghunt_${Date.now()}.json`;
+             const outputFile = path.join(tempDir, `ghunt_${Date.now()}.json`);
              let ghuntResult = null;
              
              // Method 1: Try Docker GHunt (proper implementation)
@@ -825,6 +872,27 @@ app.post('/api/email-lookup', async (req, res) => {
             timestamp: new Date().toISOString()
         };
         
+        // Store final results in database
+        if (searchId) {
+            await dbManager.insertSearch(email, 'email', finalResult);
+            console.log(`💾 Results stored in database with ID: ${searchId}`);
+            
+            // Track any temporary files created during the search
+            const tempFiles = [
+                path.join(tempDir, `ghunt_${Date.now()}.json`),
+                path.join(tempDir, `holehe_${Date.now()}_results.csv`),
+                path.join(tempDir, `sherlock_${Date.now()}.json`),
+                path.join(tempDir, `maigret_${Date.now()}.json`)
+            ];
+            
+            for (const tempFile of tempFiles) {
+                if (fs.existsSync(tempFile)) {
+                    await dbManager.insertTempFile(searchId, tempFile);
+                    console.log(`📁 Tracking temp file: ${tempFile}`);
+                }
+            }
+        }
+        
         console.log('✅ Email lookup completed successfully');
         console.log('📊 Final result summary:');
         console.log('  - Name:', finalResult.name);
@@ -859,8 +927,8 @@ app.post('/api/phone-lookup', async (req, res) => {
             });
         }
         
-        // Log search
-        dbManager.insertSearch(phone, 'phone', null);
+        // Log search and get search ID for tracking
+        const searchId = await dbManager.insertSearch(phone, 'phone', null);
         
         console.log(`🔍 Starting phone lookup for: ${phone}`);
         
@@ -1169,6 +1237,26 @@ app.post('/api/phone-lookup', async (req, res) => {
         console.log('  - Social Media:', finalResult.socialMedia.length);
         console.log('  - Metadata keys:', Object.keys(finalResult.metadata));
         
+        // Store final results in database
+        if (searchId) {
+            await dbManager.insertSearch(phone, 'phone', finalResult);
+            console.log(`💾 Phone results stored in database with ID: ${searchId}`);
+            
+            // Track any temporary files created during the search
+            const tempFiles = [
+                path.join(tempDir, `phoneinfoga_${Date.now()}.json`),
+                path.join(tempDir, `sherlock_${Date.now()}.json`),
+                path.join(tempDir, `maigret_${Date.now()}.json`)
+            ];
+            
+            for (const tempFile of tempFiles) {
+                if (fs.existsSync(tempFile)) {
+                    await dbManager.insertTempFile(searchId, tempFile);
+                    console.log(`📁 Tracking temp file: ${tempFile}`);
+                }
+            }
+        }
+        
         console.log('✅ Phone lookup completed successfully');
         res.json({ success: true, data: finalResult });
         
@@ -1187,8 +1275,8 @@ app.post('/api/ip-lookup', async (req, res) => {
     try {
         const { ip } = req.body;
         
-        // Log search
-        dbManager.insertSearch(ip, 'ip', null);
+        // Log search and get search ID for tracking
+        const searchId = await dbManager.insertSearch(ip, 'ip', null);
         
         // IP Geolocation API (use token if available)
         const token = process.env.IPINFO_TOKEN ? `?token=${process.env.IPINFO_TOKEN}` : '';
@@ -1212,6 +1300,24 @@ app.post('/api/ip-lookup', async (req, res) => {
             organization: ipData.org || 'Unknown',
             timestamp: new Date().toISOString()
         };
+        
+        // Store final results in database
+        if (searchId) {
+            await dbManager.insertSearch(ip, 'ip', result);
+            console.log(`💾 IP results stored in database with ID: ${searchId}`);
+            
+            // Track any temporary files created during the search
+            const tempFiles = [
+                path.join(tempDir, `ipinfo_${Date.now()}.json`)
+            ];
+            
+            for (const tempFile of tempFiles) {
+                if (fs.existsSync(tempFile)) {
+                    await dbManager.insertTempFile(searchId, tempFile);
+                    console.log(`📁 Tracking temp file: ${tempFile}`);
+                }
+            }
+        }
         
         res.json({ success: true, data: result });
         
@@ -1240,6 +1346,76 @@ app.get('/api/stats', async (req, res) => {
     } catch (error) {
         console.log('❌ Stats error:', error.message);
         res.status(500).json({ error: 'Database error' });
+    }
+});
+
+// Search history endpoint
+app.get('/api/search-history', async (req, res) => {
+    try {
+        const limit = parseInt(req.query.limit) || 10;
+        const searchHistory = await dbManager.getSearchHistory(limit);
+        
+        res.json({
+            success: true,
+            data: searchHistory,
+            query: req.query,
+            timestamp: new Date().toISOString()
+        });
+    } catch (error) {
+        console.log('❌ Search history error:', error.message);
+        res.status(500).json({ 
+            success: false,
+            error: 'Failed to retrieve search history',
+            details: error.message 
+        });
+    }
+});
+
+// Reset counts endpoint (for production deployment)
+app.post('/api/reset-counts', async (req, res) => {
+    try {
+        const success = await dbManager.resetCounts();
+        
+        if (success) {
+            res.json({
+                success: true,
+                message: 'All visitor and search counts have been reset to zero',
+                timestamp: new Date().toISOString()
+            });
+        } else {
+            res.status(500).json({
+                success: false,
+                error: 'Failed to reset counts'
+            });
+        }
+    } catch (error) {
+        console.log('❌ Reset counts error:', error.message);
+        res.status(500).json({ 
+            success: false,
+            error: 'Failed to reset counts',
+            details: error.message 
+        });
+    }
+});
+
+// Manual cleanup endpoint
+app.post('/api/cleanup-files', async (req, res) => {
+    try {
+        const deletedFiles = await dbManager.cleanupExpiredFiles();
+        
+        res.json({
+            success: true,
+            message: `Cleaned up ${deletedFiles.length} expired files`,
+            deletedFiles: deletedFiles,
+            timestamp: new Date().toISOString()
+        });
+    } catch (error) {
+        console.log('❌ Manual cleanup error:', error.message);
+        res.status(500).json({ 
+            success: false,
+            error: 'Failed to cleanup files',
+            details: error.message 
+        });
     }
 });
 
