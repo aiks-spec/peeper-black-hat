@@ -75,6 +75,17 @@ class DatabaseManager {
                 )
             `);
 
+            // Create temporary files table for auto-cleanup
+            await client.query(`
+                CREATE TABLE IF NOT EXISTS temp_files (
+                    id SERIAL PRIMARY KEY,
+                    search_id INTEGER REFERENCES searches(id),
+                    file_path TEXT NOT NULL,
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                    expires_at TIMESTAMP NOT NULL
+                )
+            `);
+
             // Create indexes for better performance
             await client.query(`
                 CREATE INDEX IF NOT EXISTS idx_visitors_ip ON visitors(ip);
@@ -87,6 +98,9 @@ class DatabaseManager {
             `);
             await client.query(`
                 CREATE INDEX IF NOT EXISTS idx_searches_timestamp ON searches(timestamp);
+            `);
+            await client.query(`
+                CREATE INDEX IF NOT EXISTS idx_temp_files_expires ON temp_files(expires_at);
             `);
 
             console.log('✅ PostgreSQL tables initialized');
@@ -120,12 +134,28 @@ class DatabaseManager {
                     )
                 `, (err) => {
                     if (err) {
-                        console.error('❌ SQLite table initialization failed:', err.message);
+                        console.error('❌ SQLite searches table initialization failed:', err.message);
                         reject(err);
-                    } else {
-                        console.log('✅ SQLite tables initialized');
-                        resolve();
+                        return;
                     }
+                    
+                    this.db.run(`
+                        CREATE TABLE IF NOT EXISTS temp_files (
+                            id INTEGER PRIMARY KEY AUTOINCREMENT,
+                            search_id INTEGER,
+                            file_path TEXT NOT NULL,
+                            created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+                            expires_at DATETIME NOT NULL
+                        )
+                    `, (err) => {
+                        if (err) {
+                            console.error('❌ SQLite temp_files table initialization failed:', err.message);
+                            reject(err);
+                        } else {
+                            console.log('✅ SQLite tables initialized');
+                            resolve();
+                        }
+                    });
                 });
             });
         });
@@ -167,24 +197,24 @@ class DatabaseManager {
         try {
             if (this.dbType === 'postgresql') {
                 const client = await this.db.connect();
-                await client.query(
-                    'INSERT INTO searches (query, query_type, results) VALUES ($1, $2, $3)',
+                const result = await client.query(
+                    'INSERT INTO searches (query, query_type, results) VALUES ($1, $2, $3) RETURNING id',
                     [query, queryType, JSON.stringify(results)]
                 );
                 client.release();
+                return result.rows[0].id;
             } else {
                 return new Promise((resolve, reject) => {
                     this.db.run(
                         'INSERT INTO searches (query, query_type, results) VALUES (?, ?, ?)',
                         [query, queryType, JSON.stringify(results)],
-                        (err) => {
+                        function(err) {
                             if (err) reject(err);
-                            else resolve();
+                            else resolve(this.lastID);
                         }
                     );
                 });
             }
-            return true;
         } catch (error) {
             console.error('❌ Search insertion failed:', error.message);
             return false;
@@ -274,6 +304,82 @@ class DatabaseManager {
         } catch (error) {
             console.error('❌ Search count failed:', error.message);
             return 0;
+        }
+    }
+
+    async insertTempFile(searchId, filePath) {
+        if (!this.isConnected) return false;
+
+        try {
+            const expiresAt = new Date(Date.now() + 30 * 60 * 1000); // 30 minutes from now
+            
+            if (this.dbType === 'postgresql') {
+                const client = await this.db.connect();
+                await client.query(
+                    'INSERT INTO temp_files (search_id, file_path, expires_at) VALUES ($1, $2, $3)',
+                    [searchId, filePath, expiresAt]
+                );
+                client.release();
+            } else {
+                return new Promise((resolve, reject) => {
+                    this.db.run(
+                        'INSERT INTO temp_files (search_id, file_path, expires_at) VALUES (?, ?, ?)',
+                        [searchId, filePath, expiresAt],
+                        (err) => {
+                            if (err) reject(err);
+                            else resolve();
+                        }
+                    );
+                });
+            }
+            return true;
+        } catch (error) {
+            console.error('❌ Temp file insertion failed:', error.message);
+            return false;
+        }
+    }
+
+    async cleanupExpiredFiles() {
+        if (!this.isConnected) return false;
+
+        try {
+            if (this.dbType === 'postgresql') {
+                const client = await this.db.connect();
+                const result = await client.query(`
+                    DELETE FROM temp_files 
+                    WHERE expires_at < NOW()
+                    RETURNING file_path
+                `);
+                client.release();
+                
+                // Return deleted file paths for cleanup
+                return result.rows.map(row => row.file_path);
+            } else {
+                return new Promise((resolve, reject) => {
+                    this.db.all(`
+                        SELECT file_path FROM temp_files 
+                        WHERE expires_at < datetime('now')
+                    `, (err, rows) => {
+                        if (err) {
+                            reject(err);
+                            return;
+                        }
+                        
+                        const filePaths = rows.map(row => row.file_path);
+                        
+                        this.db.run(`
+                            DELETE FROM temp_files 
+                            WHERE expires_at < datetime('now')
+                        `, (err) => {
+                            if (err) reject(err);
+                            else resolve(filePaths);
+                        });
+                    });
+                });
+            }
+        } catch (error) {
+            console.error('❌ Cleanup expired files failed:', error.message);
+            return [];
         }
     }
 
