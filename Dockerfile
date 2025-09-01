@@ -1,6 +1,16 @@
 # Clean Dockerfile - no tput or colors.sh handling
 FROM ubuntu:22.04
 
+# Set environment variables to prevent shell issues
+ENV TERM=dumb
+ENV NO_COLOR=1
+ENV FORCE_COLOR=0
+ENV ANSI_COLORS_DISABLED=1
+ENV CLICOLOR=0
+ENV CLICOLOR_FORCE=0
+ENV BASH_ENV=""
+ENV ENV=""
+
 # Install all dependencies
 RUN apt-get update && apt-get install -y \
     curl \
