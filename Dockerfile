@@ -12,6 +12,7 @@ RUN apt-get update && apt-get install -y \
     build-essential \
     postgresql-client \
     libpq-dev \
+    ncurses-bin \
     && rm -rf /var/lib/apt/lists/*
 
 # Create tput replacement BEFORE any other operations
