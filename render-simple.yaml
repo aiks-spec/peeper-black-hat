@@ -1,0 +1,34 @@
+services:
+  - type: web
+    name: osint-lookup-engine
+    env: node
+    plan: starter
+    buildCommand: |
+      # Install ncurses-bin to provide tput
+      apt-get update && apt-get install -y ncurses-bin
+      # Install dependencies
+      npm install
+      # Install OSINT tools
+      pip3 install --user sherlock-project holehe maigret ghunt
+    startCommand: npm start
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: PORT
+        value: 3000
+      - key: TERM
+        value: dumb
+      - key: FORCE_COLOR
+        value: "0"
+      - key: NO_COLOR
+        value: "1"
+      - key: ANSI_COLORS_DISABLED
+        value: "1"
+      - key: DATABASE_URL
+        value: postgresql://peeper_aiks_database_user:kUs7g6cBDJTW6DPkaRebaMPa3E5Z6aGg@dpg-d2qnqep5pdvs738e09cg-a/peeper_aiks_database
+      - key: DB_TYPE
+        value: postgresql
+    healthCheckPath: /
+    autoDeploy: true
+    branch: main
+    numInstances: 1
