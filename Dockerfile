@@ -1,7 +1,7 @@
-# Multi-stage Dockerfile to completely isolate environment
-FROM ubuntu:22.04 as base
+# Clean Dockerfile - no tput or colors.sh handling
+FROM ubuntu:22.04
 
-# Install all dependencies including tput
+# Install all dependencies
 RUN apt-get update && apt-get install -y \
     curl \
     wget \
@@ -12,18 +12,11 @@ RUN apt-get update && apt-get install -y \
     python3-venv \
     postgresql-client \
     libpq-dev \
-    ncurses-bin \
     && rm -rf /var/lib/apt/lists/*
 
 # Install Node.js
 RUN curl -fsSL https://deb.nodesource.com/setup_18.x | bash - \
     && apt-get install -y nodejs
-
-# Verify tput works
-RUN which tput && tput colors
-
-# Final stage
-FROM base as final
 
 # Install OSINT tools
 RUN pip3 install --user sherlock-project holehe maigret ghunt
