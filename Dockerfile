@@ -18,8 +18,17 @@ RUN apt-get update && apt-get install -y \
 RUN curl -fsSL https://deb.nodesource.com/setup_18.x | bash - \
     && apt-get install -y nodejs
 
-# Install OSINT tools
+# Install OSINT tools with proper paths
 RUN pip3 install --user sherlock-project holehe maigret ghunt
+
+# Create symlinks for tools in system PATH
+RUN ln -sf /root/.local/bin/sherlock /usr/local/bin/sherlock
+RUN ln -sf /root/.local/bin/holehe /usr/local/bin/holehe
+RUN ln -sf /root/.local/bin/maigret /usr/local/bin/maigret
+RUN ln -sf /root/.local/bin/ghunt /usr/local/bin/ghunt
+
+# Verify tools are accessible
+RUN which sherlock && which holehe && which maigret && which ghunt
 
 # Set working directory
 WORKDIR /app
