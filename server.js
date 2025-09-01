@@ -106,12 +106,20 @@ try {
             console.log('✅ Added Linux Python paths to PATH');
         }
         
-        // Set environment variables to prevent tput errors
-        process.env.TERM = process.env.TERM || 'xterm-256color';
+        // Set environment variables to prevent tput errors - AGGRESSIVE DISABLING
+        process.env.TERM = 'dumb';
         process.env.FORCE_COLOR = '0';
         process.env.NO_COLOR = '1';
         process.env.CLICOLOR = '0';
         process.env.CLICOLOR_FORCE = '0';
+        process.env.ANSI_COLORS_DISABLED = '1';
+        process.env.PYTHONUNBUFFERED = '1';
+        process.env.PYTHONIOENCODING = 'utf-8';
+        
+        // Create a mock tput function if needed
+        if (!process.env.PATH.includes('/usr/bin')) {
+            process.env.PATH = '/usr/bin:' + process.env.PATH;
+        }
     }
 } catch (error) {
     console.log('⚠️ PATH expansion failed, using default:', error.message);
@@ -878,20 +886,31 @@ app.post('/api/phone-lookup', async (req, res) => {
             metadata: {}
         };
         
-        // 1. PhoneInfoga (primary phone OSINT tool) - IMPROVED IMPLEMENTATION
+        // 1. PhoneInfoga (primary phone OSINT tool) - DOCKER-FIRST APPROACH
         try {
             console.log('📱 Running PhoneInfoga...');
             let infoga = null;
             
-            // Method 1: Try local PhoneInfoga first
+            // Method 1: Try Docker PhoneInfoga first (most reliable on Render)
             try {
-                console.log('🔍 Attempting PhoneInfoga with local installation...');
-                infoga = await runToolIfAvailable('phoneinfoga', ['scan', '-n', phone], parsePhoneInfoga);
+                console.log('🐳 Attempting PhoneInfoga with Docker...');
+                infoga = await runPhoneInfogaDocker(phone);
                 if (infoga) {
-                    console.log('✅ PhoneInfoga local execution successful');
+                    console.log('✅ PhoneInfoga Docker execution successful');
                 }
-            } catch (localError) {
-                console.log('❌ PhoneInfoga local failed:', localError.message);
+            } catch (dockerError) {
+                console.log('❌ PhoneInfoga Docker failed:', dockerError.message);
+                
+                // Method 2: Try local PhoneInfoga as fallback
+                try {
+                    console.log('🔍 Attempting PhoneInfoga with local installation...');
+                    infoga = await runToolIfAvailable('phoneinfoga', ['scan', '-n', phone, '--no-color'], parsePhoneInfoga);
+                    if (infoga) {
+                        console.log('✅ PhoneInfoga local execution successful');
+                    }
+                } catch (localError) {
+                    console.log('❌ PhoneInfoga local failed:', localError.message);
+                }
             }
             
             // Method 2: Try Docker if local failed
@@ -1357,6 +1376,60 @@ function resolveToolCommand(cmd) {
     });
 }
 
+// Docker-based PhoneInfoga execution for Render.com
+async function runPhoneInfogaDocker(phone) {
+    return new Promise((resolve, reject) => {
+        console.log('🐳 Starting PhoneInfoga Docker container...');
+        
+        const dockerArgs = [
+            'run', '--rm',
+            '-e', 'TERM=dumb',
+            '-e', 'NO_COLOR=1',
+            '-e', 'FORCE_COLOR=0',
+            'sundowndev/phoneinfoga:latest',
+            'scan', '-n', phone
+        ];
+        
+        const child = spawn('docker', dockerArgs, {
+            stdio: ['ignore', 'pipe', 'pipe'],
+            env: {
+                ...process.env,
+                TERM: 'dumb',
+                NO_COLOR: '1',
+                FORCE_COLOR: '0'
+            }
+        });
+        
+        let stdout = '';
+        let stderr = '';
+        
+        child.stdout.on('data', (data) => {
+            stdout += data.toString();
+        });
+        
+        child.stderr.on('data', (data) => {
+            stderr += data.toString();
+        });
+        
+        child.on('close', (code) => {
+            if (code === 0) {
+                console.log('✅ PhoneInfoga Docker completed successfully');
+                const result = parsePhoneInfoga(stdout, stderr);
+                resolve(result);
+            } else {
+                console.log('❌ PhoneInfoga Docker failed with code:', code);
+                console.log('stderr:', stderr);
+                reject(new Error(`Docker PhoneInfoga failed with code ${code}`));
+            }
+        });
+        
+        child.on('error', (error) => {
+            console.log('❌ PhoneInfoga Docker spawn error:', error.message);
+            reject(error);
+        });
+    });
+}
+
 async function runToolIfAvailable(cmd, args, parseFn) {
     console.log(`🔧 Running tool: ${cmd} with args:`, args);
     const resolved = await resolveToolCommand(cmd);
@@ -1381,7 +1454,12 @@ async function runToolIfAvailable(cmd, args, parseFn) {
                 PYTHONIOENCODING: 'utf-8',
                 RICH_NO_COLOR: '1',
                 NO_COLOR: '1',
-                TERM: 'dumb'
+                TERM: 'dumb',
+                FORCE_COLOR: '0',
+                CLICOLOR: '0',
+                CLICOLOR_FORCE: '0',
+                ANSI_COLORS_DISABLED: '1',
+                PYTHONUNBUFFERED: '1'
             }
         });
         console.log(`✅ Tool ${cmd} executed successfully`);
