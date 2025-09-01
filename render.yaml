@@ -1,29 +1,9 @@
 services:
   - type: web
     name: osint-lookup-engine
-    env: node
+    env: docker
     plan: starter
-    buildCommand: |
-      # CRITICAL: Install ncurses-bin IMMEDIATELY to provide tput
-      apt-get update && apt-get install -y ncurses-bin
-      # Create a simple tput replacement that always works
-      echo '#!/bin/bash\necho ""' > /usr/bin/tput && chmod +x /usr/bin/tput
-      echo '#!/bin/bash\necho ""' > /usr/local/bin/tput && chmod +x /usr/local/bin/tput
-      echo '#!/bin/bash\necho ""' > /bin/tput && chmod +x /bin/tput
-      # Set environment variables to disable colors
-      export TERM=dumb && export FORCE_COLOR=0 && export NO_COLOR=1 && export ANSI_COLORS_DISABLED=1
-      # Now proceed with normal build
-      npm install
-      # Install OSINT tools with no color dependencies
-      pip3 install --user sherlock-project 
-      pip3 install --user holehe 
-      pip3 install --user maigret 
-      pip3 install --user ghunt
-      # Set up environment for no-color operation
-      echo 'export TERM=dumb' >> ~/.bashrc
-      echo 'export FORCE_COLOR=0' >> ~/.bashrc
-      echo 'export NO_COLOR=1' >> ~/.bashrc
-      echo 'export ANSI_COLORS_DISABLED=1' >> ~/.bashrc
+    dockerfilePath: ./Dockerfile
     startCommand: npm start
     envVars:
       - key: NODE_ENV
