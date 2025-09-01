@@ -33,6 +33,10 @@ services:
         value: "0"
       - key: ANSI_COLORS_DISABLED
         value: "1"
+      - key: BASH_ENV
+        value: ""
+      - key: ENV
+        value: ""
       - key: DATABASE_URL
         value: postgresql://peeper_aiks_database_user:kUs7g6cBDJTW6DPkaRebaMPa3E5Z6aGg@dpg-d2qnqep5pdvs738e09cg-a/peeper_aiks_database
       - key: DB_TYPE
