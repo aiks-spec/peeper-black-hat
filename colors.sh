@@ -1,3 +1,0 @@
-RED=""
-GREEN=""
-RESET=""
