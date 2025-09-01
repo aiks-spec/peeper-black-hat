@@ -383,6 +383,48 @@ class DatabaseManager {
         }
     }
 
+    async getSearchHistory(limit = 10) {
+        if (!this.isConnected) return [];
+
+        try {
+            if (this.dbType === 'postgresql') {
+                const client = await this.db.connect();
+                const result = await client.query(`
+                    SELECT id, query, query_type, results, timestamp 
+                    FROM searches 
+                    ORDER BY timestamp DESC 
+                    LIMIT $1
+                `, [limit]);
+                client.release();
+                
+                return result.rows.map(row => ({
+                    ...row,
+                    results: row.results ? JSON.parse(row.results) : null
+                }));
+            } else {
+                return new Promise((resolve, reject) => {
+                    this.db.all(`
+                        SELECT id, query, query_type, results, timestamp 
+                        FROM searches 
+                        ORDER BY timestamp DESC 
+                        LIMIT ?
+                    `, [limit], (err, rows) => {
+                        if (err) reject(err);
+                        else {
+                            resolve(rows.map(row => ({
+                                ...row,
+                                results: row.results ? JSON.parse(row.results) : null
+                            })));
+                        }
+                    });
+                });
+            }
+        } catch (error) {
+            console.error('❌ Get search history failed:', error.message);
+            return [];
+        }
+    }
+
     async cleanup() {
         if (this.dbType === 'postgresql' && this.db) {
             await this.db.end();
@@ -390,6 +432,51 @@ class DatabaseManager {
         } else if (this.db) {
             this.db.close();
             console.log('✅ SQLite connection closed');
+        }
+    }
+
+    async resetCounts() {
+        if (!this.isConnected) return false;
+
+        try {
+            if (this.dbType === 'postgresql') {
+                const client = await this.db.connect();
+                await client.query('DELETE FROM visitors');
+                await client.query('DELETE FROM searches');
+                await client.query('DELETE FROM temp_files');
+                client.release();
+                console.log('✅ All counts reset successfully');
+            } else {
+                return new Promise((resolve, reject) => {
+                    this.db.serialize(() => {
+                        this.db.run('DELETE FROM visitors', (err) => {
+                            if (err) {
+                                reject(err);
+                                return;
+                            }
+                            
+                            this.db.run('DELETE FROM searches', (err) => {
+                                if (err) {
+                                    reject(err);
+                                    return;
+                                }
+                                
+                                this.db.run('DELETE FROM temp_files', (err) => {
+                                    if (err) reject(err);
+                                    else {
+                                        console.log('✅ All counts reset successfully');
+                                        resolve();
+                                    }
+                                });
+                            });
+                        });
+                    });
+                });
+            }
+            return true;
+        } catch (error) {
+            console.error('❌ Reset counts failed:', error.message);
+            return false;
         }
     }
 }
