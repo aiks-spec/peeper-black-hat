@@ -201,13 +201,14 @@ dbManager.connect().then(async (connected) => {
                 console.error('❌ Failed to reset counts:', error.message);
             }
         }
-    } else {        console.log('⚠️ Database connection failed, continuing with fallback mode');
+    } else {
+        console.log('⚠️ Database connection failed, continuing with fallback mode');
         console.log('📝 Note: Some features may be limited without database connection');
-        console.log('📝 Note: Some features may be limited without database connection');
+    }
 }).catch((error) => {
     console.error('❌ Database initialization error:', error.message);
     console.log('⚠️ Continuing without database connection');
-    console.log('⚠️ Continuing without database connection');
+});
 
 // Visitor tracking middleware - FIXED FOR RENDER.COM
 app.use((req, res, next) => {
@@ -228,10 +229,10 @@ app.use((req, res, next) => {
                 console.log('✅ Visitor tracked:', ip);
             } else {
                 console.log('⚠️ Visitor tracking failed (database may not be connected)');
-                console.log('⚠️ Visitor tracking failed (database may not be connected)');
+            }
         }).catch((error) => {
             console.log('⚠️ Visitor tracking error:', error.message);
-            console.log('⚠️ Visitor tracking error:', error.message);
+        });
     }
     
     next();
@@ -271,7 +272,6 @@ app.get('/lookup', async (req, res) => {
             await dbManager.insertSearch(phone, 'lookup', result);
         } catch (error) {
             console.log('⚠️ Search logging failed:', error.message);
-        }   console.log('⚠️ Search logging failed:', error.message);
         }
         return res.json(result);
     } catch (err) {
@@ -327,7 +327,6 @@ app.post('/api/aggregate', async (req, res) => {
         await dbManager.insertSearch(trimmed, qtype, null);
     } catch (error) {
         console.log('⚠️ Search logging failed:', error.message);
-    }   console.log('⚠️ Search logging failed:', error.message);
     }
     try {
         const tasks = [];
@@ -465,12 +464,10 @@ app.post('/api/email-lookup', async (req, res) => {
         }
         
         // Log search and get search ID for tracking
-        let searchId = null;
         try {
-            searchId = await dbManager.insertSearch(email, 'email', null);
+            const searchId = await dbManager.insertSearch(email, 'email', null);
         } catch (error) {
             console.log('⚠️ Search logging failed:', error.message);
-        }   console.log('⚠️ Search logging failed:', error.message);
         }
         console.log(`🔍 Starting email lookup for: ${email}`);
         
@@ -903,8 +900,8 @@ app.post('/api/email-lookup', async (req, res) => {
         };
         
         // Store final results in database
-        if (searchId) {
-            try {
+        try {
+            if (searchId) {
                 await dbManager.insertSearch(email, 'email', finalResult);
                 console.log(`💾 Results stored in database with ID: ${searchId}`);
                 
@@ -918,17 +915,13 @@ app.post('/api/email-lookup', async (req, res) => {
                 
                 for (const tempFile of tempFiles) {
                     if (fs.existsSync(tempFile)) {
-                        try {
-                            await dbManager.insertTempFile(searchId, tempFile);
-                            console.log(`📁 Tracking temp file: ${tempFile}`);
-                        } catch (error) {
-                            console.log('⚠️ Temp file tracking failed:', error.message);
-                        }
+                        await dbManager.insertTempFile(searchId, tempFile);
+                        console.log(`📁 Tracking temp file: ${tempFile}`);
                     }
                 }
-            } catch (error) {
-                console.log('⚠️ Result storage failed:', error.message);
-                console.log('⚠️ Result storage failed:', error.message);
+            }
+        } catch (error) {
+            console.log('⚠️ Result storage failed:', error.message);
         }
         
         console.log('✅ Email lookup completed successfully');
@@ -966,12 +959,10 @@ app.post('/api/phone-lookup', async (req, res) => {
         }
         
         // Log search and get search ID for tracking
-        let searchId = null;
         try {
-            searchId = await dbManager.insertSearch(phone, 'phone', null);
+            const searchId = await dbManager.insertSearch(phone, 'phone', null);
         } catch (error) {
             console.log('⚠️ Search logging failed:', error.message);
-        }   console.log('⚠️ Search logging failed:', error.message);
         }
         console.log(`🔍 Starting phone lookup for: ${phone}`);
         
@@ -1284,8 +1275,8 @@ app.post('/api/phone-lookup', async (req, res) => {
         console.log('  - Metadata keys:', Object.keys(finalResult.metadata));
         
         // Store final results in database
-        if (searchId) {
-            try {
+        try {
+            if (searchId) {
                 await dbManager.insertSearch(phone, 'phone', finalResult);
                 console.log(`💾 Phone results stored in database with ID: ${searchId}`);
                 
@@ -1298,17 +1289,13 @@ app.post('/api/phone-lookup', async (req, res) => {
                 
                 for (const tempFile of tempFiles) {
                     if (fs.existsSync(tempFile)) {
-                        try {
-                            await dbManager.insertTempFile(searchId, tempFile);
-                            console.log(`📁 Tracking temp file: ${tempFile}`);
-                        } catch (error) {
-                            console.log('⚠️ Temp file tracking failed:', error.message);
-                        }
+                        await dbManager.insertTempFile(searchId, tempFile);
+                        console.log(`📁 Tracking temp file: ${tempFile}`);
                     }
                 }
-            } catch (error) {
-                console.log('⚠️ Result storage failed:', error.message);
-                console.log('⚠️ Result storage failed:', error.message);
+            }
+        } catch (error) {
+            console.log('⚠️ Result storage failed:', error.message);
         }
         
         console.log('✅ Phone lookup completed successfully');
@@ -1330,12 +1317,10 @@ app.post('/api/ip-lookup', async (req, res) => {
         const { ip } = req.body;
         
         // Log search and get search ID for tracking
-        let searchId = null;
         try {
-            searchId = await dbManager.insertSearch(ip, 'ip', null);
+            const searchId = await dbManager.insertSearch(ip, 'ip', null);
         } catch (error) {
             console.log('⚠️ Search logging failed:', error.message);
-        }   console.log('⚠️ Search logging failed:', error.message);
         }
         // IP Geolocation API (use token if available)
         const token = process.env.IPINFO_TOKEN ? `?token=${process.env.IPINFO_TOKEN}` : '';
@@ -1361,21 +1346,25 @@ app.post('/api/ip-lookup', async (req, res) => {
         };
         
         // Store final results in database
-        if (searchId) {
-            await dbManager.insertSearch(ip, 'ip', result);
-            console.log(`💾 IP results stored in database with ID: ${searchId}`);
-            
-            // Track any temporary files created during the search
-            const tempFiles = [
-                path.join(tempDir, `ipinfo_${Date.now()}.json`)
-            ];
-            
-            for (const tempFile of tempFiles) {
-                if (fs.existsSync(tempFile)) {
-                    await dbManager.insertTempFile(searchId, tempFile);
-                    console.log(`📁 Tracking temp file: ${tempFile}`);
+        try {
+            if (searchId) {
+                await dbManager.insertSearch(ip, 'ip', result);
+                console.log(`💾 IP results stored in database with ID: ${searchId}`);
+                
+                // Track any temporary files created during the search
+                const tempFiles = [
+                    path.join(tempDir, `ipinfo_${Date.now()}.json`)
+                ];
+                
+                for (const tempFile of tempFiles) {
+                    if (fs.existsSync(tempFile)) {
+                        await dbManager.insertTempFile(searchId, tempFile);
+                        console.log(`📁 Tracking temp file: ${tempFile}`);
+                    }
                 }
             }
+        } catch (error) {
+            console.log('⚠️ Result storage failed:', error.message);
         }
         
         res.json({ success: true, data: result });
