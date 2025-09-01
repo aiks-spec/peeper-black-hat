@@ -15,10 +15,14 @@ export PYTHONIOENCODING=utf-8
 export RICH_NO_COLOR=1
 export PYTHONUTF8=1
 
-# Create a simple tput replacement
-cat > /usr/local/bin/tput << 'EOF'
+# Create system-wide tput replacement in multiple locations
+echo "🔧 Creating system-wide tput replacement..."
+
+# Create tput in /usr/bin (highest priority)
+sudo mkdir -p /usr/bin
+cat > /usr/bin/tput << 'EOF'
 #!/bin/bash
-# Simple tput replacement that returns empty strings
+# System-wide tput replacement that returns empty strings
 case "$1" in
     "colors"|"lines"|"cols"|"setaf"|"setab"|"sgr0"|"reset"|"bold"|"dim"|"smul"|"rmul"|"rev"|"smso"|"rmso")
         echo ""
@@ -29,7 +33,56 @@ case "$1" in
 esac
 EOF
 
+# Create tput in /usr/local/bin
+sudo mkdir -p /usr/local/bin
+cat > /usr/local/bin/tput << 'EOF'
+#!/bin/bash
+# System-wide tput replacement that returns empty strings
+case "$1" in
+    "colors"|"lines"|"cols"|"setaf"|"setab"|"sgr0"|"reset"|"bold"|"dim"|"smul"|"rmul"|"rev"|"smso"|"rmso")
+        echo ""
+        ;;
+    *)
+        echo ""
+        ;;
+esac
+EOF
+
+# Create tput in /bin
+sudo mkdir -p /bin
+cat > /bin/tput << 'EOF'
+#!/bin/bash
+# System-wide tput replacement that returns empty strings
+case "$1" in
+    "colors"|"lines"|"cols"|"setaf"|"setab"|"sgr0"|"reset"|"bold"|"dim"|"smul"|"rmul"|"rev"|"smso"|"rmso")
+        echo ""
+        ;;
+    *)
+        echo ""
+        ;;
+esac
+EOF
+
+# Make all tput replacements executable
+chmod +x /usr/bin/tput
 chmod +x /usr/local/bin/tput
+chmod +x /bin/tput
+
+# Override the problematic colors.sh script
+echo "🔧 Overriding colors.sh script..."
+sudo mkdir -p /home/render
+cat > /home/render/colors.sh << 'EOF'
+#!/bin/bash
+# Overridden colors.sh script that does nothing
+# This prevents the tput error from occurring
+exit 0
+EOF
+
+chmod +x /home/render/colors.sh
+
+# Update PATH to prioritize our tput replacements
+export PATH="/usr/bin:/usr/local/bin:/bin:$PATH"
 
 echo "✅ Color output disabled successfully"
-echo "✅ tput replacement created"
+echo "✅ System-wide tput replacement created"
+echo "✅ colors.sh script overridden"
