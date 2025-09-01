@@ -109,20 +109,9 @@ try {
             console.log('✅ Added Linux Python paths to PATH');
         }
         
-        // Set environment variables to prevent tput errors - AGGRESSIVE DISABLING
-        process.env.TERM = 'dumb';
-        process.env.FORCE_COLOR = '0';
-        process.env.NO_COLOR = '1';
-        process.env.CLICOLOR = '0';
-        process.env.CLICOLOR_FORCE = '0';
-        process.env.ANSI_COLORS_DISABLED = '1';
+        // Set environment variables for Python tools
         process.env.PYTHONUNBUFFERED = '1';
         process.env.PYTHONIOENCODING = 'utf-8';
-        
-        // Create a mock tput function if needed
-        if (!process.env.PATH.includes('/usr/bin')) {
-            process.env.PATH = '/usr/bin:' + process.env.PATH;
-        }
     }
 } catch (error) {
     console.log('⚠️ PATH expansion failed, using default:', error.message);
@@ -1431,13 +1420,6 @@ async function runToolIfAvailable(cmd, args, parseFn) {
                 ...process.env,
                 PYTHONUTF8: '1',
                 PYTHONIOENCODING: 'utf-8',
-                RICH_NO_COLOR: '1',
-                NO_COLOR: '1',
-                TERM: 'dumb',
-                FORCE_COLOR: '0',
-                CLICOLOR: '0',
-                CLICOLOR_FORCE: '0',
-                ANSI_COLORS_DISABLED: '1',
                 PYTHONUNBUFFERED: '1'
             }
         });
