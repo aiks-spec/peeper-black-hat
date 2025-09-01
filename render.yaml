@@ -1,0 +1,31 @@
+services:
+  - type: web
+    name: osint-lookup-engine
+    env: node
+    plan: starter
+    buildCommand: npm install
+    startCommand: npm start
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: PORT
+        value: 3000
+      - key: CUFINDER_API_KEY
+        sync: false
+      - key: IPINFO_TOKEN
+        sync: false
+      - key: DEHASHED_EMAIL
+        sync: false
+      - key: DEHASHED_API_KEY
+        sync: false
+    healthCheckPath: /
+    autoDeploy: true
+    branch: main
+    numInstances: 1
+    disk:
+      name: osint-data
+      mountPath: /opt/render/project/src
+      sizeGB: 1
+    envVars:
+      - key: DATABASE_URL
+        value: sqlite:///opt/render/project/src/osint.db
