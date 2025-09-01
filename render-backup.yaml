@@ -8,6 +8,13 @@ services:
       npm install
       # Install OSINT tools
       pip3 install --user sherlock-project holehe maigret ghunt
+      # Create symlinks for tools in system PATH
+      ln -sf /home/render/.local/bin/sherlock /usr/local/bin/sherlock
+      ln -sf /home/render/.local/bin/holehe /usr/local/bin/holehe
+      ln -sf /home/render/.local/bin/maigret /usr/local/bin/maigret
+      ln -sf /home/render/.local/bin/ghunt /usr/local/bin/ghunt
+      # Verify tools are accessible
+      which sherlock && which holehe && which maigret && which ghunt
     startCommand: npm start
     envVars:
       - key: NODE_ENV
