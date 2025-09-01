@@ -42,6 +42,9 @@ RUN npm install
 # Copy application files
 COPY . .
 
+# Create temp directory for OSINT tool output files
+RUN mkdir -p /app/temp && chmod 777 /app/temp
+
 # Copy and setup entrypoint
 COPY entrypoint.sh /entrypoint.sh
 RUN chmod +x /entrypoint.sh
