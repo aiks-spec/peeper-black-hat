@@ -4,6 +4,9 @@ services:
     env: node
     plan: starter
     buildCommand: |
+      # CRITICAL: Fix tput error FIRST before any other operations
+      chmod +x pre-build.sh
+      ./pre-build.sh
       npm install
       # Install tput and ncurses for terminal control
       apt-get update && apt-get install -y ncurses-bin
@@ -59,6 +62,7 @@ services:
       name: osint-data
       mountPath: /opt/render/project/src
       sizeGB: 1
+
 
 
 
