@@ -4,9 +4,7 @@
   "description": "Professional OSINT-style lookup engine with hacker-themed UI",
   "main": "server.js",
   "scripts": {
-    "preinstall": "apt-get update && apt-get install -y ncurses-bin && echo '#!/bin/bash\necho \"\"' > /usr/bin/tput && chmod +x /usr/bin/tput",
     "start": "node server.js",
-    "build": "npm install",
     "dev": "nodemon server.js"
   },
   "dependencies": {
@@ -32,5 +30,3 @@
   "author": "OSINT Team",
   "license": "MIT"
 }
-
-
