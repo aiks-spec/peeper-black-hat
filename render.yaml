@@ -3,7 +3,7 @@ services:
     name: osint-lookup-engine
     env: node
     plan: starter
-    buildCommand:
+    buildCommand: |
       npm install
       pip3 install --user sherlock-project 
       pip3 install --user holehe 
@@ -37,4 +37,5 @@ services:
       name: osint-data
       mountPath: /opt/render/project/src
       sizeGB: 1
+
 
