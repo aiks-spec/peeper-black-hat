@@ -15,17 +15,14 @@ RUN apt-get update && apt-get install -y \
     ncurses-bin \
     && rm -rf /var/lib/apt/lists/*
 
-# Create tput replacement BEFORE any other operations
-RUN mkdir -p /usr/bin /usr/local/bin /bin
-RUN echo '#!/bin/bash\ncase "$1" in\n    "colors"|"lines"|"cols"|"setaf"|"setab"|"sgr0"|"reset"|"bold"|"dim"|"smul"|"rmul"|"rev"|"smso"|"rmso")\n        echo ""\n        ;;\n    *)\n        echo ""\n        ;;\nesac' > /usr/bin/tput
-RUN echo '#!/bin/bash\ncase "$1" in\n    "colors"|"lines"|"cols"|"setaf"|"setab"|"sgr0"|"reset"|"bold"|"dim"|"smul"|"rmul"|"rev"|"smso"|"rmso")\n        echo ""\n        ;;\n    *)\n        echo ""\n        ;;\nesac' > /usr/local/bin/tput
-RUN echo '#!/bin/bash\ncase "$1" in\n    "colors"|"lines"|"cols"|"setaf"|"setab"|"sgr0"|"reset"|"bold"|"dim"|"smul"|"rmul"|"rev"|"smso"|"rmso")\n        echo ""\n        ;;\n    *)\n        echo ""\n        ;;\nesac' > /bin/tput
-RUN chmod +x /usr/bin/tput /usr/local/bin/tput /bin/tput
+# CRITICAL: Create simple tput replacement IMMEDIATELY
+RUN echo '#!/bin/bash\necho ""' > /usr/bin/tput && chmod +x /usr/bin/tput
+RUN echo '#!/bin/bash\necho ""' > /usr/local/bin/tput && chmod +x /usr/local/bin/tput
+RUN echo '#!/bin/bash\necho ""' > /bin/tput && chmod +x /bin/tput
 
-# Override colors.sh script
+# Override colors.sh script IMMEDIATELY
 RUN mkdir -p /home/render
-RUN echo '#!/bin/bash\nexit 0' > /home/render/colors.sh
-RUN chmod +x /home/render/colors.sh
+RUN echo '#!/bin/bash\nexit 0' > /home/render/colors.sh && chmod +x /home/render/colors.sh
 
 # Set environment variables
 ENV TERM=dumb
