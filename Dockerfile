@@ -1,51 +1,29 @@
-# Dockerfile for OSINT Lookup Engine - Render.com compatible
-FROM node:18
+# Multi-stage Dockerfile to completely isolate environment
+FROM ubuntu:22.04 as base
 
-# Install system dependencies
+# Install all dependencies including tput
 RUN apt-get update && apt-get install -y \
-    python3 \
-    python3-pip \
-    python3-venv \
     curl \
     wget \
     git \
     build-essential \
+    python3 \
+    python3-pip \
+    python3-venv \
     postgresql-client \
     libpq-dev \
     ncurses-bin \
     && rm -rf /var/lib/apt/lists/*
 
-# CRITICAL: Create comprehensive tput replacement
-RUN echo '#!/bin/bash\necho ""' > /usr/bin/tput && chmod +x /usr/bin/tput
-RUN echo '#!/bin/bash\necho ""' > /usr/local/bin/tput && chmod +x /usr/local/bin/tput
-RUN echo '#!/bin/bash\necho ""' > /bin/tput && chmod +x /bin/tput
-RUN echo '#!/bin/bash\necho ""' > /home/render/.local/bin/tput && chmod +x /home/render/.local/bin/tput
+# Install Node.js
+RUN curl -fsSL https://deb.nodesource.com/setup_18.x | bash - \
+    && apt-get install -y nodejs
 
-# CRITICAL: Create a universal tput that handles ALL cases
-RUN echo '#!/bin/bash' > /usr/bin/tput && \
-    echo 'case "$1" in' >> /usr/bin/tput && \
-    echo '    *) echo "" ;;' >> /usr/bin/tput && \
-    echo 'esac' >> /usr/bin/tput && \
-    chmod +x /usr/bin/tput
+# Verify tput works
+RUN which tput && tput colors
 
-# CRITICAL: DELETE Render's colors.sh file completely
-RUN rm -f /home/render/colors.sh
-RUN rm -f /usr/local/colors.sh
-RUN rm -f /opt/colors.sh
-RUN rm -f /etc/colors.sh
-
-# Set environment variables
-ENV TERM=dumb
-ENV FORCE_COLOR=0
-ENV NO_COLOR=1
-ENV ANSI_COLORS_DISABLED=1
-ENV CLICOLOR=0
-ENV CLICOLOR_FORCE=0
-ENV PYTHONUNBUFFERED=1
-ENV PYTHONIOENCODING=utf-8
-ENV RICH_NO_COLOR=1
-ENV PYTHONUTF8=1
-ENV PATH="/usr/bin:/usr/local/bin:/bin:$PATH"
+# Final stage
+FROM base as final
 
 # Install OSINT tools
 RUN pip3 install --user sherlock-project holehe maigret ghunt
@@ -62,8 +40,13 @@ RUN npm install
 # Copy application files
 COPY . .
 
+# Copy and setup entrypoint
+COPY entrypoint.sh /entrypoint.sh
+RUN chmod +x /entrypoint.sh
+
 # Expose port
 EXPOSE 3000
 
-# Start the application
+# Use custom entrypoint
+ENTRYPOINT ["/entrypoint.sh"]
 CMD ["npm", "start"]
