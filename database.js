@@ -39,15 +39,21 @@ class DatabaseManager {
         } catch (error) {
             console.error('❌ Database connection failed:', error.message);
             this.isConnected = false;
+            // Don't throw error, just return false to allow fallback
             return false;
         }
     }
 
     async initializeTables() {
-        if (this.dbType === 'postgresql') {
-            await this.initializePostgreSQLTables();
-        } else {
-            await this.initializeSQLiteTables();
+        try {
+            if (this.dbType === 'postgresql') {
+                await this.initializePostgreSQLTables();
+            } else {
+                await this.initializeSQLiteTables();
+            }
+        } catch (error) {
+            console.error('❌ Table initialization failed:', error.message);
+            // Don't throw error, just log it
         }
     }
 
@@ -162,7 +168,10 @@ class DatabaseManager {
     }
 
     async insertVisitor(ip, userAgent) {
-        if (!this.isConnected) return false;
+        if (!this.isConnected || !this.db) {
+            console.log('⚠️ Database not connected, skipping visitor insert');
+            return false;
+        }
 
         try {
             if (this.dbType === 'postgresql') {
@@ -192,7 +201,10 @@ class DatabaseManager {
     }
 
     async insertSearch(query, queryType, results) {
-        if (!this.isConnected) return false;
+        if (!this.isConnected || !this.db) {
+            console.log('⚠️ Database not connected, skipping search insert');
+            return null;
+        }
 
         try {
             if (this.dbType === 'postgresql') {
@@ -222,7 +234,10 @@ class DatabaseManager {
     }
 
     async getVisitorStats() {
-        if (!this.isConnected) return { visitors_today: 0, total_visitors: 0 };
+        if (!this.isConnected || !this.db) {
+            console.log('⚠️ Database not connected, returning default visitor stats');
+            return { visitors_today: 0, total_visitors: 0 };
+        }
 
         try {
             if (this.dbType === 'postgresql') {
@@ -285,7 +300,10 @@ class DatabaseManager {
     }
 
     async getSearchCount() {
-        if (!this.isConnected) return 0;
+        if (!this.isConnected || !this.db) {
+            console.log('⚠️ Database not connected, returning default search count');
+            return 0;
+        }
 
         try {
             if (this.dbType === 'postgresql') {
@@ -308,7 +326,10 @@ class DatabaseManager {
     }
 
     async insertTempFile(searchId, filePath) {
-        if (!this.isConnected) return false;
+        if (!this.isConnected || !this.db) {
+            console.log('⚠️ Database not connected, cannot insert temp file');
+            return false;
+        }
 
         try {
             const expiresAt = new Date(Date.now() + 30 * 60 * 1000); // 30 minutes from now
@@ -340,7 +361,10 @@ class DatabaseManager {
     }
 
     async cleanupExpiredFiles() {
-        if (!this.isConnected) return false;
+        if (!this.isConnected || !this.db) {
+            console.log('⚠️ Database not connected, cannot cleanup expired files');
+            return [];
+        }
 
         try {
             if (this.dbType === 'postgresql') {
@@ -384,7 +408,10 @@ class DatabaseManager {
     }
 
     async getSearchHistory(limit = 10) {
-        if (!this.isConnected) return [];
+        if (!this.isConnected || !this.db) {
+            console.log('⚠️ Database not connected, returning empty search history');
+            return [];
+        }
 
         try {
             if (this.dbType === 'postgresql') {
@@ -436,7 +463,10 @@ class DatabaseManager {
     }
 
     async resetCounts() {
-        if (!this.isConnected) return false;
+        if (!this.isConnected || !this.db) {
+            console.log('⚠️ Database not connected, cannot reset counts');
+            return false;
+        }
 
         try {
             if (this.dbType === 'postgresql') {
