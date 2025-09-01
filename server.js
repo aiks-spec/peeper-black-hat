@@ -2,7 +2,7 @@ require('dotenv').config();
 const express = require('express');
 const axios = require('axios');
 const cors = require('cors');
-const sqlite3 = require('sqlite3').verbose();
+const DatabaseManager = require('./database');
 const path = require('path');
 const cron = require('node-cron');
 const cheerio = require('cheerio');
@@ -39,9 +39,9 @@ function scheduleFileCleanup(filePath, delayMs = 30 * 60 * 1000) { // 30 minutes
     console.log(`⏰ Scheduled cleanup for ${filePath} in ${delayMs/1000/60} minutes`);
 }
 
-// Cleanup all temporary files on server shutdown
-process.on('SIGINT', () => {
-    console.log('\n🧹 Cleaning up temporary files...');
+// Cleanup all temporary files and database connections on server shutdown
+process.on('SIGINT', async () => {
+    console.log('\n🧹 Cleaning up temporary files and database connections...');
     cleanupQueue.forEach((timeoutId, filePath) => {
         clearTimeout(timeoutId);
         try {
@@ -53,6 +53,9 @@ process.on('SIGINT', () => {
             console.log(`❌ Error cleaning up ${filePath}:`, error.message);
         }
     });
+    
+    // Close database connection
+    await dbManager.cleanup();
     process.exit(0);
 });
 
@@ -149,23 +152,17 @@ app.use(express.json());
 app.use(express.static('public'));
 
 // Database setup
-const db = new sqlite3.Database('osint.db');
+const dbManager = new DatabaseManager();
 
-// Initialize database
-db.serialize(() => {
-    db.run(`CREATE TABLE IF NOT EXISTS searches (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        type TEXT NOT NULL,
-        query TEXT NOT NULL,
-        timestamp DATETIME DEFAULT CURRENT_TIMESTAMP
-    )`);
-    
-    db.run(`CREATE TABLE IF NOT EXISTS visitors (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        ip TEXT NOT NULL,
-        user_agent TEXT,
-        timestamp DATETIME DEFAULT CURRENT_TIMESTAMP
-    )`);
+// Initialize database connection
+dbManager.connect().then((connected) => {
+    if (connected) {
+        console.log('✅ Database connection established');
+    } else {
+        console.log('❌ Database connection failed, using fallback');
+    }
+}).catch((error) => {
+    console.error('❌ Database initialization error:', error.message);
 });
 
 // Visitor tracking middleware - FIXED FOR RENDER.COM
@@ -182,11 +179,11 @@ app.use((req, res, next) => {
     
     // Only track unique visitors (not every request)
     if (req.path === '/' || req.path.includes('/api/')) {
-        db.run('INSERT INTO visitors (ip, user_agent) VALUES (?, ?)', [ip, userAgent], (err) => {
-            if (err) {
-                console.log('❌ Visitor tracking error:', err.message);
-            } else {
+        dbManager.insertVisitor(ip, userAgent).then((success) => {
+            if (success) {
                 console.log('✅ Visitor tracked:', ip);
+            } else {
+                console.log('❌ Visitor tracking failed');
             }
         });
     }
@@ -224,7 +221,7 @@ app.get('/lookup', async (req, res) => {
         };
 
         // Log search
-        db.run('INSERT INTO searches (type, query) VALUES (?, ?)', ['lookup', phone]);
+        dbManager.insertSearch(phone, 'lookup', result);
 
         return res.json(result);
     } catch (err) {
@@ -276,7 +273,7 @@ app.post('/api/aggregate', async (req, res) => {
     const qtype = detectQueryType(trimmed);
 
     // Log search
-    db.run('INSERT INTO searches (type, query) VALUES (?, ?)', [qtype, trimmed]);
+    dbManager.insertSearch(trimmed, qtype, null);
 
     try {
         const tasks = [];
@@ -411,7 +408,7 @@ app.post('/api/email-lookup', async (req, res) => {
         }
         
         // Log search
-        db.run('INSERT INTO searches (type, query) VALUES (?, ?)', ['email', email]);
+        dbManager.insertSearch(email, 'email', null);
         
         console.log(`🔍 Starting email lookup for: ${email}`);
         
@@ -873,7 +870,7 @@ app.post('/api/phone-lookup', async (req, res) => {
         }
         
         // Log search
-        db.run('INSERT INTO searches (type, query) VALUES (?, ?)', ['phone', phone]);
+        dbManager.insertSearch(phone, 'phone', null);
         
         console.log(`🔍 Starting phone lookup for: ${phone}`);
         
@@ -1201,7 +1198,7 @@ app.post('/api/ip-lookup', async (req, res) => {
         const { ip } = req.body;
         
         // Log search
-        db.run('INSERT INTO searches (type, query) VALUES (?, ?)', ['ip', ip]);
+        dbManager.insertSearch(ip, 'ip', null);
         
         // IP Geolocation API (use token if available)
         const token = process.env.IPINFO_TOKEN ? `?token=${process.env.IPINFO_TOKEN}` : '';
@@ -1239,39 +1236,21 @@ app.post('/api/ip-lookup', async (req, res) => {
 });
 
 // Stats endpoint - FIXED FOR RENDER.COM
-app.get('/api/stats', (req, res) => {
-    // Get unique visitors (last 24 hours)
-    const oneDayAgo = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
-    
-    db.get('SELECT COUNT(DISTINCT ip) as visitors FROM visitors WHERE timestamp > ?', [oneDayAgo], (err, visitorResult) => {
-        if (err) {
-            console.log('❌ Visitor stats error:', err.message);
-            return res.status(500).json({ error: 'Database error' });
-        }
+app.get('/api/stats', async (req, res) => {
+    try {
+        const visitorStats = await dbManager.getVisitorStats();
+        const searchCount = await dbManager.getSearchCount();
         
-        // Get total searches
-        db.get('SELECT COUNT(*) as searches FROM searches', (err, searchResult) => {
-            if (err) {
-                console.log('❌ Search stats error:', err.message);
-                return res.status(500).json({ error: 'Database error' });
-            }
-            
-            // Get total unique visitors ever
-            db.get('SELECT COUNT(DISTINCT ip) as total_visitors FROM visitors', (err, totalVisitorResult) => {
-                if (err) {
-                    console.log('❌ Total visitor stats error:', err.message);
-                    return res.status(500).json({ error: 'Database error' });
-                }
-                
-                res.json({
-                    visitors_today: visitorResult.visitors || 0,
-                    total_visitors: totalVisitorResult.total_visitors || 0,
-                    searches: searchResult.searches || 0,
-                    timestamp: new Date().toISOString()
-                });
-            });
+        res.json({
+            visitors_today: visitorStats.visitors_today,
+            total_visitors: visitorStats.total_visitors,
+            searches: searchCount,
+            timestamp: new Date().toISOString()
         });
-    });
+    } catch (error) {
+        console.log('❌ Stats error:', error.message);
+        res.status(500).json({ error: 'Database error' });
+    }
 });
 
 // Holehe CSV download endpoint
