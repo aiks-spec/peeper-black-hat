@@ -1,10 +1,10 @@
 #!/bin/bash
 # Custom entrypoint to handle tput issues
 
-# Create tput replacement if it doesn't exist
-if ! command -v tput &> /dev/null; then
-    echo '#!/bin/bash\necho ""' > /usr/bin/tput && chmod +x /usr/bin/tput
-fi
+# Create tput replacement that does nothing (since we don't use tput)
+echo '#!/bin/bash\necho ""' > /usr/bin/tput && chmod +x /usr/bin/tput
+echo '#!/bin/bash\necho ""' > /usr/local/bin/tput && chmod +x /usr/local/bin/tput
+echo '#!/bin/bash\necho ""' > /bin/tput && chmod +x /bin/tput
 
 # Delete any colors.sh files
 rm -f /home/render/colors.sh
