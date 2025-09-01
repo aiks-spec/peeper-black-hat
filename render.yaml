@@ -7,12 +7,14 @@ services:
       # CRITICAL: Fix tput error FIRST before any other operations
       chmod +x pre-build.sh
       ./pre-build.sh
+      # Now proceed with normal build
       npm install
       # Install tput and ncurses for terminal control
       apt-get update && apt-get install -y ncurses-bin
-      # Create tput fallback if needed
-      chmod +x tput-fallback.sh
-      # Install OSINT tools
+      # Run comprehensive color disabling script
+      chmod +x disable-colors.sh
+      ./disable-colors.sh
+      # Install OSINT tools with no color dependencies
       pip3 install --user sherlock-project 
       pip3 install --user holehe 
       pip3 install --user maigret 
@@ -52,18 +54,11 @@ services:
         value: "0"
       - key: ANSI_COLORS_DISABLED
         value: "1"
-      - key: postgresql://peeper_aiks_database_user:kUs7g6cBDJTW6DPkaRebaMPa3E5Z6aGg@dpg-d2qnqep5pdvs738e09cg-a/peeper_aiks_database
-        value: sqlite:///opt/render/project/src/osint.db
+      - key: DATABASE_URL
+        value: postgresql://peeper_aiks_database_user:kUs7g6cBDJTW6DPkaRebaMPa3E5Z6aGg@dpg-d2qnqep5pdvs738e09cg-a/peeper_aiks_database
+      - key: DB_TYPE
+        value: postgresql
     healthCheckPath: /
     autoDeploy: true
     branch: main
     numInstances: 1
-    disk:
-      name: osint-data
-      mountPath: /opt/render/project/src
-      sizeGB: 1
-
-
-
-
-
