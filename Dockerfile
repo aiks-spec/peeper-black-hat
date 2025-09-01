@@ -15,14 +15,11 @@ RUN apt-get update && apt-get install -y \
     ncurses-bin \
     && rm -rf /var/lib/apt/lists/*
 
-# CRITICAL: Create simple tput replacement IMMEDIATELY
+# CRITICAL: ncurses-bin provides real tput command
+# Create simple tput replacement as backup
 RUN echo '#!/bin/bash\necho ""' > /usr/bin/tput && chmod +x /usr/bin/tput
 RUN echo '#!/bin/bash\necho ""' > /usr/local/bin/tput && chmod +x /usr/local/bin/tput
 RUN echo '#!/bin/bash\necho ""' > /bin/tput && chmod +x /bin/tput
-
-# Override colors.sh script IMMEDIATELY
-RUN mkdir -p /home/render
-RUN echo '#!/bin/bash\nexit 0' > /home/render/colors.sh && chmod +x /home/render/colors.sh
 
 # Set environment variables
 ENV TERM=dumb
