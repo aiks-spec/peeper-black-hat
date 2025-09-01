@@ -3,7 +3,7 @@
 
 module.exports = {
     // API Keys (optional for demo mode)
-    CUFINDER_API_KEY: 'your_cufinder_api_key_here',
+    CUFINDER_API_KEY: 'm4s6tVzfUUsMG5cTj8vypbMEt9vqGvSHBMDrD5Av',
     PHONE_API_KEY: 'your_phone_api_key_here',
     
     // Server Configuration
@@ -15,3 +15,4 @@ module.exports = {
     // Optional: Environment
     NODE_ENV: process.env.NODE_ENV || 'production'
 };
+
