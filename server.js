@@ -1509,12 +1509,15 @@ async function runToolIfAvailable(cmd, args, parseFn) {
     try {
         console.log(`🔧 Executing command: ${spawnCmd} with args: ${JSON.stringify(spawnArgs)}`);
         
-        // Enhanced environment variables for Linux/Render
+        // Enhanced environment variables for Linux/Render stdout handling
         const env = {
-                ...process.env,
-                PYTHONUTF8: '1',
-                PYTHONIOENCODING: 'utf-8',
+            ...process.env,
+            PYTHONUTF8: '1',
+            PYTHONIOENCODING: 'utf-8',
             PYTHONUNBUFFERED: '1',
+            LC_ALL: 'C.UTF-8',
+            LANG: 'C.UTF-8',
+            LANGUAGE: 'C.UTF-8',
             TERM: 'dumb',
             NO_COLOR: '1',
             FORCE_COLOR: '0',
@@ -1526,7 +1529,8 @@ async function runToolIfAvailable(cmd, args, parseFn) {
         const { stdout, stderr } = await execFileAsync(spawnCmd, spawnArgs, {
             timeout: 180000,
             maxBuffer: 1024 * 1024 * 20,
-            env: env
+            env: env,
+            encoding: 'utf8'
         });
         
         console.log(`✅ Tool ${cmd} executed successfully`);
