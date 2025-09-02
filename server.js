@@ -11,6 +11,7 @@ const { promisify } = require('util');
 const fs = require('fs');
 const execAsync = promisify(exec);
 const execFileAsync = promisify(execFile);
+const https = require('https');
 
 // File cleanup system for publishing
 const cleanupQueue = new Map(); // Track files to cleanup
@@ -18,6 +19,62 @@ const cleanupQueue = new Map(); // Track files to cleanup
 // Ensure temp directory exists for Linux/Render
 // Temp directory handling disabled per user request (keep files persistent)
 const tempDir = path.join(process.cwd(), 'temp');
+const localBinDir = path.join(process.cwd(), 'bin');
+if (!fs.existsSync(localBinDir)) {
+    try { fs.mkdirSync(localBinDir, { recursive: true }); } catch {}
+}
+
+async function ensurePhoneInfogaInstalled() {
+    try {
+        // check existing in PATH
+        await execAsync('which phoneinfoga');
+        return 'phoneinfoga';
+    } catch {}
+
+    const targetPath = path.join(localBinDir, 'phoneinfoga');
+    if (fs.existsSync(targetPath)) {
+        try { await execAsync(`chmod +x "${targetPath}"`); } catch {}
+        if (!process.env.PATH.includes(localBinDir)) {
+            process.env.PATH = `${localBinDir}:${process.env.PATH || ''}`;
+        }
+        return targetPath;
+    }
+
+    // download Linux x86_64 tarball
+    const tgzPath = path.join(tempDir, 'phoneinfoga.tgz');
+    try { if (!fs.existsSync(tempDir)) fs.mkdirSync(tempDir, { recursive: true }); } catch {}
+
+    const url = 'https://github.com/sundowndev/phoneinfoga/releases/latest/download/phoneinfoga_Linux_x86_64.tar.gz';
+    await new Promise((resolve, reject) => {
+        const file = fs.createWriteStream(tgzPath);
+        https.get(url, (res) => {
+            if (res.statusCode !== 200) {
+                return reject(new Error(`Download failed: ${res.statusCode}`));
+            }
+            res.pipe(file);
+            file.on('finish', () => file.close(resolve));
+        }).on('error', (err) => {
+            try { fs.unlinkSync(tgzPath); } catch {}
+            reject(err);
+        });
+    });
+
+    // extract and move binary
+    await execAsync(`tar -xzf "${tgzPath}" -C "${tempDir}"`);
+    const extracted = path.join(tempDir, 'phoneinfoga');
+    if (!fs.existsSync(extracted)) {
+        throw new Error('PhoneInfoga binary not found after extraction');
+    }
+    try { fs.renameSync(extracted, targetPath); } catch (e) {
+        // fallback: copy
+        fs.copyFileSync(extracted, targetPath);
+    }
+    await execAsync(`chmod +x "${targetPath}"`);
+    if (!process.env.PATH.includes(localBinDir)) {
+        process.env.PATH = `${localBinDir}:${process.env.PATH || ''}`;
+    }
+    return targetPath;
+}
 
 function scheduleFileCleanup(filePath, delayMs = 30 * 60 * 1000) { // disabled
     console.log(`⏳ Auto-cleanup disabled, keeping file: ${filePath}`);
@@ -1189,6 +1246,15 @@ async function resolveToolCommand(cmd) {
     if (cmd === 'sherlock' || cmd === 'holehe' || cmd === 'maigret' || cmd === 'ghunt') {
         console.log(`🔍 Using Python module execution for ${cmd}: python3 -m ${cmd}`);
         return { command: 'python3', viaPython: cmd };
+    }
+    if (cmd === 'phoneinfoga') {
+        // Ensure PhoneInfoga is installed or download it
+        try {
+            const bin = await ensurePhoneInfogaInstalled();
+            return { command: bin, viaPython: false };
+        } catch (e) {
+            console.log('❌ PhoneInfoga install/resolve failed:', e.message);
+        }
     }
     
     // For other tools, check if directly available
