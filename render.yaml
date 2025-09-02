@@ -1,9 +1,9 @@
 services:
   - type: web
     name: osint-lookup-engine
-    env: node
+    env: docker
     plan: starter
-    buildCommand: npm ci
+    dockerfilePath: ./Dockerfile
     startCommand: npm start
     envVars:
       - key: NODE_ENV
