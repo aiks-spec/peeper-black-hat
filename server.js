@@ -460,142 +460,42 @@ app.post('/api/email-lookup', async (req, res) => {
             console.log('❌ CUFinder failed:', error.message);
         }
         
-                                   // 2. GHunt (Google account OSINT) - PROPER DOCKER IMPLEMENTATION
+                                                                      // 2. GHunt (Google account OSINT) - Direct Python module execution
          try {
-             console.log('🔍 Running GHunt with Docker...');
+             console.log('🔍 Running GHunt with Python module...');
              
-             let ghuntResult = null;
-             
-             // Method 1: Try GHunt with Docker (proper implementation)
-             try {
-                 console.log('🔍 Attempting GHunt with Docker...');
-                 
-                 // Use Docker with proper volume mounting and environment
-                 const currentDir = process.cwd().replace(/\\/g, '/');
-                 const dockerArgs = [
-                     'run', '--rm',
-                     '-v', `${currentDir}:/workspace`,
-                     '-w', '/workspace',
-                     'mxrch/ghunt:latest',
-                     'ghunt', 'email', email
-                 ];
-                 
-                 console.log('🔍 Docker GHunt command:', `docker ${dockerArgs.join(' ')}`);
-                 
-                 const { stdout, stderr } = await new Promise((resolve, reject) => {
-                     const { spawn } = require('child_process');
-                     const ghunt = spawn('docker', dockerArgs, { 
-                         stdio: ['pipe', 'pipe', 'pipe'],
-                         shell: false,
-                         env: {
-                             ...process.env,
-                             PYTHONUNBUFFERED: '1',
-                             PYTHONIOENCODING: 'utf-8',
-                             TERM: 'dumb',
-                             NO_COLOR: '1',
-                             FORCE_COLOR: '0'
-                         }
-                     });
-                     
-                     let stdoutData = '';
-                     let stderrData = '';
-                     
-                     ghunt.stdout.on('data', (data) => {
-                         stdoutData += data.toString();
-                     });
-                     
-                     ghunt.stderr.on('data', (data) => {
-                         stderrData += data.toString();
-                     });
-                     
-                     ghunt.on('close', (code) => {
-                         console.log('🔍 GHunt Docker process exited with code:', code);
-                         resolve({ stdout: stdoutData, stderr: stderrData, code });
-                     });
-                     
-                     ghunt.on('error', (error) => {
-                         console.log('❌ GHunt Docker process error:', error.message);
-                         reject(error);
-                     });
-                 });
-                 
-                 console.log('🔍 GHunt Docker stdout length:', stdout.length);
-                 console.log('🔍 GHunt Docker stderr length:', stderr.length);
-                 
-                 if (stderr) {
-                     console.log('🔍 GHunt Docker stderr preview:', stderr.substring(0, 500));
-                 }
-                 
-                 // Parse the output directly from stdout (no JSON file needed)
-                 if (stdout && stdout.trim()) {
-                     console.log('✅ GHunt Docker executed successfully');
-                     
-                     // Try to extract useful information from the text output
-                     const ghuntData = parseGHuntFromText(stdout);
-                     if (ghuntData) {
-                         ghuntResult = parseGHuntSimple(ghuntData);
-                         console.log('🔍 GHunt Docker extracted data:', ghuntResult);
-                     } else {
-                         console.log('❌ GHunt Docker output parsing failed');
-                     }
-                 } else {
-                     console.log('❌ GHunt Docker returned no output');
-                 }
-                 
-             } catch (dockerError) {
-                 console.log('❌ GHunt Docker failed:', dockerError.message);
-             }
-             
-             // Method 2: Try local GHunt if Docker failed
-             if (!ghuntResult) {
+             const ghuntData = await runToolIfAvailable('ghunt', ['email', email], (stdout, stderr) => {
                  try {
-                     console.log('🔍 Attempting GHunt with local installation...');
-                     
-                     // Use our new tool execution system
-                     const ghuntData = await runToolIfAvailable('ghunt', ['email', email], (stdout, stderr) => {
-                         try {
-                             // Try to parse the output directly
-                             if (stdout && stdout.trim()) {
-                                 const parsed = JSON.parse(stdout);
-                                 return parsed;
-                             }
-                             return null;
-                         } catch (parseError) {
-                             console.log('❌ GHunt stdout parsing failed:', parseError.message);
-                             return null;
+                     // Try to parse the output directly
+                     if (stdout && stdout.trim()) {
+                         const ghuntData = parseGHuntFromText(stdout);
+                         if (ghuntData) {
+                             return parseGHuntSimple(ghuntData);
                          }
-                     });
-                     
-                     if (ghuntData) {
-                         console.log('✅ GHunt local executed successfully');
-                             ghuntResult = parseGHuntSimple(ghuntData);
-                             console.log('🔍 GHunt local extracted data:', ghuntResult);
-                     } else {
-                         console.log('❌ GHunt local returned no data');
                      }
-                     
-                 } catch (localError) {
-                     console.log('❌ GHunt local failed:', localError.message);
+                     return null;
+                 } catch (parseError) {
+                     console.log('❌ GHunt parsing error:', parseError.message);
+                     return null;
                  }
-             }
-                          
-             // Use the result if we got one
-             if (ghuntResult && Object.keys(ghuntResult).length > 0) {
-                 results.google = ghuntResult;
+             });
+             
+             if (ghuntData && Object.keys(ghuntData).length > 0) {
+                 results.google = ghuntData;
                  
                  // Extract additional info from GHunt
-                 if (ghuntResult.name && !results.basic.name) {
-                     results.basic.name = ghuntResult.name;
+                 if (ghuntData.name && !results.basic.name) {
+                     results.basic.name = ghuntData.name;
                  }
-                 if (ghuntResult.picture && !results.metadata.picture) {
-                     results.metadata.picture = ghuntResult.picture;
+                 if (ghuntData.picture && !results.metadata.picture) {
+                     results.metadata.picture = ghuntData.picture;
                  }
              } else {
-                 console.log('❌ GHunt extracted no useful data from both methods');
+                 console.log('❌ GHunt extracted no useful data');
              }
-        } catch (error) {
-            console.log('❌ GHunt failed:', error.message);
-        }
+         } catch (error) {
+             console.log('❌ GHunt failed:', error.message);
+         }
         
                  // 3. Holehe (email breach checker)
          try {
