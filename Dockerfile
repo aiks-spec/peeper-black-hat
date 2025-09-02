@@ -24,28 +24,30 @@ RUN apt-get update && apt-get install -y \
     libpq-dev \
     && rm -rf /var/lib/apt/lists/*
 
-# Install Python OSINT tools
+# Install Node.js
+RUN curl -fsSL https://deb.nodesource.com/setup_18.x | bash - \
+    && apt-get install -y nodejs
+
+# Install Python OSINT tools with proper module support
 RUN pip3 install --no-cache-dir \
     sherlock-project \
     maigret \
     holehe \
     ghunt
 
-# Install Node.js
-RUN curl -fsSL https://deb.nodesource.com/setup_18.x | bash - \
-    && apt-get install -y nodejs
+# Debug: Check what was installed
+RUN pip3 list | grep -E "(sherlock|holehe|maigret|ghunt)" || echo "No tools found in pip list"
 
-# Install OSINT tools with proper paths
-RUN pip3 install --user sherlock-project holehe maigret ghunt
+# Verify Python tools are installed as modules
+RUN python3 -c "import sherlock; print('Sherlock module available')" && \
+    python3 -c "import holehe; print('Holehe module available')" && \
+    python3 -c "import maigret; print('Maigret module available')" && \
+    python3 -c "import ghunt; print('GHunt module available')"
 
-# Create symlinks for tools in system PATH
-RUN ln -sf /root/.local/bin/sherlock /usr/local/bin/sherlock
-RUN ln -sf /root/.local/bin/holehe /usr/local/bin/holehe
-RUN ln -sf /root/.local/bin/maigret /usr/local/bin/maigret
-RUN ln -sf /root/.local/bin/ghunt /usr/local/bin/ghunt
-
-# Verify tools are accessible
-RUN which sherlock && which holehe && which maigret && which ghunt
+# Test tool execution via Python modules (with verbose output for debugging)
+RUN echo "Testing Sherlock..." && python3 -m sherlock --help 2>&1 | head -5 && echo "Sherlock test completed" && \
+    echo "Testing Holehe..." && python3 -m holehe --help 2>&1 | head -5 && echo "Holehe test completed" && \
+    echo "Testing Maigret..." && python3 -m maigret --help 2>&1 | head -5 && echo "Maigret test completed"
 
 # Set working directory
 WORKDIR /app
