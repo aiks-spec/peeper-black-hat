@@ -1376,24 +1376,23 @@ async function isCommandAvailable(cmd) {
 async function resolveToolCommand(cmd) {
     console.log(`🔍 Resolving tool command for: ${cmd}`);
     
-    // If directly available, return as-is
+    // For Python tools, ALWAYS use Python module execution on Linux/Render
+    if (cmd === 'sherlock' || cmd === 'holehe' || cmd === 'maigret' || cmd === 'ghunt') {
+        console.log(`🔍 Using Python module execution for ${cmd}: python3 -m ${cmd}`);
+        return { command: 'python3', viaPython: cmd };
+    }
+    
+    // For other tools, check if directly available
     const ok = await isCommandAvailable(cmd);
     console.log(`🔍 Direct command availability for ${cmd}: ${ok}`);
     if (ok) return { command: cmd, viaPython: false };
     
-    // For Python tools, prioritize Python module execution
-    if (cmd === 'sherlock' || cmd === 'holehe' || cmd === 'maigret' || cmd === 'ghunt') {
-        console.log(`🔍 Using Python module execution for ${cmd}: python3 -m ${cmd}`);
-        return { command: 'python3', viaPython: `-m ${cmd}` };
-    }
-    
-    // Cross-platform tool resolution
+    // Cross-platform tool resolution for non-Python tools
     if (process.platform === 'win32') {
         // Windows: try Scripts folders
         const pathParts = (process.env.PATH || '').split(';').filter(Boolean);
         for (const p of pathParts) {
             try {
-                // Try .exe and no extension
                 const exe = path.join(p, `${cmd}.exe`);
                 if (fs.existsSync(exe)) return { command: exe, viaPython: false };
                 const bare = path.join(p, cmd);
@@ -1415,16 +1414,10 @@ async function resolveToolCommand(cmd) {
         }
     }
     
-    // Final fallback: try python -m <module> for Python tools
-    if (cmd === 'sherlock' || cmd === 'holehe' || cmd === 'maigret' || cmd === 'ghunt') {
-        console.log(`🔍 Using final fallback for Python tool ${cmd}: python3 -m ${cmd}`);
-        return { command: 'python3', viaPython: `-m ${cmd}` };
-    }
-    
-    // For non-Python tools, use platform-specific fallback
+    // Final fallback for non-Python tools
     const pythonCmd = process.platform === 'win32' ? 'python' : 'python3';
     console.log(`🔍 Using final fallback for ${cmd}: ${pythonCmd} -m ${cmd}`);
-    return { command: pythonCmd, viaPython: `-m ${cmd}` };
+    return { command: pythonCmd, viaPython: cmd };
 }
 
 // Docker-based PhoneInfoga execution for Render.com
@@ -1496,15 +1489,29 @@ async function runToolIfAvailable(cmd, args, parseFn) {
     }
     
     const spawnCmd = resolved.command;
-    const spawnArgs = resolved.viaPython
-        ? (resolved.viaPython.startsWith('-m ')
-            ? ['-m', resolved.viaPython.replace('-m ', ''), ...args]
-            : resolved.viaPython.startsWith('-m')
-            ? [resolved.viaPython, ...args]
-            : [resolved.viaPython, ...args])
-        : args;
+    let spawnArgs;
+    
+    if (resolved.viaPython) {
+        if (resolved.viaPython.startsWith('-m ')) {
+            // Format: "-m sherlock" -> ["-m", "sherlock", ...args]
+            const moduleName = resolved.viaPython.replace('-m ', '');
+            spawnArgs = ['-m', moduleName, ...args];
+        } else if (resolved.viaPython.startsWith('-m')) {
+            // Format: "-msherlock" -> ["-m", "sherlock", ...args]
+            const moduleName = resolved.viaPython.replace('-m', '');
+            spawnArgs = ['-m', moduleName, ...args];
+        } else {
+            // Direct module name
+            spawnArgs = ['-m', resolved.viaPython, ...args];
+        }
+    } else {
+        spawnArgs = args;
+    }
     
     console.log(`🔧 Executing: ${spawnCmd} ${spawnArgs.join(' ')}`);
+    console.log(`🔍 Final command: ${spawnCmd} ${spawnArgs.join(' ')}`);
+    console.log(`🔍 viaPython: ${resolved.viaPython}`);
+    console.log(`🔍 Original args: ${JSON.stringify(args)}`);
     
     try {
         console.log(`🔧 Executing command: ${spawnCmd} with args: ${JSON.stringify(spawnArgs)}`);
@@ -2356,6 +2363,53 @@ cron.schedule('0 0 * * *', async () => {
     }
 });
 
+// Test endpoint for tool availability
+app.get('/api/test-tools', async (req, res) => {
+    const tools = ['sherlock', 'holehe', 'maigret', 'ghunt'];
+    const results = {};
+    
+    for (const tool of tools) {
+        try {
+            const resolved = await resolveToolCommand(tool);
+            results[tool] = {
+                available: !!resolved.command,
+                command: resolved.command,
+                viaPython: resolved.viaPython,
+                platform: process.platform
+            };
+            
+            // Test actual execution on Linux/Render only
+            if (process.platform !== 'win32' && resolved.command && resolved.viaPython) {
+                try {
+                    await execFileAsync(resolved.command, ['-m', resolved.viaPython, '--help'], { 
+                        timeout: 10000, 
+                        maxBuffer: 1024 * 1024,
+                        env: { ...process.env, PYTHONUNBUFFERED: '1', NO_COLOR: '1' }
+                    });
+                    results[tool].executionTest = 'passed';
+                } catch (execError) {
+                    results[tool].executionTest = 'failed';
+                    results[tool].executionError = execError.message;
+                }
+            }
+        } catch (error) {
+            results[tool] = {
+                available: false,
+                error: error.message,
+                platform: process.platform
+            };
+        }
+    }
+    
+    res.json({
+        platform: process.platform,
+        pythonPath: process.env.PYTHON_PATH,
+        environment: process.env.NODE_ENV,
+        databaseType: process.env.DB_TYPE,
+        results
+    });
+});
+
 app.listen(PORT, () => {
     console.log(`🚀 OSINT Lookup Engine running on port ${PORT}`);
     console.log(`🌐 Access at: http://localhost:${PORT}`);
@@ -2378,6 +2432,19 @@ app.listen(PORT, () => {
         try {
             const resolved = await resolveToolCommand(tool);
             console.log(`   - ${tool}: ${resolved.command} ${resolved.viaPython || ''}`);
+            
+            // Test actual execution on Linux/Render only
+            if (process.platform !== 'win32' && resolved.command && resolved.viaPython) {
+                execFileAsync(resolved.command, ['-m', resolved.viaPython, '--help'], { 
+                    timeout: 10000, 
+                    maxBuffer: 1024 * 1024,
+                    env: { ...process.env, PYTHONUNBUFFERED: '1', NO_COLOR: '1' }
+                }).then(() => {
+                    console.log(`   ✅ ${tool}: Execution test passed`);
+                }).catch(err => {
+                    console.log(`   ⚠️ ${tool}: Execution test failed (this is normal on first deploy)`);
+                });
+            }
         } catch (error) {
             console.log(`   - ${tool}: ❌ Error resolving command`);
         }
