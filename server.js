@@ -465,7 +465,7 @@ app.post('/api/email-lookup', async (req, res) => {
         
         // Log search and get search ID for tracking
         try {
-            const searchId = await dbManager.insertSearch(email, 'email', null);
+        const searchId = await dbManager.insertSearch(email, 'email', null);
         } catch (error) {
             console.log('⚠️ Search logging failed:', error.message);
         }
@@ -901,24 +901,24 @@ app.post('/api/email-lookup', async (req, res) => {
         
         // Store final results in database
         try {
-            if (searchId) {
-                await dbManager.insertSearch(email, 'email', finalResult);
-                console.log(`💾 Results stored in database with ID: ${searchId}`);
-                
-                // Track any temporary files created during the search
-                const tempFiles = [
-                    path.join(tempDir, `ghunt_${Date.now()}.json`),
-                    path.join(tempDir, `holehe_${Date.now()}_results.csv`),
-                    path.join(tempDir, `sherlock_${Date.now()}.json`),
-                    path.join(tempDir, `maigret_${Date.now()}.json`)
-                ];
-                
-                for (const tempFile of tempFiles) {
-                    if (fs.existsSync(tempFile)) {
-                        await dbManager.insertTempFile(searchId, tempFile);
-                        console.log(`📁 Tracking temp file: ${tempFile}`);
-                    }
+        if (searchId) {
+            await dbManager.insertSearch(email, 'email', finalResult);
+            console.log(`💾 Results stored in database with ID: ${searchId}`);
+            
+            // Track any temporary files created during the search
+            const tempFiles = [
+                path.join(tempDir, `ghunt_${Date.now()}.json`),
+                path.join(tempDir, `holehe_${Date.now()}_results.csv`),
+                path.join(tempDir, `sherlock_${Date.now()}.json`),
+                path.join(tempDir, `maigret_${Date.now()}.json`)
+            ];
+            
+            for (const tempFile of tempFiles) {
+                if (fs.existsSync(tempFile)) {
+                    await dbManager.insertTempFile(searchId, tempFile);
+                    console.log(`📁 Tracking temp file: ${tempFile}`);
                 }
+            }
             }
         } catch (error) {
             console.log('⚠️ Result storage failed:', error.message);
@@ -960,7 +960,7 @@ app.post('/api/phone-lookup', async (req, res) => {
         
         // Log search and get search ID for tracking
         try {
-            const searchId = await dbManager.insertSearch(phone, 'phone', null);
+        const searchId = await dbManager.insertSearch(phone, 'phone', null);
         } catch (error) {
             console.log('⚠️ Search logging failed:', error.message);
         }
@@ -1276,23 +1276,23 @@ app.post('/api/phone-lookup', async (req, res) => {
         
         // Store final results in database
         try {
-            if (searchId) {
-                await dbManager.insertSearch(phone, 'phone', finalResult);
-                console.log(`💾 Phone results stored in database with ID: ${searchId}`);
-                
-                // Track any temporary files created during the search
-                const tempFiles = [
-                    path.join(tempDir, `phoneinfoga_${Date.now()}.json`),
-                    path.join(tempDir, `sherlock_${Date.now()}.json`),
-                    path.join(tempDir, `maigret_${Date.now()}.json`)
-                ];
-                
-                for (const tempFile of tempFiles) {
-                    if (fs.existsSync(tempFile)) {
-                        await dbManager.insertTempFile(searchId, tempFile);
-                        console.log(`📁 Tracking temp file: ${tempFile}`);
-                    }
+        if (searchId) {
+            await dbManager.insertSearch(phone, 'phone', finalResult);
+            console.log(`💾 Phone results stored in database with ID: ${searchId}`);
+            
+            // Track any temporary files created during the search
+            const tempFiles = [
+                path.join(tempDir, `phoneinfoga_${Date.now()}.json`),
+                path.join(tempDir, `sherlock_${Date.now()}.json`),
+                path.join(tempDir, `maigret_${Date.now()}.json`)
+            ];
+            
+            for (const tempFile of tempFiles) {
+                if (fs.existsSync(tempFile)) {
+                    await dbManager.insertTempFile(searchId, tempFile);
+                    console.log(`📁 Tracking temp file: ${tempFile}`);
                 }
+            }
             }
         } catch (error) {
             console.log('⚠️ Result storage failed:', error.message);
@@ -1318,7 +1318,7 @@ app.post('/api/ip-lookup', async (req, res) => {
         
         // Log search and get search ID for tracking
         try {
-            const searchId = await dbManager.insertSearch(ip, 'ip', null);
+        const searchId = await dbManager.insertSearch(ip, 'ip', null);
         } catch (error) {
             console.log('⚠️ Search logging failed:', error.message);
         }
@@ -1347,21 +1347,21 @@ app.post('/api/ip-lookup', async (req, res) => {
         
         // Store final results in database
         try {
-            if (searchId) {
-                await dbManager.insertSearch(ip, 'ip', result);
-                console.log(`💾 IP results stored in database with ID: ${searchId}`);
-                
-                // Track any temporary files created during the search
-                const tempFiles = [
-                    path.join(tempDir, `ipinfo_${Date.now()}.json`)
-                ];
-                
-                for (const tempFile of tempFiles) {
-                    if (fs.existsSync(tempFile)) {
-                        await dbManager.insertTempFile(searchId, tempFile);
-                        console.log(`📁 Tracking temp file: ${tempFile}`);
-                    }
+        if (searchId) {
+            await dbManager.insertSearch(ip, 'ip', result);
+            console.log(`💾 IP results stored in database with ID: ${searchId}`);
+            
+            // Track any temporary files created during the search
+            const tempFiles = [
+                path.join(tempDir, `ipinfo_${Date.now()}.json`)
+            ];
+            
+            for (const tempFile of tempFiles) {
+                if (fs.existsSync(tempFile)) {
+                    await dbManager.insertTempFile(searchId, tempFile);
+                    console.log(`📁 Tracking temp file: ${tempFile}`);
                 }
+            }
             }
         } catch (error) {
             console.log('⚠️ Result storage failed:', error.message);
@@ -1578,12 +1578,12 @@ async function isCommandAvailable(cmd) {
     }
 }
 
-function resolveToolCommand(cmd) {
+async function resolveToolCommand(cmd) {
     console.log(`🔍 Resolving tool command for: ${cmd}`);
     // If directly available, return as-is
-    return isCommandAvailable(cmd).then((ok) => {
-        console.log(`🔍 Direct command availability for ${cmd}: ${ok}`);
-        if (ok) return { command: cmd, viaPython: false };
+    const ok = await isCommandAvailable(cmd);
+    console.log(`🔍 Direct command availability for ${cmd}: ${ok}`);
+    if (ok) return { command: cmd, viaPython: false };
         
         // Cross-platform tool resolution
         if (process.platform === 'win32') {
@@ -1601,7 +1601,15 @@ function resolveToolCommand(cmd) {
                 } catch {}
             }
         } else {
-            // Linux/Mac/Render.com: try common locations
+            // Linux/Mac/Render.com: prioritize Python module execution
+            // since the tools are installed via pip3 install
+            if (cmd === 'sherlock' || cmd === 'holehe' || cmd === 'maigret' || cmd === 'ghunt') {
+                // For Python tools, always try python3 first
+                console.log(`🔍 Using Python module execution for ${cmd}: python3 -m ${cmd}`);
+                return { command: 'python3', viaPython: `-m ${cmd}` };
+            }
+            
+            // For non-Python tools, try common locations
             const pathParts = (process.env.PATH || '').split(':').filter(Boolean);
             for (const p of pathParts) {
                 try {
@@ -1611,51 +1619,13 @@ function resolveToolCommand(cmd) {
                     }
                 } catch {}
             }
-            
-            // Try Python module execution for Render.com
-            const pythonCommands = ['python3', 'python', 'py'];
-            for (const pythonCmd of pythonCommands) {
-                try {
-                    // Check if python command exists
-                    const pythonPath = path.join(p, pythonCmd);
-                    if (fs.existsSync(pythonPath)) {
-                        return { command: pythonCmd, viaPython: `-m ${cmd}` };
-                    }
-                } catch {}
-            }
-            
-            // Try direct Python module execution with different module names
-            if (cmd === 'sherlock') {
-                return { command: 'python3', viaPython: '-m sherlock' };
-            } else if (cmd === 'holehe') {
-                return { command: 'python3', viaPython: '-m holehe' };
-            } else if (cmd === 'maigret') {
-                return { command: 'python3', viaPython: '-m maigret' };
-            } else if (cmd === 'ghunt') {
-                return { command: 'python3', viaPython: '-m ghunt' };
-            }
-            
-            // Try alternative module names
-            const moduleMap = {
-                'sherlock': ['sherlock', 'sherlock-project'],
-                'holehe': ['holehe'],
-                'maigret': ['maigret'],
-                'ghunt': ['ghunt']
-            };
-            
-            if (moduleMap[cmd]) {
-                for (const moduleName of moduleMap[cmd]) {
-                    return { command: 'python3', viaPython: `-m ${moduleName}` };
-                }
-            }
         }
         
         // Final fallback: try python -m <module>
         const pythonCmd = process.platform === 'win32' ? 'python' : 'python3';
         console.log(`🔍 Using final fallback for ${cmd}: ${pythonCmd} -m ${cmd}`);
         return { command: pythonCmd, viaPython: `-m ${cmd}` };
-    });
-}
+    }
 
 // Docker-based PhoneInfoga execution for Render.com
 async function runPhoneInfogaDocker(phone) {
@@ -2545,7 +2515,7 @@ async function getPhoneApiData(phone) {
 // Cleanup old records daily (using dbManager instead of undefined db)
 cron.schedule('0 0 * * *', async () => {
     try {
-        const thirtyDaysAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
+    const thirtyDaysAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
         await dbManager.cleanupExpiredFiles();
         console.log('🧹 Daily cleanup completed');
     } catch (error) {
