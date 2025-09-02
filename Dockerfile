@@ -10,6 +10,9 @@ ENV CLICOLOR=0
 ENV CLICOLOR_FORCE=0
 ENV BASH_ENV=""
 ENV ENV=""
+ENV PYTHONPATH="/usr/local/lib/python3.10/dist-packages:/usr/lib/python3/dist-packages"
+ENV PYTHONUNBUFFERED=1
+ENV PYTHONIOENCODING=utf-8
 
 # Install all dependencies
 RUN apt-get update && apt-get install -y \
@@ -29,25 +32,39 @@ RUN curl -fsSL https://deb.nodesource.com/setup_18.x | bash - \
     && apt-get install -y nodejs
 
 # Install Python OSINT tools with proper module support
-RUN pip3 install --no-cache-dir \
+RUN pip3 install --no-cache-dir --upgrade pip && \
+    pip3 install --no-cache-dir \
     sherlock-project \
     maigret \
     holehe \
     ghunt
 
 # Debug: Check what was installed
-RUN pip3 list | grep -E "(sherlock|holehe|maigret|ghunt)" || echo "No tools found in pip list"
+RUN echo "=== Installed Python packages ===" && \
+    pip3 list | grep -E "(sherlock|holehe|maigret|ghunt)" || echo "No tools found in pip list" && \
+    echo "=== Python version ===" && \
+    python3 --version && \
+    echo "=== Python path ===" && \
+    which python3
 
 # Verify Python tools are installed as modules
-RUN python3 -c "import sherlock; print('Sherlock module available')" && \
-    python3 -c "import holehe; print('Holehe module available')" && \
-    python3 -c "import maigret; print('Maigret module available')" && \
-    python3 -c "import ghunt; print('GHunt module available')"
+RUN echo "=== Testing module imports ===" && \
+    python3 -c "import sherlock; print('✅ Sherlock module available')" && \
+    python3 -c "import holehe; print('✅ Holehe module available')" && \
+    python3 -c "import maigret; print('✅ Maigret module available')" && \
+    python3 -c "import ghunt; print('✅ GHunt module available')"
 
 # Test tool execution via Python modules (with verbose output for debugging)
-RUN echo "Testing Sherlock..." && python3 -m sherlock --help 2>&1 | head -5 && echo "Sherlock test completed" && \
-    echo "Testing Holehe..." && python3 -m holehe --help 2>&1 | head -5 && echo "Holehe test completed" && \
-    echo "Testing Maigret..." && python3 -m maigret --help 2>&1 | head -5 && echo "Maigret test completed"
+RUN echo "=== Testing tool execution ===" && \
+    echo "Testing Sherlock..." && \
+    python3 -m sherlock --help 2>&1 | head -10 && \
+    echo "✅ Sherlock test completed" && \
+    echo "Testing Holehe..." && \
+    python3 -m holehe --help 2>&1 | head -10 && \
+    echo "✅ Holehe test completed" && \
+    echo "Testing Maigret..." && \
+    python3 -m maigret --help 2>&1 | head -10 && \
+    echo "✅ Maigret test completed"
 
 # Set working directory
 WORKDIR /app
