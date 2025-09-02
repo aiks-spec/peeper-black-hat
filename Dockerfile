@@ -17,11 +17,15 @@ ENV TERM=dumb \
     LANG=C.UTF-8 \
     LANGUAGE=C.UTF-8
 
+# Add ncurses to your Alpine-based Dockerfile
+RUN apk add ncurses
+
 # OS deps
 RUN apt-get update && apt-get install -y \
     curl wget git ca-certificates build-essential \
     python3 python3-pip python3-venv \
     libpq-dev postgresql-client \
+    ncurses-bin \
  && rm -rf /var/lib/apt/lists/*
 
 # Node.js 20.x
@@ -55,6 +59,11 @@ COPY . .
 
 # Create persistent temp dir
 RUN mkdir -p /app/temp && chmod 777 /app/temp
+
+# Neutralize any external shell color script Render might auto-source
+RUN mkdir -p /home/render \
+ && printf '#!/bin/sh\n# disabled\nexport NO_COLOR=1\nexport TERM=dumb\n' > /home/render/colors.sh \
+ && chmod +x /home/render/colors.sh
 
 COPY entrypoint.sh /entrypoint.sh
 RUN chmod +x /entrypoint.sh
