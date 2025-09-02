@@ -337,107 +337,31 @@ app.post('/api/aggregate', async (req, res) => {
             tasks.push(scrapePhoneNumberApiHtml(trimmed));
             // Also try social media search with phone number
             const phoneUsername = trimmed.replace(/[^a-zA-Z0-9+]/g, '');
-            tasks.push(runToolIfAvailable('sherlock', [phoneUsername, '--print-found', '--no-color'], parseSherlock));
-                         tasks.push(runToolIfAvailable('maigret', [phoneUsername, '--no-color'], parseMaigretSimple));
+            tasks.push(runToolIfAvailable('sherlock', [phoneUsername, '--print-found', '--no-color', '--json'], parseSherlock));
+                         tasks.push(runToolIfAvailable('maigret', [phoneUsername, '--no-color', '--json'], parseMaigretSimple));
         }
         if (qtype === 'email') {
-            tasks.push(runToolIfAvailable('holehe', [trimmed, '-C', '--no-color'], parseHolehe));
-                                                   // For aggregate endpoint, use proper Docker GHunt implementation
-             const outputFile = path.join(tempDir, `ghunt_aggregate_${Date.now()}.json`);
+            tasks.push(runToolIfAvailable('holehe', [trimmed, '-C', '--no-color', '--json'], parseHolehe));
+                                                   // For aggregate endpoint, use our new tool execution system
+             console.log('🔍 Using Python module GHunt for aggregate');
              
-             console.log('🔍 Using Docker GHunt for aggregate');
-             
-             // Use Docker with proper volume mounting and environment (Windows path fix)
-             const currentDir = process.cwd().replace(/\\/g, '/');
-             const dockerArgs = [
-                 'run', '--rm',
-                 '-v', `${currentDir}:/workspace`,
-                 '-w', '/workspace',
-                 'mxrch/ghunt:latest',
-                 'ghunt', 'email', trimmed, '--json', outputFile
-             ];
-             
-             tasks.push((async () => {
-                                  try {
-                     const { spawn } = require('child_process');
-                     const ghunt = spawn('docker', dockerArgs, { 
-                         stdio: ['pipe', 'pipe', 'pipe'],
-                         shell: false,
-                         env: {
-                             ...process.env,
-                             PYTHONUNBUFFERED: '1',
-                             PYTHONIOENCODING: 'utf-8',
-                             TERM: 'dumb',
-                             NO_COLOR: '1',
-                             FORCE_COLOR: '0'
-                         }
-                     });
-                     
-                     let stdoutData = '';
-                     let stderrData = '';
-                     
-                     ghunt.stdout.on('data', (data) => {
-                         stdoutData += data.toString();
-                     });
-                     
-                     ghunt.stderr.on('data', (data) => {
-                         stderrData += data.toString();
-                     });
-                     
-                     await new Promise((resolve, reject) => {
-                         ghunt.on('close', (code) => {
-                             console.log('🔍 GHunt aggregate Docker process exited with code:', code);
-                             resolve();
-                         });
-                         ghunt.on('error', (error) => {
-                             console.log('❌ GHunt aggregate Docker process error:', error.message);
-                             reject(error);
-                         });
-                     });
-                     
-                     console.log('🔍 GHunt aggregate stdout length:', stdoutData.length);
-                     console.log('🔍 GHunt aggregate stderr length:', stderrData.length);
-                     
-                     // Wait a bit for file to be written
-                     await new Promise(resolve => setTimeout(resolve, 5000));
-                    
-                    // Try to read the output file
-                    if (fs.existsSync(outputFile)) {
-                        console.log('✅ GHunt aggregate output file found:', outputFile);
-                        const fileContent = fs.readFileSync(outputFile, 'utf8');
-                        
-                        try {
-                            const ghuntData = JSON.parse(fileContent);
-                            console.log('✅ GHunt aggregate JSON parsed successfully');
-                            
-                            const ghuntResult = parseGHuntSimple(ghuntData);
-                            console.log('🔍 GHunt aggregate extracted data:', ghuntResult);
-                            
-                            // Schedule file cleanup instead of immediate deletion
-                            scheduleFileCleanup(outputFile);
-                            
-                            return ghuntResult;
-                        } catch (parseError) {
-                            console.log('❌ GHunt aggregate JSON parsing failed:', parseError.message);
-                            // Schedule file cleanup instead of immediate deletion
-                            if (fs.existsSync(outputFile)) {
-                                scheduleFileCleanup(outputFile);
-                            }
-                            return null;
-                        }
-                    } else {
-                        console.log('❌ GHunt aggregate output file not found');
-                        return null;
-                    }
-                } catch (error) {
-                    console.log('❌ GHunt aggregate failed:', error.message);
-                    return null;
-                }
-            })());
+             tasks.push(runToolIfAvailable('ghunt', ['email', trimmed, '--json'], (stdout, stderr) => {
+                 try {
+                     // Try to parse the output directly
+                     if (stdout && stdout.trim()) {
+                         const parsed = JSON.parse(stdout);
+                         return parsed;
+                     }
+                     return null;
+                 } catch (parseError) {
+                     console.log('❌ GHunt aggregate stdout parsing failed:', parseError.message);
+                     return null;
+                 }
+             }));
         }
         if (qtype === 'username') {
-            tasks.push(runToolIfAvailable('sherlock', [trimmed, '--print-found', '--no-color'], parseSherlock));
-                         tasks.push(runToolIfAvailable('maigret', [trimmed, '--no-color'], parseMaigretSimple));
+            tasks.push(runToolIfAvailable('sherlock', [trimmed, '--print-found', '--no-color', '--json'], parseSherlock));
+                         tasks.push(runToolIfAvailable('maigret', [trimmed, '--no-color', '--json'], parseMaigretSimple));
         }
 
         const results = await Promise.all(tasks.map(p => p.catch(() => null)));
@@ -553,7 +477,7 @@ app.post('/api/email-lookup', async (req, res) => {
              try {
                  console.log('🔍 Attempting GHunt with Python module...');
                  
-                 const ghuntData = await runToolIfAvailable('ghunt', ['email', email], (stdout, stderr) => {
+                 const ghuntData = await runToolIfAvailable('ghunt', ['email', email, '--json'], (stdout, stderr) => {
                      try {
                          // Try to parse the output directly
                          if (stdout && stdout.trim()) {
@@ -633,7 +557,7 @@ app.post('/api/email-lookup', async (req, res) => {
                  // 3. Holehe (email breach checker)
          try {
              console.log('🔍 Running Holehe...');
-             const holeheResult = await runToolIfAvailable('holehe', [email, '-C', '--no-color'], async (stdout, stderr) => {
+             const holeheResult = await runToolIfAvailable('holehe', [email, '-C', '--no-color', '--json'], async (stdout, stderr) => {
                 // Wait a bit for the CSV file to be written
                 await new Promise(resolve => setTimeout(resolve, 8000));
                 
@@ -679,7 +603,7 @@ app.post('/api/email-lookup', async (req, res) => {
              console.log('🔍 Username extracted:', username);
              
              // First run Sherlock for general search
-             const sherlockResult = await runToolIfAvailable('sherlock', [username, '--print-found', '--no-color'], (stdout) => {
+             const sherlockResult = await runToolIfAvailable('sherlock', [username, '--print-found', '--no-color', '--json'], (stdout) => {
                 console.log('🔍 Sherlock raw output length:', stdout.length);
                 console.log('🔍 Sherlock raw output preview:', stdout.substring(0, 300) + '...');
                 try {
@@ -750,7 +674,7 @@ app.post('/api/email-lookup', async (req, res) => {
         try {
             console.log('🔍 Running Maigret...');
             const username = email.split('@')[0];
-            const maigretResult = await runToolIfAvailable('maigret', [username, '--no-color'], parseMaigretSimple);
+                         const maigretResult = await runToolIfAvailable('maigret', [username, '--no-color', '--json'], parseMaigretSimple);
             
             if (maigretResult && maigretResult.socialProfiles) {
                 console.log('✅ Maigret data received, social profiles:', maigretResult.socialProfiles.length);
@@ -1110,7 +1034,7 @@ app.post('/api/phone-lookup', async (req, res) => {
              console.log('🔍 Running Maigret...');
              // For phone numbers, try both with and without + symbol
              const username = phone.replace(/[^a-zA-Z0-9+]/g, '');
-             const maigretResult = await runToolIfAvailable('maigret', [username, '--no-color'], parseMaigretSimple);
+             const maigretResult = await runToolIfAvailable('maigret', [username, '--no-color', '--json'], parseMaigretSimple);
             
             if (maigretResult && maigretResult.socialProfiles) {
                 console.log('✅ Maigret data received, social profiles:', maigretResult.socialProfiles.length);
