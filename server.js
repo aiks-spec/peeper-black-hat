@@ -219,6 +219,8 @@ try {
     process.env.ANSI_COLORS_DISABLED = '1';
     process.env.CLICOLOR = '0';
     process.env.CLICOLOR_FORCE = '0';
+    delete process.env.BASH_ENV;
+    delete process.env.ENV;
 } catch (error) {
     console.log('⚠️ PATH expansion failed, using default:', error.message);
 }
