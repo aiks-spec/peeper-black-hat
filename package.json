@@ -7,6 +7,9 @@
     "start": "node server.js",
     "dev": "nodemon server.js"
   },
+  "engines": {
+    "node": "20.16.0"
+  },
   "dependencies": {
     "axios": "^1.11.0",
     "cheerio": "^1.1.0",
