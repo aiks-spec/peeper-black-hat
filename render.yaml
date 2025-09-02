@@ -29,7 +29,7 @@ services:
       - key: PYTHONIOENCODING
         value: utf-8
       - key: DATABASE_URL
-        sync: false
+        value: postgresql://peeper_aiks_database_user:kUs7g6cBDJTW6DPkaRebaMPa3E5Z6aGg@dpg-d2qnqep5pdvs738e09cg-a/peeper_aiks_database
       - key: DB_TYPE
         value: postgresql
       - key: RESET_COUNTS
