@@ -14,7 +14,7 @@ ENV PYTHONPATH="/usr/local/lib/python3.10/dist-packages:/usr/lib/python3/dist-pa
 ENV PYTHONUNBUFFERED=1
 ENV PYTHONIOENCODING=utf-8
 
-# Install all dependencies
+# Install all dependencies including Docker
 RUN apt-get update && apt-get install -y \
     curl \
     wget \
@@ -25,7 +25,17 @@ RUN apt-get update && apt-get install -y \
     python3-venv \
     postgresql-client \
     libpq-dev \
+    ca-certificates \
+    gnupg \
+    lsb-release \
     && rm -rf /var/lib/apt/lists/*
+
+# Install Docker
+RUN curl -fsSL https://download.docker.com/linux/ubuntu/gpg | gpg --dearmor -o /usr/share/keyrings/docker-archive-keyring.gpg && \
+    echo "deb [arch=$(dpkg --print-architecture) signed-by=/usr/share/keyrings/docker-archive-keyring.gpg] https://download.docker.com/linux/ubuntu $(lsb_release -cs) stable" | tee /etc/apt/sources.list.d/docker.list > /dev/null && \
+    apt-get update && \
+    apt-get install -y docker-ce docker-ce-cli containerd.io && \
+    rm -rf /var/lib/apt/lists/*
 
 # Install Node.js
 RUN curl -fsSL https://deb.nodesource.com/setup_18.x | bash - \
