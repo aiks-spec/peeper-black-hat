@@ -547,177 +547,64 @@ app.post('/api/email-lookup', async (req, res) => {
          try {
              console.log('🔍 Running GHunt with Docker...');
              
-             const outputFile = path.join(tempDir, `ghunt_${Date.now()}.json`);
              let ghuntResult = null;
              
-             // Method 1: Try Docker GHunt (proper implementation)
+             // Method 1: Try GHunt with our new tool execution system
              try {
-                 console.log('🔍 Attempting GHunt with Docker...');
+                 console.log('🔍 Attempting GHunt with Python module...');
                  
-                 // Use Docker with proper volume mounting and environment (Windows path fix)
-                 const currentDir = process.cwd().replace(/\\/g, '/');
-                 const dockerArgs = [
-                     'run', '--rm',
-                     '-v', `${currentDir}:/workspace`,
-                     '-w', '/workspace',
-                     'mxrch/ghunt:latest',
-                     'ghunt', 'email', email, '--json', outputFile
-                 ];
-                 
-                 console.log('🔍 Docker GHunt command:', `docker ${dockerArgs.join(' ')}`);
-                 
-                 const { stdout, stderr } = await new Promise((resolve, reject) => {
-                     const { spawn } = require('child_process');
-                     const ghunt = spawn('docker', dockerArgs, { 
-                         stdio: ['pipe', 'pipe', 'pipe'],
-                         shell: false,
-                         env: {
-                             ...process.env,
-                             PYTHONUNBUFFERED: '1',
-                             PYTHONIOENCODING: 'utf-8',
-                             TERM: 'dumb',
-                             NO_COLOR: '1',
-                             FORCE_COLOR: '0'
+                 const ghuntData = await runToolIfAvailable('ghunt', ['email', email], (stdout, stderr) => {
+                     try {
+                         // Try to parse the output directly
+                         if (stdout && stdout.trim()) {
+                             const parsed = JSON.parse(stdout);
+                             return parsed;
                          }
-                     });
-                     
-                     let stdoutData = '';
-                     let stderrData = '';
-                     
-                     ghunt.stdout.on('data', (data) => {
-                         stdoutData += data.toString();
-                     });
-                     
-                     ghunt.stderr.on('data', (data) => {
-                         stderrData += data.toString();
-                     });
-                     
-                     ghunt.on('close', (code) => {
-                         console.log('🔍 GHunt Docker process exited with code:', code);
-                         resolve({ stdout: stdoutData, stderr: stderrData, code });
-                     });
-                     
-                     ghunt.on('error', (error) => {
-                         console.log('❌ GHunt Docker process error:', error.message);
-                         reject(error);
-                     });
+                         return null;
+                     } catch (parseError) {
+                         console.log('❌ GHunt stdout parsing failed:', parseError.message);
+                         return null;
+                     }
                  });
                  
-                 console.log('🔍 GHunt Docker stdout length:', stdout.length);
-                 console.log('🔍 GHunt Docker stderr length:', stderr.length);
-                 
-                 if (stderr) {
-                     console.log('🔍 GHunt Docker stderr preview:', stderr.substring(0, 500));
-                 }
-                 
-                 // Wait a bit for file to be written
-                 await new Promise(resolve => setTimeout(resolve, 5000));
-                 
-                 // Try to read the output file
-                 if (fs.existsSync(outputFile)) {
-                     console.log('✅ GHunt Docker output file found:', outputFile);
-                     const fileContent = fs.readFileSync(outputFile, 'utf8');
-                     console.log('🔍 GHunt file content length:', fileContent.length);
-                     
-                     try {
-                         const ghuntData = JSON.parse(fileContent);
-                         console.log('✅ GHunt Docker JSON parsed successfully');
-                         ghuntResult = parseGHuntSimple(ghuntData);
-                         console.log('🔍 GHunt Docker extracted data:', ghuntResult);
-                         
-                         // Schedule file cleanup instead of immediate deletion
-                         scheduleFileCleanup(outputFile);
-                     } catch (parseError) {
-                         console.log('❌ GHunt Docker JSON parsing failed:', parseError.message);
-                         console.log('🔍 File content preview:', fileContent.substring(0, 1000));
-                         if (fs.existsSync(outputFile)) {
-                             scheduleFileCleanup(outputFile);
-                         }
-                     }
+                 if (ghuntData) {
+                     console.log('✅ GHunt executed successfully');
+                     ghuntResult = parseGHuntSimple(ghuntData);
+                     console.log('🔍 GHunt extracted data:', ghuntResult);
                  } else {
-                     console.log('❌ GHunt Docker output file not found');
-                     console.log('🔍 Current directory files:', fs.readdirSync('.').filter(f => f.includes('ghunt')));
+                     console.log('❌ GHunt returned no data');
                  }
                  
-             } catch (dockerError) {
-                 console.log('❌ GHunt Docker failed:', dockerError.message);
+             } catch (ghuntError) {
+                 console.log('❌ GHunt failed:', ghuntError.message);
              }
              
              // Method 2: Try local GHunt if Docker failed
              if (!ghuntResult) {
                  try {
                      console.log('🔍 Attempting GHunt with local installation...');
-                     const localArgs = ['email', email, '--json', outputFile];
                      
-                     const { stdout, stderr } = await new Promise((resolve, reject) => {
-                         const { spawn } = require('child_process');
-                         const ghunt = spawn('ghunt', localArgs, { 
-                             stdio: ['pipe', 'pipe', 'pipe'],
-                             shell: false,
-                             env: {
-                                 ...process.env,
-                                 PYTHONUNBUFFERED: '1',
-                                 PYTHONIOENCODING: 'utf-8',
-                                 RICH_NO_COLOR: '1',
-                                 NO_COLOR: '1',
-                                 TERM: 'dumb',
-                                 FORCE_COLOR: '0'
+                     // Use our new tool execution system
+                     const ghuntData = await runToolIfAvailable('ghunt', ['email', email], (stdout, stderr) => {
+                         try {
+                             // Try to parse the output directly
+                             if (stdout && stdout.trim()) {
+                                 const parsed = JSON.parse(stdout);
+                                 return parsed;
                              }
-                         });
-                         
-                         let stdoutData = '';
-                         let stderrData = '';
-                         
-                         ghunt.stdout.on('data', (data) => {
-                             stdoutData += data.toString();
-                         });
-                         
-                         ghunt.stderr.on('data', (data) => {
-                             stderrData += data.toString();
-                         });
-                         
-                         ghunt.on('close', (code) => {
-                             console.log('🔍 GHunt local process exited with code:', code);
-                             resolve({ stdout: stdoutData, stderr: stderrData, code });
-                         });
-                         
-                         ghunt.on('error', (error) => {
-                             console.log('❌ GHunt local process error:', error.message);
-                             reject(error);
-                         });
+                             return null;
+                         } catch (parseError) {
+                             console.log('❌ GHunt stdout parsing failed:', parseError.message);
+                             return null;
+                         }
                      });
                      
-                     console.log('🔍 GHunt local stdout length:', stdout.length);
-                     console.log('🔍 GHunt local stderr length:', stderr.length);
-                     
-                     if (stderr) {
-                         console.log('🔍 GHunt local stderr preview:', stderr.substring(0, 500));
-                     }
-                     
-                     // Wait a bit for file to be written
-                     await new Promise(resolve => setTimeout(resolve, 5000));
-                     
-                     // Try to read the output file
-                     if (fs.existsSync(outputFile)) {
-                         console.log('✅ GHunt local output file found:', outputFile);
-                         const fileContent = fs.readFileSync(outputFile, 'utf8');
-                         
-                         try {
-                             const ghuntData = JSON.parse(fileContent);
-                             console.log('✅ GHunt local JSON parsed successfully');
-                             ghuntResult = parseGHuntSimple(ghuntData);
-                             console.log('🔍 GHunt local extracted data:', ghuntResult);
-                             
-                             // Schedule file cleanup instead of immediate deletion
-                             scheduleFileCleanup(outputFile);
-                         } catch (parseError) {
-                             console.log('❌ GHunt local JSON parsing failed:', parseError.message);
-                             if (fs.existsSync(outputFile)) {
-                                 scheduleFileCleanup(outputFile);
-                             }
-                         }
+                     if (ghuntData) {
+                         console.log('✅ GHunt local executed successfully');
+                         ghuntResult = parseGHuntSimple(ghuntData);
+                         console.log('🔍 GHunt local extracted data:', ghuntResult);
                      } else {
-                         console.log('❌ GHunt local output file not found');
+                         console.log('❌ GHunt local returned no data');
                      }
                      
                  } catch (localError) {
@@ -1580,52 +1467,57 @@ async function isCommandAvailable(cmd) {
 
 async function resolveToolCommand(cmd) {
     console.log(`🔍 Resolving tool command for: ${cmd}`);
+    
     // If directly available, return as-is
     const ok = await isCommandAvailable(cmd);
     console.log(`🔍 Direct command availability for ${cmd}: ${ok}`);
     if (ok) return { command: cmd, viaPython: false };
-        
-        // Cross-platform tool resolution
-        if (process.platform === 'win32') {
-            // Windows: try Scripts folders
-            const pathParts = (process.env.PATH || '').split(';').filter(Boolean);
-            for (const p of pathParts) {
-                try {
-                    // Try .exe and no extension
-                    const exe = path.join(p, `${cmd}.exe`);
-                    if (fs.existsSync(exe)) return { command: exe, viaPython: false };
-                    const bare = path.join(p, cmd);
-                    if (fs.existsSync(bare)) {
-                        return { command: 'python', viaPython: bare };
-                    }
-                } catch {}
-            }
-        } else {
-            // Linux/Mac/Render.com: prioritize Python module execution
-            // since the tools are installed via pip3 install
-            if (cmd === 'sherlock' || cmd === 'holehe' || cmd === 'maigret' || cmd === 'ghunt') {
-                // For Python tools, always try python3 first
-                console.log(`🔍 Using Python module execution for ${cmd}: python3 -m ${cmd}`);
-                return { command: 'python3', viaPython: `-m ${cmd}` };
-            }
-            
-            // For non-Python tools, try common locations
-            const pathParts = (process.env.PATH || '').split(':').filter(Boolean);
-            for (const p of pathParts) {
-                try {
-                    const toolPath = path.join(p, cmd);
-                    if (fs.existsSync(toolPath)) {
-                        return { command: toolPath, viaPython: false };
-                    }
-                } catch {}
-            }
-        }
-        
-        // Final fallback: try python -m <module>
-        const pythonCmd = process.platform === 'win32' ? 'python' : 'python3';
-        console.log(`🔍 Using final fallback for ${cmd}: ${pythonCmd} -m ${cmd}`);
-        return { command: pythonCmd, viaPython: `-m ${cmd}` };
+    
+    // For Python tools, prioritize Python module execution
+    if (cmd === 'sherlock' || cmd === 'holehe' || cmd === 'maigret' || cmd === 'ghunt') {
+        console.log(`🔍 Using Python module execution for ${cmd}: python3 -m ${cmd}`);
+        return { command: 'python3', viaPython: `-m ${cmd}` };
     }
+    
+    // Cross-platform tool resolution
+    if (process.platform === 'win32') {
+        // Windows: try Scripts folders
+        const pathParts = (process.env.PATH || '').split(';').filter(Boolean);
+        for (const p of pathParts) {
+            try {
+                // Try .exe and no extension
+                const exe = path.join(p, `${cmd}.exe`);
+                if (fs.existsSync(exe)) return { command: exe, viaPython: false };
+                const bare = path.join(p, cmd);
+                if (fs.existsSync(bare)) {
+                    return { command: 'python', viaPython: bare };
+                }
+            } catch {}
+        }
+    } else {
+        // Linux/Mac/Render.com: try common locations
+        const pathParts = (process.env.PATH || '').split(':').filter(Boolean);
+        for (const p of pathParts) {
+            try {
+                const toolPath = path.join(p, cmd);
+                if (fs.existsSync(toolPath)) {
+                    return { command: toolPath, viaPython: false };
+                }
+            } catch {}
+        }
+    }
+    
+    // Final fallback: try python -m <module> for Python tools
+    if (cmd === 'sherlock' || cmd === 'holehe' || cmd === 'maigret' || cmd === 'ghunt') {
+        console.log(`🔍 Using final fallback for Python tool ${cmd}: python3 -m ${cmd}`);
+        return { command: 'python3', viaPython: `-m ${cmd}` };
+    }
+    
+    // For non-Python tools, use platform-specific fallback
+    const pythonCmd = process.platform === 'win32' ? 'python' : 'python3';
+    console.log(`🔍 Using final fallback for ${cmd}: ${pythonCmd} -m ${cmd}`);
+    return { command: pythonCmd, viaPython: `-m ${cmd}` };
+}
 
 // Docker-based PhoneInfoga execution for Render.com
 async function runPhoneInfogaDocker(phone) {
@@ -2531,6 +2423,11 @@ app.listen(PORT, () => {
     console.log(`🐍 Python Path: ${process.env.PYTHON_PATH || 'python3'}`);
     console.log(`📁 Working Directory: ${process.cwd()}`);
     console.log(`🔧 Node Version: ${process.version}`);
+    console.log(`🔍 Environment Variables Debug:`);
+    console.log(`   - DB_TYPE: ${process.env.DB_TYPE}`);
+    console.log(`   - DATABASE_URL: ${process.env.DATABASE_URL ? 'Set' : 'Not set'}`);
+    console.log(`   - PYTHON_PATH: ${process.env.PYTHON_PATH}`);
+    console.log(`   - PATH: ${process.env.PATH?.substring(0, 100)}...`);
     console.log(`📦 Available Tools Test: Visit /api/test-tools to verify OSINT tools`);
 });
 
