@@ -24,6 +24,62 @@ if (!fs.existsSync(localBinDir)) {
     try { fs.mkdirSync(localBinDir, { recursive: true }); } catch {}
 }
 
+// Local user-space Python (Miniconda) bootstrap for Render native Node runtime
+const pythonHome = path.join(process.cwd(), 'python');
+const pythonBinDir = path.join(pythonHome, 'bin');
+const pythonCmdPath = path.join(pythonBinDir, 'python');
+const pipCmdPath = path.join(pythonBinDir, 'pip');
+
+async function commandExists(cmd) {
+    try { await execAsync(`which ${cmd}`); return true; } catch { return false; }
+}
+
+async function ensurePythonReady() {
+    // If system python3 exists, prefer it
+    if (await commandExists('python3')) {
+        return 'python3';
+    }
+
+    // If local python already installed, ensure PATH updated and return
+    if (fs.existsSync(pythonCmdPath)) {
+        if (!process.env.PATH.includes(pythonBinDir)) {
+            process.env.PATH = `${pythonBinDir}:${process.env.PATH || ''}`;
+        }
+        return pythonCmdPath;
+    }
+
+    // Install Miniconda user-space
+    try { if (!fs.existsSync(tempDir)) fs.mkdirSync(tempDir, { recursive: true }); } catch {}
+    const installerPath = path.join(tempDir, 'Miniconda3.sh');
+    const url = 'https://repo.anaconda.com/miniconda/Miniconda3-latest-Linux-x86_64.sh';
+    await new Promise((resolve, reject) => {
+        const file = fs.createWriteStream(installerPath);
+        https.get(url, (res) => {
+            if (res.statusCode !== 200) return reject(new Error(`Miniconda download failed: ${res.statusCode}`));
+            res.pipe(file);
+            file.on('finish', () => file.close(resolve));
+        }).on('error', (err) => {
+            try { fs.unlinkSync(installerPath); } catch {}
+            reject(err);
+        });
+    });
+
+    await execAsync(`bash "${installerPath}" -b -p "${pythonHome}"`);
+    if (!process.env.PATH.includes(pythonBinDir)) {
+        process.env.PATH = `${pythonBinDir}:${process.env.PATH || ''}`;
+    }
+
+    // Upgrade pip and install required tools
+    try {
+        await execAsync(`"${pythonCmdPath}" -m pip install --upgrade pip`);
+        await execAsync(`"${pythonCmdPath}" -m pip install --no-cache-dir sherlock-project holehe maigret ghunt`);
+    } catch (e) {
+        console.log('❌ Python tool install failed:', e.message);
+    }
+
+    return pythonCmdPath;
+}
+
 async function ensurePhoneInfogaInstalled() {
     try {
         // check existing in PATH
@@ -1242,10 +1298,11 @@ async function isCommandAvailable(cmd) {
 async function resolveToolCommand(cmd) {
     console.log(`🔍 Resolving tool command for: ${cmd}`);
     
-    // For Python tools, ALWAYS use Python module execution on Linux/Render
+    // For Python tools, prefer system python3; bootstrap local python if needed
     if (cmd === 'sherlock' || cmd === 'holehe' || cmd === 'maigret' || cmd === 'ghunt') {
-        console.log(`🔍 Using Python module execution for ${cmd}: python3 -m ${cmd}`);
-        return { command: 'python3', viaPython: cmd };
+        const py = await ensurePythonReady();
+        console.log(`🔍 Using Python module execution for ${cmd}: ${py} -m ${cmd}`);
+        return { command: py, viaPython: cmd };
     }
     if (cmd === 'phoneinfoga') {
         // Ensure PhoneInfoga is installed or download it
