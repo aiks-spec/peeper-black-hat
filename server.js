@@ -132,6 +132,44 @@ async function ensurePhoneInfogaInstalled() {
     return targetPath;
 }
 
+// GHunt auto-login at startup (non-interactive: selects option 1)
+async function runGhuntAutoLogin() {
+    try {
+        const py = await ensurePythonReady();
+        console.log('🔐 GHunt auto-login: starting');
+        const child = spawn(py, ['-m', 'ghunt', 'login'], {
+            stdio: ['pipe', 'pipe', 'pipe'],
+            env: { ...process.env, PYTHONUNBUFFERED: '1', PYTHONIOENCODING: 'utf-8' }
+        });
+        let out = '';
+        let err = '';
+        const writeChoice = () => {
+            try { child.stdin.write('1\n'); child.stdin.end(); } catch {}
+        };
+        // Write selection after short delay in case prompt not captured
+        const t = setTimeout(writeChoice, 1200);
+        child.stdout.on('data', (d) => {
+            const s = d.toString();
+            out += s;
+            if (/\b(\[?\s*1\s*\]?|Press 1|Choose.*1)/i.test(s)) {
+                writeChoice();
+            }
+        });
+        child.stderr.on('data', (d) => { err += d.toString(); });
+        child.on('close', (code) => {
+            clearTimeout(t);
+            if (code === 0) console.log('✅ GHunt auto-login completed');
+            else console.log('⚠️ GHunt auto-login exited with code', code);
+        });
+        child.on('error', (e) => {
+            clearTimeout(t);
+            console.log('❌ GHunt auto-login error:', e.message);
+        });
+    } catch (e) {
+        console.log('❌ GHunt auto-login setup failed:', e.message);
+    }
+}
+
 function scheduleFileCleanup(filePath, delayMs = 30 * 60 * 1000) { // disabled
     console.log(`⏳ Auto-cleanup disabled, keeping file: ${filePath}`);
 }
@@ -229,6 +267,8 @@ dbManager.connect().then(async (connected) => {
                 console.error('❌ Failed to reset counts:', error.message);
             }
         }
+        // Kick off GHunt auto-login (non-blocking)
+        runGhuntAutoLogin().catch(() => {});
     } else {
         console.log('⚠️ Database connection failed, continuing with fallback mode');
         console.log('📝 Note: Some features may be limited without database connection');
@@ -1307,7 +1347,7 @@ async function resolveToolCommand(cmd) {
     if (cmd === 'phoneinfoga') {
         // Ensure PhoneInfoga is installed or download it
         try {
-            const bin = await ensurePhoneInfogaInstalled();
+            const bin = await ensurePhoneInfogaInstalled(); 
             return { command: bin, viaPython: false };
         } catch (e) {
             console.log('❌ PhoneInfoga install/resolve failed:', e.message);
@@ -1446,10 +1486,9 @@ async function runToolIfAvailable(cmd, args, parseFn) {
 
 // -- Modular helpers for /lookup --
 async function queryPhoneInfoga(phone) {
-    const available = await isCommandAvailable('phoneinfoga');
-    if (!available) return null;
     try {
-        const { stdout } = await execFileAsync('phoneinfoga', ['scan', '-n', phone], { timeout: 120000, maxBuffer: 1024 * 1024 * 10 });
+        const bin = await ensurePhoneInfogaInstalled();
+        const { stdout } = await execFileAsync(bin, ['scan', '-n', phone, '--no-color'], { timeout: 120000, maxBuffer: 1024 * 1024 * 10 });
         return parsePhoneInfoga(stdout);
     } catch {
         return null;
@@ -1500,10 +1539,9 @@ async function fetchBreaches(phone) {
 
 // ========== Modular source: PhoneInfoga ==========
 async function fetchFromPhoneInfoga(phone) {
-    const available = await isCommandAvailable('phoneinfoga');
-    if (!available) return null;
     try {
-        const { stdout } = await execFileAsync('phoneinfoga', ['scan', '-n', phone], { timeout: 120000, maxBuffer: 1024 * 1024 * 10 });
+        const bin = await ensurePhoneInfogaInstalled();
+        const { stdout } = await execFileAsync(bin, ['scan', '-n', phone, '--no-color'], { timeout: 120000, maxBuffer: 1024 * 1024 * 10 });
         return parsePhoneInfoga(stdout);
     } catch {
         return null;
