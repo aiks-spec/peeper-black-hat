@@ -348,8 +348,8 @@ app.post('/api/aggregate', async (req, res) => {
                     if (ghuntData) {
                         return parseGHuntSimple(ghuntData);
                     }
-                }
-                return null;
+                            }
+                            return null;
             }));
         }
         if (qtype === 'username') {
@@ -474,7 +474,7 @@ app.post('/api/email-lookup', async (req, res) => {
                          }
                      }
                      return null;
-                 } catch (parseError) {
+                     } catch (parseError) {
                      console.log('❌ GHunt parsing error:', parseError.message);
                      return null;
                  }
@@ -493,9 +493,9 @@ app.post('/api/email-lookup', async (req, res) => {
              } else {
                  console.log('❌ GHunt extracted no useful data');
              }
-         } catch (error) {
-             console.log('❌ GHunt failed:', error.message);
-         }
+        } catch (error) {
+            console.log('❌ GHunt failed:', error.message);
+        }
         
                  // 3. Holehe (email breach checker)
          try {
@@ -1379,40 +1379,40 @@ async function resolveToolCommand(cmd) {
     // If directly available, return as-is
     const ok = await isCommandAvailable(cmd);
     console.log(`🔍 Direct command availability for ${cmd}: ${ok}`);
-        if (ok) return { command: cmd, viaPython: false };
+    if (ok) return { command: cmd, viaPython: false };
     
     // For Python tools, prioritize Python module execution
     if (cmd === 'sherlock' || cmd === 'holehe' || cmd === 'maigret' || cmd === 'ghunt') {
         console.log(`🔍 Using Python module execution for ${cmd}: python3 -m ${cmd}`);
         return { command: 'python3', viaPython: `-m ${cmd}` };
     }
-        
-        // Cross-platform tool resolution
-        if (process.platform === 'win32') {
-            // Windows: try Scripts folders
-            const pathParts = (process.env.PATH || '').split(';').filter(Boolean);
-            for (const p of pathParts) {
-                try {
-                    // Try .exe and no extension
-                    const exe = path.join(p, `${cmd}.exe`);
-                    if (fs.existsSync(exe)) return { command: exe, viaPython: false };
-                    const bare = path.join(p, cmd);
-                    if (fs.existsSync(bare)) {
-                        return { command: 'python', viaPython: bare };
-                    }
-                } catch {}
-            }
-        } else {
-            // Linux/Mac/Render.com: try common locations
-            const pathParts = (process.env.PATH || '').split(':').filter(Boolean);
-            for (const p of pathParts) {
-                try {
-                    const toolPath = path.join(p, cmd);
-                    if (fs.existsSync(toolPath)) {
-                        return { command: toolPath, viaPython: false };
-                    }
-                } catch {}
-            }
+    
+    // Cross-platform tool resolution
+    if (process.platform === 'win32') {
+        // Windows: try Scripts folders
+        const pathParts = (process.env.PATH || '').split(';').filter(Boolean);
+        for (const p of pathParts) {
+            try {
+                // Try .exe and no extension
+                const exe = path.join(p, `${cmd}.exe`);
+                if (fs.existsSync(exe)) return { command: exe, viaPython: false };
+                const bare = path.join(p, cmd);
+                if (fs.existsSync(bare)) {
+                    return { command: 'python', viaPython: bare };
+                }
+            } catch {}
+        }
+    } else {
+        // Linux/Mac/Render.com: try common locations
+        const pathParts = (process.env.PATH || '').split(':').filter(Boolean);
+        for (const p of pathParts) {
+            try {
+                const toolPath = path.join(p, cmd);
+                if (fs.existsSync(toolPath)) {
+                    return { command: toolPath, viaPython: false };
+                }
+            } catch {}
+        }
     }
     
     // Final fallback: try python -m <module> for Python tools
@@ -1422,9 +1422,9 @@ async function resolveToolCommand(cmd) {
     }
     
     // For non-Python tools, use platform-specific fallback
-        const pythonCmd = process.platform === 'win32' ? 'python' : 'python3';
+    const pythonCmd = process.platform === 'win32' ? 'python' : 'python3';
     console.log(`🔍 Using final fallback for ${cmd}: ${pythonCmd} -m ${cmd}`);
-        return { command: pythonCmd, viaPython: `-m ${cmd}` };
+    return { command: pythonCmd, viaPython: `-m ${cmd}` };
 }
 
 // Docker-based PhoneInfoga execution for Render.com
@@ -1511,9 +1511,9 @@ async function runToolIfAvailable(cmd, args, parseFn) {
         
         // Enhanced environment variables for Linux/Render
         const env = {
-            ...process.env,
-            PYTHONUTF8: '1',
-            PYTHONIOENCODING: 'utf-8',
+                ...process.env,
+                PYTHONUTF8: '1',
+                PYTHONIOENCODING: 'utf-8',
             PYTHONUNBUFFERED: '1',
             TERM: 'dumb',
             NO_COLOR: '1',
@@ -2366,6 +2366,18 @@ app.listen(PORT, () => {
     console.log(`   - PYTHON_PATH: ${process.env.PYTHON_PATH}`);
     console.log(`   - PATH: ${process.env.PATH?.substring(0, 100)}...`);
     console.log(`📦 Available Tools Test: Visit /api/test-tools to verify OSINT tools`);
+    
+    // Test tool availability at startup
+    console.log(`🔍 Testing tool availability at startup...`);
+    const tools = ['sherlock', 'holehe', 'maigret', 'ghunt'];
+    tools.forEach(async (tool) => {
+        try {
+            const resolved = await resolveToolCommand(tool);
+            console.log(`   - ${tool}: ${resolved.command} ${resolved.viaPython || ''}`);
+        } catch (error) {
+            console.log(`   - ${tool}: ❌ Error resolving command`);
+        }
+    });
 });
 
 
