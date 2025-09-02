@@ -12,6 +12,8 @@ class DatabaseManager {
 
     async connect() {
         try {
+            console.log(`🔍 Database connection attempt - Type: ${this.dbType}, URL: ${this.databaseUrl ? 'Set' : 'Not set'}`);
+            
             if (this.dbType === 'postgresql' && this.databaseUrl) {
                 console.log('🐘 Connecting to PostgreSQL database...');
                 this.db = new Pool({
@@ -38,6 +40,7 @@ class DatabaseManager {
             return true;
         } catch (error) {
             console.error('❌ Database connection failed:', error.message);
+            console.error('❌ Database error details:', error);
             this.isConnected = false;
             // Don't throw error, just return false to allow fallback
             return false;
@@ -172,6 +175,8 @@ class DatabaseManager {
             console.log('⚠️ Database not connected, skipping visitor insert');
             return false;
         }
+        
+        console.log(`🔍 Inserting visitor: ${ip} with user agent: ${userAgent?.substring(0, 50)}...`);
 
         try {
             if (this.dbType === 'postgresql') {
@@ -196,6 +201,7 @@ class DatabaseManager {
             return true;
         } catch (error) {
             console.error('❌ Visitor insertion failed:', error.message);
+            console.error('❌ Visitor insertion error details:', error);
             return false;
         }
     }
@@ -205,6 +211,8 @@ class DatabaseManager {
             console.log('⚠️ Database not connected, skipping search insert');
             return null;
         }
+        
+        console.log(`🔍 Inserting search: ${query} (${queryType}) with results: ${results ? 'Yes' : 'No'}`);
 
         try {
             if (this.dbType === 'postgresql') {
@@ -229,6 +237,7 @@ class DatabaseManager {
             }
         } catch (error) {
             console.error('❌ Search insertion failed:', error.message);
+            console.error('❌ Search insertion error details:', error);
             return false;
         }
     }
