@@ -1579,8 +1579,10 @@ async function isCommandAvailable(cmd) {
 }
 
 function resolveToolCommand(cmd) {
+    console.log(`🔍 Resolving tool command for: ${cmd}`);
     // If directly available, return as-is
     return isCommandAvailable(cmd).then((ok) => {
+        console.log(`🔍 Direct command availability for ${cmd}: ${ok}`);
         if (ok) return { command: cmd, viaPython: false };
         
         // Cross-platform tool resolution
@@ -1650,6 +1652,7 @@ function resolveToolCommand(cmd) {
         
         // Final fallback: try python -m <module>
         const pythonCmd = process.platform === 'win32' ? 'python' : 'python3';
+        console.log(`🔍 Using final fallback for ${cmd}: ${pythonCmd} -m ${cmd}`);
         return { command: pythonCmd, viaPython: `-m ${cmd}` };
     });
 }
@@ -1731,6 +1734,7 @@ async function runToolIfAvailable(cmd, args, parseFn) {
         : args;
     console.log(`🔧 Executing: ${spawnCmd} ${spawnArgs.join(' ')}`);
     try {
+        console.log(`🔧 Executing command: ${spawnCmd} with args: ${JSON.stringify(spawnArgs)}`);
         const { stdout, stderr } = await execFileAsync(spawnCmd, spawnArgs, {
             timeout: 180000,
             maxBuffer: 1024 * 1024 * 20,
@@ -1738,7 +1742,10 @@ async function runToolIfAvailable(cmd, args, parseFn) {
                 ...process.env,
                 PYTHONUTF8: '1',
                 PYTHONIOENCODING: 'utf-8',
-                PYTHONUNBUFFERED: '1'
+                PYTHONUNBUFFERED: '1',
+                TERM: 'dumb',
+                NO_COLOR: '1',
+                FORCE_COLOR: '0'
             }
         });
         console.log(`✅ Tool ${cmd} executed successfully`);
@@ -1756,6 +1763,10 @@ async function runToolIfAvailable(cmd, args, parseFn) {
         return parsed;
     } catch (err) {
         console.log(`❌ Tool ${cmd} failed:`, err.message);
+        console.log(`❌ Tool ${cmd} error details:`, err);
+        if (err.code === 'ENOENT') {
+            console.log(`❌ Tool ${cmd} not found in PATH. This usually means the tool is not installed or not in the system PATH.`);
+        }
         return null;
     }
 }
@@ -2545,6 +2556,12 @@ cron.schedule('0 0 * * *', async () => {
 app.listen(PORT, () => {
     console.log(`🚀 OSINT Lookup Engine running on port ${PORT}`);
     console.log(`🌐 Access at: http://localhost:${PORT}`);
+    console.log(`📊 Environment: ${process.env.NODE_ENV || 'development'}`);
+    console.log(`🗄️ Database Type: ${process.env.DB_TYPE || 'sqlite'}`);
+    console.log(`🐍 Python Path: ${process.env.PYTHON_PATH || 'python3'}`);
+    console.log(`📁 Working Directory: ${process.cwd()}`);
+    console.log(`🔧 Node Version: ${process.version}`);
+    console.log(`📦 Available Tools Test: Visit /api/test-tools to verify OSINT tools`);
 });
 
 
