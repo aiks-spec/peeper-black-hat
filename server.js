@@ -16,68 +16,16 @@ const execFileAsync = promisify(execFile);
 const cleanupQueue = new Map(); // Track files to cleanup
 
 // Ensure temp directory exists for Linux/Render
+// Temp directory handling disabled per user request (keep files persistent)
 const tempDir = path.join(process.cwd(), 'temp');
-if (!fs.existsSync(tempDir)) {
-    fs.mkdirSync(tempDir, { recursive: true });
-    console.log(`📁 Created temp directory: ${tempDir}`);
+
+function scheduleFileCleanup(filePath, delayMs = 30 * 60 * 1000) { // disabled
+    console.log(`⏳ Auto-cleanup disabled, keeping file: ${filePath}`);
 }
 
-function scheduleFileCleanup(filePath, delayMs = 30 * 60 * 1000) { // 30 minutes default
-    if (cleanupQueue.has(filePath)) {
-        clearTimeout(cleanupQueue.get(filePath));
-        cleanupQueue.delete(filePath);
-        fs.unlinkSync(filePath); // Remove existing file immediately
-    }
-    
-    const timeoutId = setTimeout(() => {
-        try {
-            if (fs.existsSync(filePath)) {
-                fs.unlinkSync(filePath);
-                console.log(`🗑️ Cleaned up file: ${filePath}`);
-            }
-        } catch (error) {
-            console.log(`❌ Error cleaning up file ${filePath}:`, error.message);
-        } finally {
-            cleanupQueue.delete(filePath);
-        }
-    }, delayMs);
-    
-    cleanupQueue.set(filePath, timeoutId);
-    console.log(`⏰ Scheduled cleanup for ${filePath} in ${delayMs/1000/60} minutes`);
-}
-
-// Cleanup all temporary files and database connections on server shutdown
+// Cleanup on shutdown: keep files (no deletions), just close DB
 process.on('SIGINT', async () => {
-    console.log('\n🧹 Cleaning up temporary files and database connections...');
-    cleanupQueue.forEach((timeoutId, filePath) => {
-        clearTimeout(timeoutId);
-        try {
-            if (fs.existsSync(filePath)) {
-                fs.unlinkSync(filePath);
-                console.log(`🗑️ Cleaned up: ${filePath}`);
-            }
-        } catch (error) {
-            console.log(`❌ Error cleaning up ${filePath}:`, error.message);
-        }
-    });
-    
-    // Clean up temp directory
-    try {
-        if (fs.existsSync(tempDir)) {
-            const tempFiles = fs.readdirSync(tempDir);
-            for (const file of tempFiles) {
-                const filePath = path.join(tempDir, file);
-                fs.unlinkSync(filePath);
-                console.log(`🗑️ Cleaned up temp file: ${filePath}`);
-            }
-            fs.rmdirSync(tempDir);
-            console.log(`🗑️ Cleaned up temp directory: ${tempDir}`);
-        }
-    } catch (error) {
-        console.log(`❌ Error cleaning up temp directory:`, error.message);
-    }
-    
-    // Close database connection
+    console.log('\n🧹 Shutdown: keeping temp files (auto-delete disabled). Closing DB...');
     await dbManager.cleanup();
     process.exit(0);
 });
@@ -87,29 +35,29 @@ try {
     console.log('🌐 Running on Linux/Render platform');
     
     // Add common Python paths for Linux/Render
-    const linuxPaths = [
-        '/usr/local/bin',
-        '/usr/bin',
-        '/bin',
-        '/opt/python/bin',
-        '/home/render/.local/bin',
-        '/root/.local/bin',
-        '/usr/local/lib/python3.11/bin',
-        '/usr/local/lib/python3.10/bin',
-        '/usr/local/lib/python3.9/bin'
-    ];
-    
-    const existingPath = process.env.PATH || '';
-    const newPaths = linuxPaths.filter(p => fs.existsSync(p));
-    
-    if (newPaths.length > 0) {
+        const linuxPaths = [
+            '/usr/local/bin',
+            '/usr/bin',
+            '/bin',
+            '/opt/python/bin',
+            '/home/render/.local/bin',
+            '/root/.local/bin',
+            '/usr/local/lib/python3.11/bin',
+            '/usr/local/lib/python3.10/bin',
+            '/usr/local/lib/python3.9/bin'
+        ];
+        
+        const existingPath = process.env.PATH || '';
+        const newPaths = linuxPaths.filter(p => fs.existsSync(p));
+        
+        if (newPaths.length > 0) {
         process.env.PATH = `${newPaths.join(':')}:${existingPath}`;
-        console.log('✅ Added Linux Python paths to PATH');
-    }
-    
+            console.log('✅ Added Linux Python paths to PATH');
+        }
+        
     // Set environment variables for Python tools and prevent shell issues
-    process.env.PYTHONUNBUFFERED = '1';
-    process.env.PYTHONIOENCODING = 'utf-8';
+        process.env.PYTHONUNBUFFERED = '1';
+        process.env.PYTHONIOENCODING = 'utf-8';
     process.env.PYTHONUTF8 = '1';
     process.env.LC_ALL = 'C.UTF-8';
     process.env.LANG = 'C.UTF-8';
@@ -150,18 +98,8 @@ app.use(express.static('public'));
 // Database setup
 const dbManager = new DatabaseManager();
 
-// Auto-cleanup expired files every 5 minutes
-cron.schedule('*/5 * * * *', async () => {
-    try {
-        console.log('🧹 Running auto-cleanup for expired files...');
-        const deletedFiles = await dbManager.cleanupExpiredFiles();
-        if (deletedFiles.length > 0) {
-            console.log(`🗑️ Cleaned up ${deletedFiles.length} expired files:`, deletedFiles);
-        }
-    } catch (error) {
-        console.error('❌ Auto-cleanup failed:', error.message);
-    }
-});
+// Auto-cleanup disabled per user request
+// cron.schedule('*/5 * * * *', async () => {});
 
 // Initialize database connection
 dbManager.connect().then(async (connected) => {
@@ -758,13 +696,13 @@ app.post('/api/phone-lookup', async (req, res) => {
                             
                             console.log('🔍 Docker PhoneInfoga command:', `docker ${dockerArgs.join(' ')}`);
                             
-                                                         const { stdout, stderr } = await new Promise((resolve, reject) => {
-                                 const phoneinfoga = spawn('docker', dockerArgs, { 
-                                     stdio: ['pipe', 'pipe', 'pipe'],
+                            const { stdout, stderr } = await new Promise((resolve, reject) => {
+                                const phoneinfoga = spawn('docker', dockerArgs, { 
+                                    stdio: ['pipe', 'pipe', 'pipe'],
                                      shell: false,
-                                     env: {
-                                         ...process.env,
-                                         PYTHONUNBUFFERED: '1',
+                                    env: {
+                                        ...process.env,
+                                        PYTHONUNBUFFERED: '1',
                                          PYTHONIOENCODING: 'utf-8',
                                          PYTHONUTF8: '1',
                                          LC_ALL: 'C.UTF-8',
@@ -773,8 +711,8 @@ app.post('/api/phone-lookup', async (req, res) => {
                                          TERM: 'dumb',
                                          NO_COLOR: '1',
                                          FORCE_COLOR: '0'
-                                     }
-                                 });
+                                    }
+                                });
                                 
                                 let stdoutData = '';
                                 let stderrData = '';
@@ -1343,11 +1281,11 @@ async function isCommandAvailable(cmd) {
     try {
         // Linux/Render: use 'which' command
         await execAsync(`which ${cmd}`);
-        return true;
-    } catch {
-        return false;
+            return true;
+        } catch {
+            return false;
+        }
     }
-}
 
 async function resolveToolCommand(cmd) {
     console.log(`🔍 Resolving tool command for: ${cmd}`);
@@ -1361,19 +1299,19 @@ async function resolveToolCommand(cmd) {
     // For other tools, check if directly available
     const ok = await isCommandAvailable(cmd);
     console.log(`🔍 Direct command availability for ${cmd}: ${ok}`);
-    if (ok) return { command: cmd, viaPython: false };
-    
+        if (ok) return { command: cmd, viaPython: false };
+        
     // Linux/Render: try common locations
-    const pathParts = (process.env.PATH || '').split(':').filter(Boolean);
-    for (const p of pathParts) {
-        try {
-            const toolPath = path.join(p, cmd);
-            if (fs.existsSync(toolPath)) {
-                return { command: toolPath, viaPython: false };
+            const pathParts = (process.env.PATH || '').split(':').filter(Boolean);
+            for (const p of pathParts) {
+                try {
+                    const toolPath = path.join(p, cmd);
+                    if (fs.existsSync(toolPath)) {
+                        return { command: toolPath, viaPython: false };
+                    }
+                } catch {}
             }
-        } catch {}
-    }
-    
+            
     // Final fallback for non-Python tools
     console.log(`🔍 Using final fallback for ${cmd}: python3 -m ${cmd}`);
     return { command: 'python3', viaPython: cmd };
@@ -1481,9 +1419,9 @@ async function runToolIfAvailable(cmd, args, parseFn) {
         
         // Enhanced environment variables for Linux/Render stdout handling
         const env = {
-            ...process.env,
-            PYTHONUTF8: '1',
-            PYTHONIOENCODING: 'utf-8',
+                ...process.env,
+                PYTHONUTF8: '1',
+                PYTHONIOENCODING: 'utf-8',
             PYTHONUNBUFFERED: '1',
             LC_ALL: 'C.UTF-8',
             LANG: 'C.UTF-8',
@@ -2315,16 +2253,8 @@ async function getPhoneApiData(phone) {
     }
 }
 
-// Cleanup old records daily (using dbManager instead of undefined db)
-cron.schedule('0 0 * * *', async () => {
-    try {
-    const thirtyDaysAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
-        await dbManager.cleanupExpiredFiles();
-        console.log('🧹 Daily cleanup completed');
-    } catch (error) {
-        console.log('❌ Daily cleanup failed:', error.message);
-    }
-});
+// Daily cleanup disabled per user request
+// cron.schedule('0 0 * * *', async () => {});
 
 // Test endpoint for tool availability
 app.get('/api/test-tools', async (req, res) => {
