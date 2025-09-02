@@ -338,78 +338,23 @@ app.post('/api/aggregate', async (req, res) => {
             // Also try social media search with phone number
             const phoneUsername = trimmed.replace(/[^a-zA-Z0-9+]/g, '');
             tasks.push(runToolIfAvailable('sherlock', [phoneUsername, '--print-found', '--no-color'], parseSherlock));
-                                                    tasks.push(runToolIfAvailable('maigret', [phoneUsername, '--no-color'], parseMaigretSimple));
+                         tasks.push(runToolIfAvailable('maigret', [phoneUsername, '--no-color'], parseMaigretSimple));
         }
         if (qtype === 'email') {
             tasks.push(runToolIfAvailable('holehe', [trimmed, '-C', '--no-color'], parseHolehe));
-                                                   // For aggregate endpoint, use Docker GHunt
-             console.log('🔍 Using Docker GHunt for aggregate');
-             
-             tasks.push((async () => {
-                 try {
-                     console.log('🔍 Running GHunt Docker for aggregate...');
-                     
-                     const currentDir = process.cwd().replace(/\\/g, '/');
-                     const dockerArgs = [
-                         'run', '--rm',
-                         '-v', `${currentDir}:/workspace`,
-                         '-w', '/workspace',
-                         'mxrch/ghunt:latest',
-                         'ghunt', 'email', trimmed
-                     ];
-                     
-                     const { stdout, stderr } = await new Promise((resolve, reject) => {
-                         const { spawn } = require('child_process');
-                         const ghunt = spawn('docker', dockerArgs, { 
-                             stdio: ['pipe', 'pipe', 'pipe'],
-                             shell: false,
-                             env: {
-                                 ...process.env,
-                                 PYTHONUNBUFFERED: '1',
-                                 PYTHONIOENCODING: 'utf-8',
-                                 TERM: 'dumb',
-                                 NO_COLOR: '1',
-                                 FORCE_COLOR: '0'
-                             }
-                         });
-                         
-                         let stdoutData = '';
-                         let stderrData = '';
-                         
-                         ghunt.stdout.on('data', (data) => {
-                             stdoutData += data.toString();
-                         });
-                         
-                         ghunt.stderr.on('data', (data) => {
-                             stderrData += data.toString();
-                         });
-                         
-                         ghunt.on('close', (code) => {
-                             resolve({ stdout: stdoutData, stderr: stderrData, code });
-                         });
-                         
-                         ghunt.on('error', (error) => {
-                             reject(error);
-                         });
-                     });
-                     
-                     if (stdout && stdout.trim()) {
-                         const ghuntData = parseGHuntFromText(stdout);
-                         if (ghuntData) {
-                             return parseGHuntSimple(ghuntData);
-                         }
-                     }
-                     
-                     return null;
-                 } catch (error) {
-                     console.log('❌ GHunt aggregate Docker failed:', error.message);
-                     return null;
-                 }
-             })());
+            tasks.push(runToolIfAvailable('ghunt', ['email', trimmed], (stdout, stderr) => {
+                if (stdout && stdout.trim()) {
+                    const ghuntData = parseGHuntFromText(stdout);
+                    if (ghuntData) {
+                        return parseGHuntSimple(ghuntData);
+                    }
+                }
+                return null;
+            }));
         }
         if (qtype === 'username') {
             tasks.push(runToolIfAvailable('sherlock', [trimmed, '--print-found', '--no-color'], parseSherlock));
-                                                    tasks.push(runToolIfAvailable('maigret', [trimmed, '--no-color'], parseMaigretSimple));
+                         tasks.push(runToolIfAvailable('maigret', [trimmed, '--no-color'], parseMaigretSimple));
         }
 
         const results = await Promise.all(tasks.map(p => p.catch(() => null)));
@@ -623,8 +568,8 @@ app.post('/api/email-lookup', async (req, res) => {
                      
                      if (ghuntData) {
                          console.log('✅ GHunt local executed successfully');
-                         ghuntResult = parseGHuntSimple(ghuntData);
-                         console.log('🔍 GHunt local extracted data:', ghuntResult);
+                             ghuntResult = parseGHuntSimple(ghuntData);
+                             console.log('🔍 GHunt local extracted data:', ghuntResult);
                      } else {
                          console.log('❌ GHunt local returned no data');
                      }
@@ -772,7 +717,7 @@ app.post('/api/email-lookup', async (req, res) => {
         try {
             console.log('🔍 Running Maigret...');
             const username = email.split('@')[0];
-                         const maigretResult = await runToolIfAvailable('maigret', [username, '--no-color'], parseMaigretSimple);
+            const maigretResult = await runToolIfAvailable('maigret', [username, '--no-color'], parseMaigretSimple);
             
             if (maigretResult && maigretResult.socialProfiles) {
                 console.log('✅ Maigret data received, social profiles:', maigretResult.socialProfiles.length);
@@ -1534,40 +1479,40 @@ async function resolveToolCommand(cmd) {
     // If directly available, return as-is
     const ok = await isCommandAvailable(cmd);
     console.log(`🔍 Direct command availability for ${cmd}: ${ok}`);
-    if (ok) return { command: cmd, viaPython: false };
+        if (ok) return { command: cmd, viaPython: false };
     
     // For Python tools, prioritize Python module execution
     if (cmd === 'sherlock' || cmd === 'holehe' || cmd === 'maigret' || cmd === 'ghunt') {
         console.log(`🔍 Using Python module execution for ${cmd}: python3 -m ${cmd}`);
         return { command: 'python3', viaPython: `-m ${cmd}` };
     }
-    
-    // Cross-platform tool resolution
-    if (process.platform === 'win32') {
-        // Windows: try Scripts folders
-        const pathParts = (process.env.PATH || '').split(';').filter(Boolean);
-        for (const p of pathParts) {
-            try {
-                // Try .exe and no extension
-                const exe = path.join(p, `${cmd}.exe`);
-                if (fs.existsSync(exe)) return { command: exe, viaPython: false };
-                const bare = path.join(p, cmd);
-                if (fs.existsSync(bare)) {
-                    return { command: 'python', viaPython: bare };
-                }
-            } catch {}
-        }
-    } else {
-        // Linux/Mac/Render.com: try common locations
-        const pathParts = (process.env.PATH || '').split(':').filter(Boolean);
-        for (const p of pathParts) {
-            try {
-                const toolPath = path.join(p, cmd);
-                if (fs.existsSync(toolPath)) {
-                    return { command: toolPath, viaPython: false };
-                }
-            } catch {}
-        }
+        
+        // Cross-platform tool resolution
+        if (process.platform === 'win32') {
+            // Windows: try Scripts folders
+            const pathParts = (process.env.PATH || '').split(';').filter(Boolean);
+            for (const p of pathParts) {
+                try {
+                    // Try .exe and no extension
+                    const exe = path.join(p, `${cmd}.exe`);
+                    if (fs.existsSync(exe)) return { command: exe, viaPython: false };
+                    const bare = path.join(p, cmd);
+                    if (fs.existsSync(bare)) {
+                        return { command: 'python', viaPython: bare };
+                    }
+                } catch {}
+            }
+        } else {
+            // Linux/Mac/Render.com: try common locations
+            const pathParts = (process.env.PATH || '').split(':').filter(Boolean);
+            for (const p of pathParts) {
+                try {
+                    const toolPath = path.join(p, cmd);
+                    if (fs.existsSync(toolPath)) {
+                        return { command: toolPath, viaPython: false };
+                    }
+                } catch {}
+            }
     }
     
     // Final fallback: try python -m <module> for Python tools
@@ -1577,9 +1522,9 @@ async function resolveToolCommand(cmd) {
     }
     
     // For non-Python tools, use platform-specific fallback
-    const pythonCmd = process.platform === 'win32' ? 'python' : 'python3';
+        const pythonCmd = process.platform === 'win32' ? 'python' : 'python3';
     console.log(`🔍 Using final fallback for ${cmd}: ${pythonCmd} -m ${cmd}`);
-    return { command: pythonCmd, viaPython: `-m ${cmd}` };
+        return { command: pythonCmd, viaPython: `-m ${cmd}` };
 }
 
 // Docker-based PhoneInfoga execution for Render.com
@@ -1649,6 +1594,7 @@ async function runToolIfAvailable(cmd, args, parseFn) {
     if (resolved.viaPython) {
         console.log(`🐍 Using Python module execution: ${resolved.command} ${resolved.viaPython}`);
     }
+    
     const spawnCmd = resolved.command;
     const spawnArgs = resolved.viaPython
         ? (resolved.viaPython.startsWith('-m ')
@@ -1657,29 +1603,48 @@ async function runToolIfAvailable(cmd, args, parseFn) {
             ? [resolved.viaPython, ...args]
             : [resolved.viaPython, ...args])
         : args;
+    
     console.log(`🔧 Executing: ${spawnCmd} ${spawnArgs.join(' ')}`);
+    
     try {
         console.log(`🔧 Executing command: ${spawnCmd} with args: ${JSON.stringify(spawnArgs)}`);
+        
+        // Enhanced environment variables for Linux/Render
+        const env = {
+            ...process.env,
+            PYTHONUTF8: '1',
+            PYTHONIOENCODING: 'utf-8',
+            PYTHONUNBUFFERED: '1',
+            TERM: 'dumb',
+            NO_COLOR: '1',
+            FORCE_COLOR: '0',
+            ANSI_COLORS_DISABLED: '1',
+            CLICOLOR: '0',
+            CLICOLOR_FORCE: '0'
+        };
+        
         const { stdout, stderr } = await execFileAsync(spawnCmd, spawnArgs, {
             timeout: 180000,
             maxBuffer: 1024 * 1024 * 20,
-            env: {
-                ...process.env,
-                PYTHONUTF8: '1',
-                PYTHONIOENCODING: 'utf-8',
-                PYTHONUNBUFFERED: '1',
-                TERM: 'dumb',
-                NO_COLOR: '1',
-                FORCE_COLOR: '0'
-            }
+            env: env
         });
+        
         console.log(`✅ Tool ${cmd} executed successfully`);
         console.log(`📤 stdout length: ${stdout?.length || 0}`);
         console.log(`📤 stderr length: ${stderr?.length || 0}`);
+        
+        // Debug output for troubleshooting
+        if (stdout && stdout.length > 0) {
+            console.log(`🔍 ${cmd} stdout preview:`, stdout.substring(0, 200) + '...');
+        }
+        if (stderr && stderr.length > 0) {
+            console.log(`🔍 ${cmd} stderr preview:`, stderr.substring(0, 200) + '...');
+        }
+        
         const parsed = parseFn(stdout, stderr);
         if (parsed && typeof parsed === 'object') parsed.__source = cmd;
         
-        // Debug logging for PhoneInfoga
+        // Debug logging for specific tools
         if (cmd === 'phoneinfoga' || (cmd === 'docker' && args.includes('phoneinfoga'))) {
             console.log('🔍 PhoneInfoga raw output preview:', stdout.substring(0, 500) + '...');
             console.log('🔍 PhoneInfoga parsed result:', parsed);
@@ -1689,9 +1654,18 @@ async function runToolIfAvailable(cmd, args, parseFn) {
     } catch (err) {
         console.log(`❌ Tool ${cmd} failed:`, err.message);
         console.log(`❌ Tool ${cmd} error details:`, err);
+        
         if (err.code === 'ENOENT') {
             console.log(`❌ Tool ${cmd} not found in PATH. This usually means the tool is not installed or not in the system PATH.`);
+            console.log(`🔍 Current PATH: ${process.env.PATH}`);
+            console.log(`🔍 Resolved command: ${resolved.command}`);
+            console.log(`🔍 Platform: ${process.platform}`);
         }
+        
+        if (err.code === 'ETIMEDOUT') {
+            console.log(`❌ Tool ${cmd} timed out after 3 minutes`);
+        }
+        
         return null;
     }
 }
