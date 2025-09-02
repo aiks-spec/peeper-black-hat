@@ -15,7 +15,7 @@ const execFileAsync = promisify(execFile);
 // File cleanup system for publishing
 const cleanupQueue = new Map(); // Track files to cleanup
 
-// Ensure temp directory exists for Render.com
+// Ensure temp directory exists for Linux/Render
 const tempDir = path.join(process.cwd(), 'temp');
 if (!fs.existsSync(tempDir)) {
     fs.mkdirSync(tempDir, { recursive: true });
@@ -82,67 +82,44 @@ process.on('SIGINT', async () => {
     process.exit(0);
 });
 
-// Cross-platform PATH handling for Render.com deployment
+// Linux/Render PATH handling
 try {
-    if (process.platform === 'win32') {
-        // Windows: try common Python locations
-        const userProfile = process.env.USERPROFILE || '';
-        const localApp = process.env.LOCALAPPDATA || '';
-        const candidates = [
-            path.join(userProfile, 'AppData', 'Local', 'Programs', 'Python'),
-            path.join(localApp, 'Programs', 'Python')
-        ];
-        const scriptPaths = [];
-        candidates.forEach((base) => {
-            try {
-                if (fs.existsSync(base)) {
-                    const entries = fs.readdirSync(base);
-                    entries.forEach((dir) => {
-                        const sp = path.join(base, dir, 'Scripts');
-                        if (fs.existsSync(sp)) scriptPaths.push(sp);
-                    });
-                }
-            } catch {}
-        });
-        if (scriptPaths.length) {
-            process.env.PATH = `${scriptPaths.join(';')};${process.env.PATH}`;
-        }
-    } else {
-        // Linux/Mac/Render.com: use standard PATH and common locations
-        console.log('🌐 Running on Linux/Mac/Render.com platform');
-        
-        // Add common Python paths for Linux/Render.com
-        const linuxPaths = [
-            '/usr/local/bin',
-            '/usr/bin',
-            '/bin',
-            '/opt/python/bin',
-            '/home/render/.local/bin',
-            '/root/.local/bin',
-            '/usr/local/lib/python3.11/bin',
-            '/usr/local/lib/python3.10/bin',
-            '/usr/local/lib/python3.9/bin'
-        ];
-        
-        const existingPath = process.env.PATH || '';
-        const pathSeparator = process.platform === 'win32' ? ';' : ':';
-        const newPaths = linuxPaths.filter(p => fs.existsSync(p));
-        
-        if (newPaths.length > 0) {
-            process.env.PATH = `${newPaths.join(pathSeparator)}${pathSeparator}${existingPath}`;
-            console.log('✅ Added Linux Python paths to PATH');
-        }
-        
-        // Set environment variables for Python tools and prevent shell issues
-        process.env.PYTHONUNBUFFERED = '1';
-        process.env.PYTHONIOENCODING = 'utf-8';
-        process.env.TERM = 'dumb';
-        process.env.NO_COLOR = '1';
-        process.env.FORCE_COLOR = '0';
-        process.env.ANSI_COLORS_DISABLED = '1';
-        process.env.CLICOLOR = '0';
-        process.env.CLICOLOR_FORCE = '0';
+    console.log('🌐 Running on Linux/Render platform');
+    
+    // Add common Python paths for Linux/Render
+    const linuxPaths = [
+        '/usr/local/bin',
+        '/usr/bin',
+        '/bin',
+        '/opt/python/bin',
+        '/home/render/.local/bin',
+        '/root/.local/bin',
+        '/usr/local/lib/python3.11/bin',
+        '/usr/local/lib/python3.10/bin',
+        '/usr/local/lib/python3.9/bin'
+    ];
+    
+    const existingPath = process.env.PATH || '';
+    const newPaths = linuxPaths.filter(p => fs.existsSync(p));
+    
+    if (newPaths.length > 0) {
+        process.env.PATH = `${newPaths.join(':')}:${existingPath}`;
+        console.log('✅ Added Linux Python paths to PATH');
     }
+    
+    // Set environment variables for Python tools and prevent shell issues
+    process.env.PYTHONUNBUFFERED = '1';
+    process.env.PYTHONIOENCODING = 'utf-8';
+    process.env.PYTHONUTF8 = '1';
+    process.env.LC_ALL = 'C.UTF-8';
+    process.env.LANG = 'C.UTF-8';
+    process.env.LANGUAGE = 'C.UTF-8';
+    process.env.TERM = 'dumb';
+    process.env.NO_COLOR = '1';
+    process.env.FORCE_COLOR = '0';
+    process.env.ANSI_COLORS_DISABLED = '1';
+    process.env.CLICOLOR = '0';
+    process.env.CLICOLOR_FORCE = '0';
 } catch (error) {
     console.log('⚠️ PATH expansion failed, using default:', error.message);
 }
@@ -210,9 +187,9 @@ dbManager.connect().then(async (connected) => {
     console.log('⚠️ Continuing without database connection');
 });
 
-// Visitor tracking middleware - FIXED FOR RENDER.COM
+// Visitor tracking middleware - FIXED FOR LINUX/RENDER
 app.use((req, res, next) => {
-    // Get real IP address (Render.com uses proxy headers)
+    // Get real IP address (Linux/Render uses proxy headers)
     const ip = req.headers['x-forwarded-for'] || 
                req.headers['x-real-ip'] || 
                req.connection.remoteAddress || 
@@ -368,7 +345,7 @@ app.post('/api/aggregate', async (req, res) => {
     }
 });
 
-// Email lookup endpoint (CUFinder + GHunt + Holehe + Sherlock + Maigret)
+// Email lookup endpoint (CUFinder + GHunt + Holehe + Sherlock + Maigret) - Linux/Render optimized
 app.post('/api/email-lookup', async (req, res) => {
     try {
         const { email } = req.body;
@@ -700,7 +677,7 @@ app.post('/api/email-lookup', async (req, res) => {
     }
 });
 
-// Phone lookup endpoint (PhoneInfoga + phone-number-api.com + Sherlock + Maigret + Holehe)
+// Phone lookup endpoint (PhoneInfoga + phone-number-api.com + Sherlock + Maigret) - Linux/Render optimized
 app.post('/api/phone-lookup', async (req, res) => {
     try {
         const { phone } = req.body;
@@ -729,12 +706,12 @@ app.post('/api/phone-lookup', async (req, res) => {
             metadata: {}
         };
         
-        // 1. PhoneInfoga (primary phone OSINT tool) - DOCKER-FIRST APPROACH
+                 // 1. PhoneInfoga (primary phone OSINT tool) - LINUX/RENDER DOCKER APPROACH
         try {
             console.log('📱 Running PhoneInfoga...');
             let infoga = null;
             
-            // Method 1: Try Docker PhoneInfoga first (most reliable on Render)
+                         // Method 1: Try Docker PhoneInfoga first (most reliable on Linux/Render)
             try {
                 console.log('🐳 Attempting PhoneInfoga with Docker...');
                 infoga = await runPhoneInfogaDocker(phone);
@@ -781,19 +758,23 @@ app.post('/api/phone-lookup', async (req, res) => {
                             
                             console.log('🔍 Docker PhoneInfoga command:', `docker ${dockerArgs.join(' ')}`);
                             
-                            const { stdout, stderr } = await new Promise((resolve, reject) => {
-                                const phoneinfoga = spawn('docker', dockerArgs, { 
-                                    stdio: ['pipe', 'pipe', 'pipe'],
-                                    shell: false,
-                                    env: {
-                                        ...process.env,
-                                        PYTHONUNBUFFERED: '1',
-                                        PYTHONIOENCODING: 'utf-8',
-                                        TERM: 'dumb',
-                                        NO_COLOR: '1',
-                                        FORCE_COLOR: '0'
-                                    }
-                                });
+                                                         const { stdout, stderr } = await new Promise((resolve, reject) => {
+                                 const phoneinfoga = spawn('docker', dockerArgs, { 
+                                     stdio: ['pipe', 'pipe', 'pipe'],
+                                     shell: false,
+                                     env: {
+                                         ...process.env,
+                                         PYTHONUNBUFFERED: '1',
+                                         PYTHONIOENCODING: 'utf-8',
+                                         PYTHONUTF8: '1',
+                                         LC_ALL: 'C.UTF-8',
+                                         LANG: 'C.UTF-8',
+                                         LANGUAGE: 'C.UTF-8',
+                                         TERM: 'dumb',
+                                         NO_COLOR: '1',
+                                         FORCE_COLOR: '0'
+                                     }
+                                 });
                                 
                                 let stdoutData = '';
                                 let stderrData = '';
@@ -1133,7 +1114,7 @@ app.post('/api/ip-lookup', async (req, res) => {
     }
 });
 
-// Stats endpoint - FIXED FOR RENDER.COM
+// Stats endpoint - FIXED FOR LINUX/RENDER
 app.get('/api/stats', async (req, res) => {
     try {
         const visitorStats = await dbManager.getVisitorStats();
@@ -1360,16 +1341,11 @@ function detectQueryType(value) {
 
 async function isCommandAvailable(cmd) {
     try {
-        // Windows 'where', *nix 'which'. Prefer 'where' as environment is Windows.
-        await execAsync(`where ${cmd} | cat`);
+        // Linux/Render: use 'which' command
+        await execAsync(`which ${cmd}`);
         return true;
     } catch {
-        try {
-            await execAsync(`which ${cmd} | cat`);
-            return true;
-        } catch {
-            return false;
-        }
+        return false;
     }
 }
 
@@ -1387,40 +1363,23 @@ async function resolveToolCommand(cmd) {
     console.log(`🔍 Direct command availability for ${cmd}: ${ok}`);
     if (ok) return { command: cmd, viaPython: false };
     
-    // Cross-platform tool resolution for non-Python tools
-    if (process.platform === 'win32') {
-        // Windows: try Scripts folders
-        const pathParts = (process.env.PATH || '').split(';').filter(Boolean);
-        for (const p of pathParts) {
-            try {
-                const exe = path.join(p, `${cmd}.exe`);
-                if (fs.existsSync(exe)) return { command: exe, viaPython: false };
-                const bare = path.join(p, cmd);
-                if (fs.existsSync(bare)) {
-                    return { command: 'python', viaPython: bare };
-                }
-            } catch {}
-        }
-    } else {
-        // Linux/Mac/Render.com: try common locations
-        const pathParts = (process.env.PATH || '').split(':').filter(Boolean);
-        for (const p of pathParts) {
-            try {
-                const toolPath = path.join(p, cmd);
-                if (fs.existsSync(toolPath)) {
-                    return { command: toolPath, viaPython: false };
-                }
-            } catch {}
-        }
+    // Linux/Render: try common locations
+    const pathParts = (process.env.PATH || '').split(':').filter(Boolean);
+    for (const p of pathParts) {
+        try {
+            const toolPath = path.join(p, cmd);
+            if (fs.existsSync(toolPath)) {
+                return { command: toolPath, viaPython: false };
+            }
+        } catch {}
     }
     
     // Final fallback for non-Python tools
-    const pythonCmd = process.platform === 'win32' ? 'python' : 'python3';
-    console.log(`🔍 Using final fallback for ${cmd}: ${pythonCmd} -m ${cmd}`);
-    return { command: pythonCmd, viaPython: cmd };
+    console.log(`🔍 Using final fallback for ${cmd}: python3 -m ${cmd}`);
+    return { command: 'python3', viaPython: cmd };
 }
 
-// Docker-based PhoneInfoga execution for Render.com
+// Docker-based PhoneInfoga execution for Linux/Render
 async function runPhoneInfogaDocker(phone) {
     return new Promise((resolve, reject) => {
         console.log('🐳 Starting PhoneInfoga Docker container...');
@@ -1430,6 +1389,8 @@ async function runPhoneInfogaDocker(phone) {
             '-e', 'TERM=dumb',
             '-e', 'NO_COLOR=1',
             '-e', 'FORCE_COLOR=0',
+            '-e', 'PYTHONUNBUFFERED=1',
+            '-e', 'PYTHONIOENCODING=utf-8',
             'sundowndev/phoneinfoga:latest',
             'scan', '-n', phone
         ];
@@ -1440,7 +1401,9 @@ async function runPhoneInfogaDocker(phone) {
                 ...process.env,
                 TERM: 'dumb',
                 NO_COLOR: '1',
-                FORCE_COLOR: '0'
+                FORCE_COLOR: '0',
+                PYTHONUNBUFFERED: '1',
+                PYTHONIOENCODING: 'utf-8'
             }
         });
         
@@ -2174,7 +2137,7 @@ async function scrapePhoneNumberApiHtml(phone) {
                     timeout: 12000,
                     maxRedirects: 3,
                     headers: {
-                        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36',
+                        'User-Agent': 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36',
                         'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8',
                         'Accept-Language': 'en-US,en;q=0.9',
                         'Referer': 'https://phone-number-api.com/'
@@ -2378,8 +2341,8 @@ app.get('/api/test-tools', async (req, res) => {
                 platform: process.platform
             };
             
-            // Test actual execution on Linux/Render only
-            if (process.platform !== 'win32' && resolved.command && resolved.viaPython) {
+            // Test actual execution on Linux/Render
+            if (resolved.command && resolved.viaPython) {
                 try {
                     await execFileAsync(resolved.command, ['-m', resolved.viaPython, '--help'], { 
                         timeout: 10000, 
@@ -2433,8 +2396,8 @@ app.listen(PORT, () => {
             const resolved = await resolveToolCommand(tool);
             console.log(`   - ${tool}: ${resolved.command} ${resolved.viaPython || ''}`);
             
-            // Test actual execution on Linux/Render only
-            if (process.platform !== 'win32' && resolved.command && resolved.viaPython) {
+            // Test actual execution on Linux/Render
+            if (resolved.command && resolved.viaPython) {
                 execFileAsync(resolved.command, ['-m', resolved.viaPython, '--help'], { 
                     timeout: 10000, 
                     maxBuffer: 1024 * 1024,
