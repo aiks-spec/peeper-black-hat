@@ -1397,6 +1397,64 @@ app.get('/api/stats', async (req, res) => {
     }
 });
 
+// Tool test endpoint to verify OSINT tools are working
+app.get('/api/test-tools', async (req, res) => {
+    const results = {};
+    
+    // Test each tool
+    const tools = ['sherlock', 'holehe', 'maigret', 'ghunt'];
+    
+    for (const tool of tools) {
+        try {
+            console.log(`🧪 Testing tool: ${tool}`);
+            const resolved = await resolveToolCommand(tool);
+            results[tool] = {
+                resolved: resolved,
+                available: !!resolved.command
+            };
+            
+            if (resolved.command) {
+                // Try a simple help command
+                try {
+                    const { stdout, stderr } = await execFileAsync(resolved.command, 
+                        resolved.viaPython 
+                            ? (resolved.viaPython.startsWith('-m ') 
+                                ? ['-m', resolved.viaPython.replace('-m ', ''), '--help']
+                                : resolved.viaPython.startsWith('-m')
+                                ? [resolved.viaPython, '--help']
+                                : [resolved.viaPython, '--help'])
+                            : ['--help'], 
+                        { timeout: 10000 }
+                    );
+                    results[tool].helpTest = {
+                        success: true,
+                        stdoutLength: stdout?.length || 0,
+                        stderrLength: stderr?.length || 0
+                    };
+                } catch (helpError) {
+                    results[tool].helpTest = {
+                        success: false,
+                        error: helpError.message
+                    };
+                }
+            }
+        } catch (error) {
+            results[tool] = {
+                resolved: null,
+                available: false,
+                error: error.message
+            };
+        }
+    }
+    
+    res.json({
+        success: true,
+        tools: results,
+        pythonVersion: process.env.PYTHON_VERSION || 'unknown',
+        nodeVersion: process.version
+    });
+});
+
 // Search history endpoint
 app.get('/api/search-history', async (req, res) => {
     try {
@@ -1558,7 +1616,7 @@ function resolveToolCommand(cmd) {
                 try {
                     // Check if python command exists
                     const pythonPath = path.join(p, pythonCmd);
-                    if (fs.existsSync(pythonPath) || isCommandAvailable(pythonCmd)) {
+                    if (fs.existsSync(pythonPath)) {
                         return { command: pythonCmd, viaPython: `-m ${cmd}` };
                     }
                 } catch {}
@@ -1657,6 +1715,11 @@ async function runToolIfAvailable(cmd, args, parseFn) {
     if (!resolved.command) {
         console.log(`❌ Tool ${cmd} not available`);
         return null;
+    }
+    
+    // Additional debugging for Python module execution
+    if (resolved.viaPython) {
+        console.log(`🐍 Using Python module execution: ${resolved.command} ${resolved.viaPython}`);
     }
     const spawnCmd = resolved.command;
     const spawnArgs = resolved.viaPython
