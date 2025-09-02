@@ -9,7 +9,7 @@ A powerful OSINT (Open Source Intelligence) tool that provides comprehensive inf
 - **👤 Username Search**: Sherlock, Maigret across 100+ platforms
 - **🌐 IP Geolocation**: IPInfo integration with detailed location data
 - **🔄 Real-time Results**: Live data from multiple sources
-- **🧹 Auto-cleanup**: Automatic file cleanup after 30 minutes
+- **🧹 Auto-cleanup**: Optional (disabled by default)
 - **🌍 Cross-platform**: Works on Windows, Linux, and Mac
 
 ## 🚀 Live Demo
@@ -19,7 +19,7 @@ A powerful OSINT (Open Source Intelligence) tool that provides comprehensive inf
 ## 🛠️ Technologies Used
 
 - **Backend**: Node.js, Express.js
-- **Database**: SQLite3
+- **Database**: PostgreSQL (Render) with SQLite fallback
 - **Frontend**: HTML, CSS, JavaScript
 - **OSINT Tools**: Sherlock, Maigret, PhoneInfoga, GHunt, Holehe
 - **APIs**: CUFinder, IPInfo, Phone-Number-API
@@ -29,7 +29,7 @@ A powerful OSINT (Open Source Intelligence) tool that provides comprehensive inf
 - Node.js (v14 or higher)
 - npm or yarn
 - Python 3.7+ (for OSINT tools)
-- Docker (optional, for tool fallbacks)
+ 
 
 ## 🔧 Installation
 
