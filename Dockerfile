@@ -1,7 +1,7 @@
 # Clean Dockerfile - no tput or colors.sh handling
 FROM ubuntu:22.04
 
-# Set environment variables to prevent shell issues
+# Set environment variables to prevent shell issues and ensure proper stdout handling
 ENV TERM=dumb
 ENV NO_COLOR=1
 ENV FORCE_COLOR=0
@@ -13,6 +13,10 @@ ENV ENV=""
 ENV PYTHONPATH="/usr/local/lib/python3.10/dist-packages:/usr/lib/python3/dist-packages"
 ENV PYTHONUNBUFFERED=1
 ENV PYTHONIOENCODING=utf-8
+ENV PYTHONUTF8=1
+ENV LC_ALL=C.UTF-8
+ENV LANG=C.UTF-8
+ENV LANGUAGE=C.UTF-8
 
 # Install all dependencies
 RUN apt-get update && apt-get install -y \
@@ -58,19 +62,26 @@ RUN echo "=== Testing module imports ===" && \
     python3 -c "import ghunt; print('✅ GHunt module available')"
 
 # Test tool execution via Python modules (with verbose output for debugging)
-RUN echo "=== Testing tool execution ===" && \
-    echo "Testing Sherlock..." && \
+RUN echo "=== Testing tool execution and stdout handling ===" && \
+    echo "Testing Sherlock stdout..." && \
     python3 -m sherlock --help 2>&1 | head -10 && \
-    echo "✅ Sherlock test completed" && \
-    echo "Testing Holehe..." && \
+    echo "✅ Sherlock stdout test completed" && \
+    echo "Testing Holehe stdout..." && \
     python3 -m holehe --help 2>&1 | head -10 && \
-    echo "✅ Holehe test completed" && \
-    echo "Testing Maigret..." && \
+    echo "✅ Holehe stdout test completed" && \
+    echo "Testing Maigret stdout..." && \
     python3 -m maigret --help 2>&1 | head -10 && \
-    echo "✅ Maigret test completed" && \
-    echo "Testing GHunt..." && \
+    echo "✅ Maigret stdout test completed" && \
+    echo "Testing GHunt stdout..." && \
     python3 -m ghunt --help 2>&1 | head -10 && \
-    echo "✅ GHunt test completed"
+    echo "✅ GHunt stdout test completed" && \
+    echo "=== Testing stdout encoding ===" && \
+    python3 -c "import sys; print('stdout encoding:', sys.stdout.encoding); print('stderr encoding:', sys.stderr.encoding)" && \
+    echo "=== Testing environment variables ===" && \
+    echo "PYTHONUNBUFFERED: $PYTHONUNBUFFERED" && \
+    echo "PYTHONIOENCODING: $PYTHONIOENCODING" && \
+    echo "PYTHONUTF8: $PYTHONUTF8" && \
+    echo "LC_ALL: $LC_ALL"
 
 # Set working directory
 WORKDIR /app
