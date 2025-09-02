@@ -2,6 +2,9 @@
 set -e
 
 echo "=== Entrypoint ==="
+unset BASH_ENV || true
+unset ENV || true
+export NO_COLOR=1 TERM=dumb CLICOLOR=0 CLICOLOR_FORCE=0 ANSI_COLORS_DISABLED=1
 echo "Node: $(node -v)"
 echo "NPM:  $(npm -v)"
 echo "Python: $(python3 --version 2>&1 || true)"
