@@ -29,7 +29,7 @@ class DatabaseManager {
                 client.release();
                 this.isConnected = true;
             } else {
-                console.log('📁 Using SQLite database...');
+                console.log('📁 Using SQLite database (fallback)...');
                 const dbPath = process.env.DB_PATH || './osint.db';
                 this.db = new sqlite3.Database(dbPath);
                 this.isConnected = true;
