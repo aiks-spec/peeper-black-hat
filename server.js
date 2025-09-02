@@ -650,121 +650,16 @@ app.post('/api/phone-lookup', async (req, res) => {
             let infoga = null;
             
                          // Method 1: Try Docker PhoneInfoga first (most reliable on Linux/Render)
+            // Native PhoneInfoga only (Docker removed)
             try {
-                console.log('🐳 Attempting PhoneInfoga with Docker...');
-                infoga = await runPhoneInfogaDocker(phone);
-                if (infoga) {
-                    console.log('✅ PhoneInfoga Docker execution successful');
-                }
-            } catch (dockerError) {
-                console.log('❌ PhoneInfoga Docker failed:', dockerError.message);
-                
-                // Method 2: Try local PhoneInfoga as fallback
-                try {
-                    console.log('🔍 Attempting PhoneInfoga with local installation...');
-                    infoga = await runToolIfAvailable('phoneinfoga', ['scan', '-n', phone, '--no-color'], parsePhoneInfoga);
-                    if (infoga) {
-                        console.log('✅ PhoneInfoga local execution successful');
-                    }
-                } catch (localError) {
-                    console.log('❌ PhoneInfoga local failed:', localError.message);
-                }
+                console.log('🔍 Attempting PhoneInfoga (native)...');
+                infoga = await runToolIfAvailable('phoneinfoga', ['scan', '-n', phone, '--no-color'], parsePhoneInfoga);
+                if (infoga) console.log('✅ PhoneInfoga native execution successful');
+            } catch (nativeError) {
+                console.log('❌ PhoneInfoga native failed:', nativeError.message);
             }
             
-            // Method 2: Try Docker if local failed
-            if (!infoga) {
-                try {
-                    console.log('🔍 Attempting PhoneInfoga with Docker...');
-                    const { spawn } = require('child_process');
-                    
-                    // Try multiple Docker images for better compatibility
-                    const dockerImages = [
-                        'sundowndev/phoneinfoga:latest',
-                        'ghcr.io/sundowndev/phoneinfoga:latest',
-                        'sundowndev/phoneinfoga'
-                    ];
-                    
-                    for (const image of dockerImages) {
-                        try {
-                            console.log(`🔍 Trying Docker image: ${image}`);
-                            
-                            const dockerArgs = [
-                                'run', '--rm',
-                                image,
-                                'scan', '-n', phone
-                            ];
-                            
-                            console.log('🔍 Docker PhoneInfoga command:', `docker ${dockerArgs.join(' ')}`);
-                            
-                            const { stdout, stderr } = await new Promise((resolve, reject) => {
-                                const phoneinfoga = spawn('docker', dockerArgs, { 
-                                    stdio: ['pipe', 'pipe', 'pipe'],
-                                     shell: false,
-                                    env: {
-                                        ...process.env,
-                                        PYTHONUNBUFFERED: '1',
-                                         PYTHONIOENCODING: 'utf-8',
-                                         PYTHONUTF8: '1',
-                                         LC_ALL: 'C.UTF-8',
-                                         LANG: 'C.UTF-8',
-                                         LANGUAGE: 'C.UTF-8',
-                                         TERM: 'dumb',
-                                         NO_COLOR: '1',
-                                         FORCE_COLOR: '0'
-                                    }
-                                });
-                                
-                                let stdoutData = '';
-                                let stderrData = '';
-                                
-                                phoneinfoga.stdout.on('data', (data) => {
-                                    stdoutData += data.toString();
-                                });
-                                
-                                phoneinfoga.stderr.on('data', (data) => {
-                                    stderrData += data.toString();
-                                });
-                                
-                                phoneinfoga.on('close', (code) => {
-                                    console.log(`🔍 PhoneInfoga Docker process exited with code: ${code} for image: ${image}`);
-                                    resolve({ stdout: stdoutData, stderr: stderrData, code });
-                                });
-                                
-                                phoneinfoga.on('error', (error) => {
-                                    console.log(`❌ PhoneInfoga Docker process error for image ${image}:`, error.message);
-                                    reject(error);
-                                });
-                            });
-                            
-                            console.log(`🔍 PhoneInfoga Docker stdout length: ${stdout.length} for image: ${image}`);
-                            console.log(`🔍 PhoneInfoga Docker stderr length: ${stderr.length} for image: ${image}`);
-                            
-                            if (stdout && stdout.length > 0) {
-                                infoga = parsePhoneInfoga(stdout);
-                                console.log(`✅ PhoneInfoga Docker data parsed successfully from image: ${image}`);
-                                break; // Success, exit the loop
-                            } else if (stderr && stderr.includes('docker: error during connect')) {
-                                console.log('💡 Docker Desktop is not running. Skipping Docker attempts.');
-                                break; // Don't try other images if Docker isn't running
-                            } else {
-                                console.log(`❌ PhoneInfoga Docker produced no output from image: ${image}`);
-                                continue; // Try next image
-                            }
-                            
-                        } catch (imageError) {
-                            console.log(`❌ PhoneInfoga Docker failed for image ${image}:`, imageError.message);
-                            if (imageError.message.includes('docker: error during connect')) {
-                                console.log('💡 Docker Desktop is not running. Skipping remaining Docker attempts.');
-                                break; // Don't try other images if Docker isn't running
-                            }
-                            continue; // Try next image
-                        }
-                    }
-                    
-                } catch (dockerError) {
-                    console.log('❌ PhoneInfoga Docker failed completely:', dockerError.message);
-                }
-            }
+            // Docker path removed entirely
             
             // Method 3: Try CLI helper as last resort
             if (!infoga) {
@@ -799,7 +694,7 @@ app.post('/api/phone-lookup', async (req, res) => {
             const phoneApiResult = await scrapePhoneNumberApiHtml(phone);
             
             if (phoneApiResult && phoneApiResult.phoneApi) {
-                console.log('✅ phone-number-api.com data received');
+                console.log('✅ phone-number-api.com data received');   
                 const pna = phoneApiResult.phoneApi;
                 
                 // Fill in missing basic info
@@ -1317,63 +1212,7 @@ async function resolveToolCommand(cmd) {
     return { command: 'python3', viaPython: cmd };
 }
 
-// Docker-based PhoneInfoga execution for Linux/Render
-async function runPhoneInfogaDocker(phone) {
-    return new Promise((resolve, reject) => {
-        console.log('🐳 Starting PhoneInfoga Docker container...');
-        
-        const dockerArgs = [
-            'run', '--rm',
-            '-e', 'TERM=dumb',
-            '-e', 'NO_COLOR=1',
-            '-e', 'FORCE_COLOR=0',
-            '-e', 'PYTHONUNBUFFERED=1',
-            '-e', 'PYTHONIOENCODING=utf-8',
-            'sundowndev/phoneinfoga:latest',
-            'scan', '-n', phone
-        ];
-        
-        const child = spawn('docker', dockerArgs, {
-            stdio: ['ignore', 'pipe', 'pipe'],
-            env: {
-                ...process.env,
-                TERM: 'dumb',
-                NO_COLOR: '1',
-                FORCE_COLOR: '0',
-                PYTHONUNBUFFERED: '1',
-                PYTHONIOENCODING: 'utf-8'
-            }
-        });
-        
-        let stdout = '';
-        let stderr = '';
-        
-        child.stdout.on('data', (data) => {
-            stdout += data.toString();
-        });
-        
-        child.stderr.on('data', (data) => {
-            stderr += data.toString();
-        });
-        
-        child.on('close', (code) => {
-            if (code === 0) {
-                console.log('✅ PhoneInfoga Docker completed successfully');
-                const result = parsePhoneInfoga(stdout, stderr);
-                resolve(result);
-            } else {
-                console.log('❌ PhoneInfoga Docker failed with code:', code);
-                console.log('stderr:', stderr);
-                reject(new Error(`Docker PhoneInfoga failed with code ${code}`));
-            }
-        });
-        
-        child.on('error', (error) => {
-            console.log('❌ PhoneInfoga Docker spawn error:', error.message);
-            reject(error);
-        });
-    });
-}
+// PhoneInfoga Docker helper removed (Docker not used)
 
 async function runToolIfAvailable(cmd, args, parseFn) {
     console.log(`🔧 Running tool: ${cmd} with args:`, args);
@@ -1457,7 +1296,7 @@ async function runToolIfAvailable(cmd, args, parseFn) {
         if (parsed && typeof parsed === 'object') parsed.__source = cmd;
         
         // Debug logging for specific tools
-        if (cmd === 'phoneinfoga' || (cmd === 'docker' && args.includes('phoneinfoga'))) {
+        if (cmd === 'phoneinfoga') {
             console.log('🔍 PhoneInfoga raw output preview:', stdout.substring(0, 500) + '...');
             console.log('🔍 PhoneInfoga parsed result:', parsed);
         }
