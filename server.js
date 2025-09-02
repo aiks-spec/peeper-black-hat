@@ -337,31 +337,79 @@ app.post('/api/aggregate', async (req, res) => {
             tasks.push(scrapePhoneNumberApiHtml(trimmed));
             // Also try social media search with phone number
             const phoneUsername = trimmed.replace(/[^a-zA-Z0-9+]/g, '');
-            tasks.push(runToolIfAvailable('sherlock', [phoneUsername, '--print-found', '--no-color', '--json'], parseSherlock));
-                         tasks.push(runToolIfAvailable('maigret', [phoneUsername, '--no-color', '--json'], parseMaigretSimple));
+            tasks.push(runToolIfAvailable('sherlock', [phoneUsername, '--print-found', '--no-color'], parseSherlock));
+                                                    tasks.push(runToolIfAvailable('maigret', [phoneUsername, '--no-color'], parseMaigretSimple));
         }
         if (qtype === 'email') {
-            tasks.push(runToolIfAvailable('holehe', [trimmed, '-C', '--no-color', '--json'], parseHolehe));
-                                                   // For aggregate endpoint, use our new tool execution system
-             console.log('🔍 Using Python module GHunt for aggregate');
+            tasks.push(runToolIfAvailable('holehe', [trimmed, '-C', '--no-color'], parseHolehe));
+                                                   // For aggregate endpoint, use Docker GHunt
+             console.log('🔍 Using Docker GHunt for aggregate');
              
-             tasks.push(runToolIfAvailable('ghunt', ['email', trimmed, '--json'], (stdout, stderr) => {
+             tasks.push((async () => {
                  try {
-                     // Try to parse the output directly
+                     console.log('🔍 Running GHunt Docker for aggregate...');
+                     
+                     const currentDir = process.cwd().replace(/\\/g, '/');
+                     const dockerArgs = [
+                         'run', '--rm',
+                         '-v', `${currentDir}:/workspace`,
+                         '-w', '/workspace',
+                         'mxrch/ghunt:latest',
+                         'ghunt', 'email', trimmed
+                     ];
+                     
+                     const { stdout, stderr } = await new Promise((resolve, reject) => {
+                         const { spawn } = require('child_process');
+                         const ghunt = spawn('docker', dockerArgs, { 
+                             stdio: ['pipe', 'pipe', 'pipe'],
+                             shell: false,
+                             env: {
+                                 ...process.env,
+                                 PYTHONUNBUFFERED: '1',
+                                 PYTHONIOENCODING: 'utf-8',
+                                 TERM: 'dumb',
+                                 NO_COLOR: '1',
+                                 FORCE_COLOR: '0'
+                             }
+                         });
+                         
+                         let stdoutData = '';
+                         let stderrData = '';
+                         
+                         ghunt.stdout.on('data', (data) => {
+                             stdoutData += data.toString();
+                         });
+                         
+                         ghunt.stderr.on('data', (data) => {
+                             stderrData += data.toString();
+                         });
+                         
+                         ghunt.on('close', (code) => {
+                             resolve({ stdout: stdoutData, stderr: stderrData, code });
+                         });
+                         
+                         ghunt.on('error', (error) => {
+                             reject(error);
+                         });
+                     });
+                     
                      if (stdout && stdout.trim()) {
-                         const parsed = JSON.parse(stdout);
-                         return parsed;
+                         const ghuntData = parseGHuntFromText(stdout);
+                         if (ghuntData) {
+                             return parseGHuntSimple(ghuntData);
+                         }
                      }
+                     
                      return null;
-                 } catch (parseError) {
-                     console.log('❌ GHunt aggregate stdout parsing failed:', parseError.message);
+                 } catch (error) {
+                     console.log('❌ GHunt aggregate Docker failed:', error.message);
                      return null;
                  }
-             }));
+             })());
         }
         if (qtype === 'username') {
-            tasks.push(runToolIfAvailable('sherlock', [trimmed, '--print-found', '--no-color', '--json'], parseSherlock));
-                         tasks.push(runToolIfAvailable('maigret', [trimmed, '--no-color', '--json'], parseMaigretSimple));
+            tasks.push(runToolIfAvailable('sherlock', [trimmed, '--print-found', '--no-color'], parseSherlock));
+                                                    tasks.push(runToolIfAvailable('maigret', [trimmed, '--no-color'], parseMaigretSimple));
         }
 
         const results = await Promise.all(tasks.map(p => p.catch(() => null)));
@@ -473,34 +521,84 @@ app.post('/api/email-lookup', async (req, res) => {
              
              let ghuntResult = null;
              
-             // Method 1: Try GHunt with our new tool execution system
+             // Method 1: Try GHunt with Docker (proper implementation)
              try {
-                 console.log('🔍 Attempting GHunt with Python module...');
+                 console.log('🔍 Attempting GHunt with Docker...');
                  
-                 const ghuntData = await runToolIfAvailable('ghunt', ['email', email, '--json'], (stdout, stderr) => {
-                     try {
-                         // Try to parse the output directly
-                         if (stdout && stdout.trim()) {
-                             const parsed = JSON.parse(stdout);
-                             return parsed;
+                 // Use Docker with proper volume mounting and environment
+                 const currentDir = process.cwd().replace(/\\/g, '/');
+                 const dockerArgs = [
+                     'run', '--rm',
+                     '-v', `${currentDir}:/workspace`,
+                     '-w', '/workspace',
+                     'mxrch/ghunt:latest',
+                     'ghunt', 'email', email
+                 ];
+                 
+                 console.log('🔍 Docker GHunt command:', `docker ${dockerArgs.join(' ')}`);
+                 
+                 const { stdout, stderr } = await new Promise((resolve, reject) => {
+                     const { spawn } = require('child_process');
+                     const ghunt = spawn('docker', dockerArgs, { 
+                         stdio: ['pipe', 'pipe', 'pipe'],
+                         shell: false,
+                         env: {
+                             ...process.env,
+                             PYTHONUNBUFFERED: '1',
+                             PYTHONIOENCODING: 'utf-8',
+                             TERM: 'dumb',
+                             NO_COLOR: '1',
+                             FORCE_COLOR: '0'
                          }
-                         return null;
-                     } catch (parseError) {
-                         console.log('❌ GHunt stdout parsing failed:', parseError.message);
-                         return null;
-                     }
+                     });
+                     
+                     let stdoutData = '';
+                     let stderrData = '';
+                     
+                     ghunt.stdout.on('data', (data) => {
+                         stdoutData += data.toString();
+                     });
+                     
+                     ghunt.stderr.on('data', (data) => {
+                         stderrData += data.toString();
+                     });
+                     
+                     ghunt.on('close', (code) => {
+                         console.log('🔍 GHunt Docker process exited with code:', code);
+                         resolve({ stdout: stdoutData, stderr: stderrData, code });
+                     });
+                     
+                     ghunt.on('error', (error) => {
+                         console.log('❌ GHunt Docker process error:', error.message);
+                         reject(error);
+                     });
                  });
                  
-                 if (ghuntData) {
-                     console.log('✅ GHunt executed successfully');
-                     ghuntResult = parseGHuntSimple(ghuntData);
-                     console.log('🔍 GHunt extracted data:', ghuntResult);
-                 } else {
-                     console.log('❌ GHunt returned no data');
+                 console.log('🔍 GHunt Docker stdout length:', stdout.length);
+                 console.log('🔍 GHunt Docker stderr length:', stderr.length);
+                 
+                 if (stderr) {
+                     console.log('🔍 GHunt Docker stderr preview:', stderr.substring(0, 500));
                  }
                  
-             } catch (ghuntError) {
-                 console.log('❌ GHunt failed:', ghuntError.message);
+                 // Parse the output directly from stdout (no JSON file needed)
+                 if (stdout && stdout.trim()) {
+                     console.log('✅ GHunt Docker executed successfully');
+                     
+                     // Try to extract useful information from the text output
+                     const ghuntData = parseGHuntFromText(stdout);
+                     if (ghuntData) {
+                         ghuntResult = parseGHuntSimple(ghuntData);
+                         console.log('🔍 GHunt Docker extracted data:', ghuntResult);
+                     } else {
+                         console.log('❌ GHunt Docker output parsing failed');
+                     }
+                 } else {
+                     console.log('❌ GHunt Docker returned no output');
+                 }
+                 
+             } catch (dockerError) {
+                 console.log('❌ GHunt Docker failed:', dockerError.message);
              }
              
              // Method 2: Try local GHunt if Docker failed
@@ -557,7 +655,7 @@ app.post('/api/email-lookup', async (req, res) => {
                  // 3. Holehe (email breach checker)
          try {
              console.log('🔍 Running Holehe...');
-             const holeheResult = await runToolIfAvailable('holehe', [email, '-C', '--no-color', '--json'], async (stdout, stderr) => {
+             const holeheResult = await runToolIfAvailable('holehe', [email, '-C', '--no-color'], async (stdout, stderr) => {
                 // Wait a bit for the CSV file to be written
                 await new Promise(resolve => setTimeout(resolve, 8000));
                 
@@ -603,7 +701,7 @@ app.post('/api/email-lookup', async (req, res) => {
              console.log('🔍 Username extracted:', username);
              
              // First run Sherlock for general search
-             const sherlockResult = await runToolIfAvailable('sherlock', [username, '--print-found', '--no-color', '--json'], (stdout) => {
+             const sherlockResult = await runToolIfAvailable('sherlock', [username, '--print-found', '--no-color'], (stdout) => {
                 console.log('🔍 Sherlock raw output length:', stdout.length);
                 console.log('🔍 Sherlock raw output preview:', stdout.substring(0, 300) + '...');
                 try {
@@ -674,7 +772,7 @@ app.post('/api/email-lookup', async (req, res) => {
         try {
             console.log('🔍 Running Maigret...');
             const username = email.split('@')[0];
-                         const maigretResult = await runToolIfAvailable('maigret', [username, '--no-color', '--json'], parseMaigretSimple);
+                         const maigretResult = await runToolIfAvailable('maigret', [username, '--no-color'], parseMaigretSimple);
             
             if (maigretResult && maigretResult.socialProfiles) {
                 console.log('✅ Maigret data received, social profiles:', maigretResult.socialProfiles.length);
@@ -1034,7 +1132,7 @@ app.post('/api/phone-lookup', async (req, res) => {
              console.log('🔍 Running Maigret...');
              // For phone numbers, try both with and without + symbol
              const username = phone.replace(/[^a-zA-Z0-9+]/g, '');
-             const maigretResult = await runToolIfAvailable('maigret', [username, '--no-color', '--json'], parseMaigretSimple);
+             const maigretResult = await runToolIfAvailable('maigret', [username, '--no-color'], parseMaigretSimple);
             
             if (maigretResult && maigretResult.socialProfiles) {
                 console.log('✅ Maigret data received, social profiles:', maigretResult.socialProfiles.length);
@@ -1365,6 +1463,47 @@ app.get('/api/download-holehe-csv', (req, res) => {
 });
 
 // Helper functions
+function parseGHuntFromText(text) {
+    try {
+        // GHunt outputs information in a structured text format
+        // Extract key information from the text output
+        const result = {};
+        
+        // Extract name
+        const nameMatch = text.match(/Name:\s*(.+)/i);
+        if (nameMatch) result.name = nameMatch[1].trim();
+        
+        // Extract email
+        const emailMatch = text.match(/Email:\s*(.+)/i);
+        if (emailMatch) result.email = emailMatch[1].trim();
+        
+        // Extract picture URL
+        const pictureMatch = text.match(/Picture:\s*(https?:\/\/[^\s]+)/i);
+        if (pictureMatch) result.picture = pictureMatch[1].trim();
+        
+        // Extract services
+        const servicesMatch = text.match(/Services:\s*([\s\S]*?)(?=\n\n|\n[A-Z]|$)/i);
+        if (servicesMatch) {
+            const services = servicesMatch[1].split('\n')
+                .map(line => line.trim())
+                .filter(line => line && !line.startsWith('Services:'))
+                .map(line => line.replace(/^[-*]\s*/, ''));
+            result.services = services;
+        }
+        
+        // Extract additional info
+        const infoMatch = text.match(/Additional Info:\s*([\s\S]*?)(?=\n\n|\n[A-Z]|$)/i);
+        if (infoMatch) {
+            result.additionalInfo = infoMatch[1].trim();
+        }
+        
+        return Object.keys(result).length > 0 ? result : null;
+    } catch (error) {
+        console.log('❌ GHunt text parsing failed:', error.message);
+        return null;
+    }
+}
+
 function detectQueryType(value) {
     const isEmail = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value);
     const normalizedPhone = value.replace(/[\s\-\(\)]/g, '');
