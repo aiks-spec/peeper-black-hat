@@ -12,6 +12,7 @@ const fs = require('fs');
 const execAsync = promisify(exec);
 const execFileAsync = promisify(execFile);
 const https = require('https');
+const os = require('os');
 
 // File cleanup system for publishing
 const cleanupQueue = new Map(); // Track files to cleanup
@@ -194,11 +195,11 @@ console.log('   - PORT:', process.env.PORT);
 console.log('   - All env keys containing DB:', Object.keys(process.env).filter(k => k.toLowerCase().includes('db')));
 
 // Initialize database connection
+initializeGhuntDirect();
 dbManager.connect().then(async (connected) => {
     if (connected) {
         console.log('✅ Database connection established');
         
-        // Reset counts for production deployment (uncomment when deploying)
         if (process.env.NODE_ENV === 'production' && process.env.RESET_COUNTS === 'true') {
             try {
                 console.log('🔄 Resetting counts for production deployment...');
@@ -208,8 +209,9 @@ dbManager.connect().then(async (connected) => {
                 console.error('❌ Failed to reset counts:', error.message);
             }
         }
-        // Re-enable GHunt auto-login at startup (non-blocking)
-        runGhuntAutoLogin().catch(() => {});
+        
+        // Remove any previous ghunt auto-login usage
+        // GHunt is initialized via token/cookies above
     } else {
         console.log('⚠️ Database connection failed, continuing with fallback mode');
         console.log('📝 Note: Some features may be limited without database connection');
@@ -2413,3 +2415,53 @@ app.get('/api/db-health', async (req, res) => {
 // Search history endpoint
 
 // Database connection is already initialized above
+
+// GHunt direct credentials (v2.3.3) - provided by user
+const GHUNT_TOKEN_DIRECT = "oauth2_4/0AVMBsJihaCHpsqoEm3L-M7XKc_3kEWEVvqBP4Jzm14hCBOsHKqcI9mm-y0GA0iVO_6jtLw";
+const GHUNT_COOKIES_B64_DIRECT = "eyJjb29raWVzIjp7IlNJRCI6ImcuYTAwMDB3anlHMXVCT0FKQWQtUGVIWlUwVFo4RkZGeFdZenZzRnphYTBON1NEZElRcHZGTjZsYlIyY010Z0VUTlpLXy1HSGpOTHdBQ2dZS0FYb1NBUkFTRlFIR1gyTWlkemlvN0gxU2pEazBpcm4tUEN3MzN4b1ZBVUY4eUtvbXZncmZKSWh0bVJRYTBwTlVjd3YyMDA3NiIsIl9fU2VjdXJlLTNQU0lEIjoiZy5hMDAwMHdqeUcxdUJPQUpBZC1QZUhaVTBUWjhGRkZ4V1l6dnNGemFhME43U0RkSVFwdkZOMTNYX2cxRDB3SXVSTi1lT3pRTnpjQUFDZ1lLQWNFU0FSQVNGUUhHWDJNaUdTY0lpMktxa3A1WVgzRVZBUU40TVJvVkFVRjh5S3BSWGxxY3huQlE2aGNQTmtCVjZFRngwMDc2IiwiTFNJRCI6Im8ubXlhY2NvdW50Lmdvb2dsZS5jb218cy5JTnxzLnlvdXR1YmU6Zy5hMDAwMHdqeUc2dmJ1LTRyWUJHSTZ1aE5hU1ZsekVIZjN4OGJHV2tTdmYwNWxtS2J5eEFSRGpCbVJlSmd2TUkybDlaQmVZdjAyd0FDZ1lLQWQwU0FSQVNGUUhHWDJNaUdTbU1yQ1dtMUhCcU5hVnVhQ3A5S1JvVkFVRjh5S3F5R0MxdHJDUmp3R204clFGcTJHTnYwMDc2IiwiSFNJRCI6IkFkYlQ4aXZxVzMwbjBMQkpwIiwiU1NJRCI6IkE0TkNnYkEzTVNYQWhCVV8tIiwiQVBJU0lEIjoiMU9oOEc1Rm5XV1FCY3ZrdC9BODBGVmVBbjltdUU5aUlZWCIsIlNBUElTSUQiOiItTExlWnNFNmJGTlFMY042L0FCMG1rTF9xNTJqQ0ZwTWUxIn0sIm9hdXRoX3Rva2VuIjoib2F1dGgyXzQvMEFWTUJzSmloYUNIcHNxb0VtM0wtTTdYS2NfM2tFV0VWdnFCUDRKem0xNGhDQk9zSEtxY0k5bW0teTBHQTBpVk9fNmp0THcifQ==";
+
+function initializeGhuntDirect() {
+    try {
+        const homeDir = process.env.HOME || os.homedir() || process.cwd();
+        const cfgDir = path.join(homeDir, '.config', 'ghunt');
+        try { fs.mkdirSync(cfgDir, { recursive: true }); } catch {}
+
+        let ok = true;
+
+        // Write tokens.json with o_auth_token
+        if (GHUNT_TOKEN_DIRECT && GHUNT_TOKEN_DIRECT.trim()) {
+            const tokens = { o_auth_token: GHUNT_TOKEN_DIRECT.trim() };
+            try {
+                fs.writeFileSync(path.join(cfgDir, 'tokens.json'), JSON.stringify(tokens, null, 2), { encoding: 'utf8', mode: 0o600 });
+            } catch (e) {
+                ok = false;
+                console.log('❌ Failed to write GHunt tokens.json:', e.message);
+            }
+        } else {
+            ok = false;
+            console.log('❌ GHUNT_TOKEN_DIRECT missing');
+        }
+
+        // Decode cookies and write cookies.json
+        if (GHUNT_COOKIES_B64_DIRECT && GHUNT_COOKIES_B64_DIRECT.trim()) {
+            try {
+                const decoded = Buffer.from(GHUNT_COOKIES_B64_DIRECT.trim(), 'base64').toString('utf8');
+                JSON.parse(decoded); // validate
+                fs.writeFileSync(path.join(cfgDir, 'cookies.json'), decoded, { encoding: 'utf8', mode: 0o600 });
+            } catch (e) {
+                ok = false;
+                console.log('❌ Failed to write GHunt cookies.json:', e.message);
+            }
+        } else {
+            ok = false;
+            console.log('❌ GHUNT_COOKIES_B64_DIRECT missing');
+        }
+
+        if (ok) {
+            process.env.GHUNT_CONFIG = cfgDir;
+            console.log('✅ GHunt initialized successfully with provided token & cookies');
+        }
+    } catch (e) {
+        console.log('❌ GHunt direct initialization error:', e.message);
+    }
+}
