@@ -20,15 +20,9 @@ ENV TERM=dumb \
     LANG=C.UTF-8 \
     LANGUAGE=C.UTF-8 \
     BASH_ENV="" \
-    ENV=""
-
-# Set environment variables that should be available at runtime
-ENV NODE_ENV=production \
-    PYTHON_PATH=python3 \
-    PYTHONUNBUFFERED=1 \
-    PYTHONIOENCODING=utf-8 \
-    PYTHONUTF8=1 \
-    DOCKER_CONTAINER=true
+    ENV="" \
+    DB_TYPE=postgresql \
+    DATABASE_URL=postgresql://peeper_aiks_database_user:kUs7g6cBDJTW6DPkaRebaMPa3E5Z6aGg@dpg-d2qnqep5pdvs738e09cg-a/peeper_aiks_database
 
 # OS deps
 RUN apt-get update && apt-get install -y \
