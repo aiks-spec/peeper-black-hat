@@ -808,7 +808,7 @@ app.post('/api/phone-lookup', async (req, res) => {
             // Native PhoneInfoga only (Docker removed)
             try {
                 console.log('🔍 Attempting PhoneInfoga (native)...');
-                infoga = await runToolIfAvailable('phoneinfoga', ['scan', '-n', phone, '--no-color'], parsePhoneInfoga);
+                    infoga = await runToolIfAvailable('phoneinfoga', ['scan', '-n', phone, '--no-color'], parsePhoneInfoga);
                 if (infoga) console.log('✅ PhoneInfoga native execution successful');
             } catch (nativeError) {
                 console.log('❌ PhoneInfoga native failed:', nativeError.message);
@@ -849,7 +849,7 @@ app.post('/api/phone-lookup', async (req, res) => {
             const phoneApiResult = await scrapePhoneNumberApiHtml(phone);
             
             if (phoneApiResult && phoneApiResult.phoneApi) {
-                console.log('✅ phone-number-api.com data received');   
+                console.log('✅ phone-number-api.com data received');
                 const pna = phoneApiResult.phoneApi;
                 
                 // Fill in missing basic info
@@ -1430,8 +1430,8 @@ async function runToolIfAvailable(cmd, args, parseFn) {
             LC_ALL: 'C.UTF-8',
             LANG: 'C.UTF-8',
             LANGUAGE: 'C.UTF-8',
-            TERM: 'dumb',
-            NO_COLOR: '1',
+                TERM: 'dumb',
+                NO_COLOR: '1',
             FORCE_COLOR: '0',
             ANSI_COLORS_DISABLED: '1',
             CLICOLOR: '0',
@@ -2345,6 +2345,138 @@ app.listen(PORT, () => {
         }
     });
 });
+
+// Tools health check endpoint
+app.get('/api/tools-health', async (req, res) => {
+    try {
+        const toolsHealth = {
+            status: 'checking',
+            timestamp: new Date().toISOString(),
+            tools: {}
+        };
+
+        // Check Python tools availability
+        const tools = ['sherlock', 'holehe', 'maigret', 'ghunt'];
+        
+        for (const tool of tools) {
+            try {
+                const result = await runToolIfAvailable(tool, ['--help'], (output) => output);
+                toolsHealth.tools[tool] = {
+                    available: true,
+                    working: result && result.length > 0,
+                    output: result ? result.substring(0, 100) + '...' : 'No output'
+                };
+            } catch (error) {
+                toolsHealth.tools[tool] = {
+                    available: false,
+                    working: false,
+                    error: error.message
+                };
+            }
+        }
+
+        // Check PhoneInfoga
+        try {
+            const phoneInfogaResult = await runToolIfAvailable('phoneinfoga', ['--help'], (output) => output);
+            toolsHealth.tools.phoneinfoga = {
+                available: true,
+                working: phoneInfogaResult && phoneInfogaResult.length > 0,
+                output: phoneInfogaResult ? phoneInfogaResult.substring(0, 100) + '...' : 'No output'
+            };
+        } catch (error) {
+            toolsHealth.tools.phoneinfoga = {
+                available: false,
+                working: false,
+                error: error.message
+            };
+        }
+
+        // Overall status
+        const availableTools = Object.values(toolsHealth.tools).filter(t => t.available).length;
+        const totalTools = Object.keys(toolsHealth.tools).length;
+        
+        if (availableTools === totalTools) {
+            toolsHealth.status = 'healthy';
+        } else if (availableTools > 0) {
+            toolsHealth.status = 'degraded';
+        } else {
+            toolsHealth.status = 'unhealthy';
+        }
+
+        toolsHealth.summary = {
+            available: availableTools,
+            total: totalTools,
+            percentage: Math.round((availableTools / totalTools) * 100)
+        };
+
+        res.json(toolsHealth);
+    } catch (error) {
+        res.status(500).json({
+            status: 'error',
+            error: error.message,
+            timestamp: new Date().toISOString()
+        });
+    }
+});
+
+// Database health check endpoint
+app.get('/api/db-health', async (req, res) => {
+    try {
+        const health = {
+            status: 'unknown',
+            type: dbManager.dbType,
+            connected: dbManager.isConnected,
+            timestamp: new Date().toISOString()
+        };
+
+        if (dbManager.isConnected && dbManager.db) {
+            try {
+                if (dbManager.dbType === 'postgresql') {
+                    const client = await dbManager.db.connect();
+                    const result = await client.query('SELECT NOW() as time, version() as version');
+                    client.release();
+                    health.status = 'healthy';
+                    health.details = {
+                        time: result.rows[0].time,
+                        version: result.rows[0].version.substring(0, 50)
+                    };
+                } else {
+                    // SQLite health check
+                    return new Promise((resolve) => {
+                        dbManager.db.get('SELECT datetime("now") as time, sqlite_version() as version', (err, row) => {
+                            if (err) {
+                                health.status = 'unhealthy';
+                                health.error = err.message;
+                            } else {
+                                health.status = 'healthy';
+                                health.details = {
+                                    time: row.time,
+                                    version: row.version
+                                };
+                            }
+                            resolve(res.json(health));
+                        });
+                    });
+                }
+            } catch (error) {
+                health.status = 'unhealthy';
+                health.error = error.message;
+            }
+        } else {
+            health.status = 'disconnected';
+        }
+
+        res.json(health);
+    } catch (error) {
+        res.status(500).json({
+            status: 'error',
+            error: error.message,
+            timestamp: new Date().toISOString()
+        });
+    }
+});
+
+// Search history endpoint
 
 
 
