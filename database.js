@@ -20,20 +20,47 @@ class DatabaseManager {
                     connectionString: this.databaseUrl,
                     ssl: {
                         rejectUnauthorized: false
-                    }
+                    },
+                    // Add connection pool settings for production
+                    max: 20,
+                    idleTimeoutMillis: 30000,
+                    connectionTimeoutMillis: 2000,
                 });
                 
-                // Test connection
-                const client = await this.db.connect();
+                // Test connection with timeout
+                const client = await Promise.race([
+                    this.db.connect(),
+                    new Promise((_, reject) => 
+                        setTimeout(() => reject(new Error('Connection timeout')), 10000)
+                    )
+                ]);
+                
                 console.log('✅ PostgreSQL connection established');
                 client.release();
                 this.isConnected = true;
+                
+                // Test a simple query
+                const testResult = await client.query('SELECT NOW()');
+                console.log('✅ Database query test successful:', testResult.rows[0]);
+                
             } else {
                 console.log('📁 Using SQLite database (fallback)...');
                 const dbPath = process.env.DB_PATH || './osint.db';
                 this.db = new sqlite3.Database(dbPath);
-                this.isConnected = true;
-                console.log('✅ SQLite connection established');
+                
+                // Test SQLite connection
+                return new Promise((resolve, reject) => {
+                    this.db.get('SELECT 1 as test', (err, row) => {
+                        if (err) {
+                            console.error('❌ SQLite connection test failed:', err.message);
+                            reject(err);
+                        } else {
+                            console.log('✅ SQLite connection established');
+                            this.isConnected = true;
+                            resolve(true);
+                        }
+                    });
+                });
             }
             
             await this.initializeTables();
@@ -42,7 +69,33 @@ class DatabaseManager {
             console.error('❌ Database connection failed:', error.message);
             console.error('❌ Database error details:', error);
             this.isConnected = false;
-            // Don't throw error, just return false to allow fallback
+            
+            // Try SQLite fallback if PostgreSQL fails
+            if (this.dbType === 'postgresql') {
+                console.log('🔄 Attempting SQLite fallback...');
+                try {
+                    const dbPath = process.env.DB_PATH || './osint.db';
+                    this.db = new sqlite3.Database(dbPath);
+                    this.dbType = 'sqlite';
+                    
+                    return new Promise((resolve, reject) => {
+                        this.db.get('SELECT 1 as test', (err, row) => {
+                            if (err) {
+                                console.error('❌ SQLite fallback also failed:', err.message);
+                                reject(err);
+                            } else {
+                                console.log('✅ SQLite fallback successful');
+                                this.isConnected = true;
+                                this.initializeTables().then(() => resolve(true));
+                            }
+                        });
+                    });
+                } catch (fallbackError) {
+                    console.error('❌ SQLite fallback failed:', fallbackError.message);
+                    return false;
+                }
+            }
+            
             return false;
         }
     }
