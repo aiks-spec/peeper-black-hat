@@ -1336,8 +1336,11 @@ async function resolveToolCommand(cmd) {
         await ensureOsintToolsInstalled();
         const py = await ensurePythonReady();
         if (py) {
-            console.log(`🔍 Using Python module execution for ${cmd}: ${py} -m ${cmd}`);
-            return { command: py, viaPython: cmd };
+            // Prefer venv python if available
+            const venvPy = process.env.VIRTUAL_ENV ? `${process.env.VIRTUAL_ENV}/bin/python` : null;
+            const chosen = venvPy || py;
+            console.log(`🔍 Using Python module execution for ${cmd}: ${chosen} -m ${cmd}`);
+            return { command: chosen, viaPython: cmd };
         } else {
             console.log(`❌ Python not available for ${cmd}, trying direct command`);
             // Fallback to direct command
