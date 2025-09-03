@@ -31,6 +31,55 @@ echo "PATH: $PATH"
 echo "PYTHONUNBUFFERED: $PYTHONUNBUFFERED"
 echo "LC_ALL: $LC_ALL"
 
+echo "=== Critical Environment Variables ==="
+echo "NODE_ENV: $NODE_ENV"
+echo "DB_TYPE: $DB_TYPE"
+echo "DATABASE_URL: ${DATABASE_URL:+'Set (length: '${#DATABASE_URL}')'}"
+echo "DB_PATH: $DB_PATH"
+echo "PORT: $PORT"
+
+# Validate critical environment variables
+if [ -z "$DB_TYPE" ]; then
+    echo "⚠️ WARNING: DB_TYPE not set, defaulting to sqlite"
+    export DB_TYPE=sqlite
+fi
+
+if [ "$DB_TYPE" = "postgresql" ] && [ -z "$DATABASE_URL" ]; then
+    echo "❌ ERROR: DB_TYPE is postgresql but DATABASE_URL is not set"
+    echo "🔄 Falling back to SQLite database"
+    export DB_TYPE=sqlite
+fi
+
+if [ "$DB_TYPE" = "postgresql" ] && [ -n "$DATABASE_URL" ]; then
+    echo "✅ PostgreSQL configuration detected:"
+    echo "   - DB_TYPE: $DB_TYPE"
+    echo "   - DATABASE_URL: ${DATABASE_URL:0:50}..."
+    echo "   - URL length: ${#DATABASE_URL} characters"
+    
+    # Create .env file to ensure Node.js can read the variables
+    echo "Creating .env file for Node.js..."
+    cat > /app/.env << EOF
+NODE_ENV=$NODE_ENV
+DB_TYPE=$DB_TYPE
+DATABASE_URL=$DATABASE_URL
+DB_PATH=$DB_PATH
+PORT=$PORT
+PYTHON_PATH=$PYTHON_PATH
+PYTHONUNBUFFERED=$PYTHONUNBUFFERED
+PYTHONIOENCODING=$PYTHONIOENCODING
+PYTHONUTF8=$PYTHONUTF8
+CORS_ORIGIN=$CORS_ORIGIN
+TIMEOUT=$TIMEOUT
+MAX_FILE_SIZE=$MAX_FILE_SIZE
+DEBUG=$DEBUG
+LOG_LEVEL=$LOG_LEVEL
+CLEANUP_DELAY=$CLEANUP_DELAY
+EOF
+    echo "✅ .env file created with PostgreSQL configuration"
+    echo "📄 .env file contents (first 200 chars):"
+    head -c 200 /app/.env && echo "..."
+fi
+
 echo "=== Python tools verification ==="
 echo "Checking Sherlock..."
 python3 -c "import sherlock; print('✅ Sherlock module available - version:', sherlock.__version__)" 2>&1 || echo "❌ Sherlock missing"
