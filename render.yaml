@@ -10,6 +10,10 @@ services:
         value: production
       - key: PORT
         value: 3000
+      - key: DB_TYPE
+        value: postgresql
+      - key: DATABASE_URL
+        value: postgresql://peeper_aiks_database_user:kUs7g6cBDJTW6DPkaRebaMPa3E5Z6aGg@dpg-d2qnqep5pdvs738e09cg-a/peeper_aiks_database
       - key: CUFINDER_API_KEY
         sync: false
       - key: IPINFO_TOKEN
@@ -52,26 +56,9 @@ services:
         value: ""
       - key: ENV
         value: ""
-      - key: DATABASE_URL
-        value: postgresql://peeper_aiks_database_user:kUs7g6cBDJTW6DPkaRebaMPa3E5Z6aGg@dpg-d2qnqep5pdvs738e09cg-a/peeper_aiks_database
-      - key: DB_TYPE
-        value: postgresql
+
       - key: RESET_COUNTS
         value: "true"
-      - key: DB_PATH
-        value: ./osint.db
-      - key: CORS_ORIGIN
-        value: "*"
-      - key: TIMEOUT
-        value: "30000"
-      - key: MAX_FILE_SIZE
-        value: "10485760"
-      - key: DEBUG
-        value: "false"
-      - key: LOG_LEVEL
-        value: "info"
-      - key: CLEANUP_DELAY
-        value: "1800000"
     healthCheckPath: /
     healthCheckTimeout: 300
     autoDeploy: true
