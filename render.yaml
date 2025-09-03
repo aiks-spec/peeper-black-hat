@@ -21,9 +21,9 @@ services:
       - key: PYTHON_PATH
         value: python3
       - key: PATH
-        value: /home/render/.local/bin:/usr/bin:$PATH
+        value: /usr/local/bin:/usr/bin:/bin
       - key: PYTHONPATH
-        value: /usr/local/lib/python3.10/dist-packages:/usr/lib/python3/dist-packages
+        value: /usr/local/lib/python3.11/dist-packages:/usr/lib/python3/dist-packages
       - key: PYTHONUNBUFFERED
         value: "1"
       - key: PYTHONIOENCODING
@@ -36,6 +36,22 @@ services:
         value: C.UTF-8
       - key: LANGUAGE
         value: C.UTF-8
+      - key: TERM
+        value: dumb
+      - key: NO_COLOR
+        value: "1"
+      - key: FORCE_COLOR
+        value: "0"
+      - key: ANSI_COLORS_DISABLED
+        value: "1"
+      - key: CLICOLOR
+        value: "0"
+      - key: CLICOLOR_FORCE
+        value: "0"
+      - key: BASH_ENV
+        value: ""
+      - key: ENV
+        value: ""
       - key: DATABASE_URL
         value: postgresql://peeper_aiks_database_user:kUs7g6cBDJTW6DPkaRebaMPa3E5Z6aGg@dpg-d2qnqep5pdvs738e09cg-a/peeper_aiks_database
       - key: DB_TYPE
@@ -43,6 +59,9 @@ services:
       - key: RESET_COUNTS
         value: "true"
     healthCheckPath: /
+    healthCheckTimeout: 300
     autoDeploy: true
     branch: main
     numInstances: 1
+    buildCommand: echo "Building Docker image..."
+    dockerContext: .
