@@ -398,8 +398,9 @@ app.post('/api/email-lookup', async (req, res) => {
         }
         
         // Log search and get search ID for tracking
+        let searchId = null;
         try {
-        const searchId = await dbManager.insertSearch(email, 'email', null);
+            searchId = await dbManager.insertSearch(email, 'email', null);
         } catch (error) {
             console.log('⚠️ Search logging failed:', error.message);
         }
@@ -730,8 +731,9 @@ app.post('/api/phone-lookup', async (req, res) => {
         }
         
         // Log search and get search ID for tracking
+        let searchId = null;
         try {
-        const searchId = await dbManager.insertSearch(phone, 'phone', null);
+            searchId = await dbManager.insertSearch(phone, 'phone', null);
         } catch (error) {
             console.log('⚠️ Search logging failed:', error.message);
         }
@@ -987,8 +989,9 @@ app.post('/api/ip-lookup', async (req, res) => {
         const { ip } = req.body;
         
         // Log search and get search ID for tracking
+        let searchId = null;
         try {
-        const searchId = await dbManager.insertSearch(ip, 'ip', null);
+            searchId = await dbManager.insertSearch(ip, 'ip', null);
         } catch (error) {
             console.log('⚠️ Search logging failed:', error.message);
         }
