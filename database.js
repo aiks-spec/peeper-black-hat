@@ -37,12 +37,12 @@ class DatabaseManager {
             ]);
             
             console.log('✅ PostgreSQL connection established');
-            client.release();
             this.isConnected = true;
             
             // Test a simple query
             const testResult = await client.query('SELECT NOW()');
             console.log('✅ Database query test successful:', testResult.rows[0]);
+            client.release();
             
             await this.initializeTables();
             return true;
