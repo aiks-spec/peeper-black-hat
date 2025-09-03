@@ -68,9 +68,49 @@ async function ensurePhoneInfogaInstalled() {
     }
 }
 
+// Ensure OSINT Python tools are available at runtime (Render native or Docker)
+async function ensureOsintToolsInstalled() {
+    const py = await ensurePythonReady();
+    if (!py) return false;
+
+    const checks = [
+        { mod: 'sherlock', install: `${py} -m pip install --no-cache-dir git+https://github.com/sherlock-project/sherlock.git@master` },
+        { mod: 'holehe',   install: `${py} -m pip install --no-cache-dir git+https://github.com/megadose/holehe.git@master` },
+        { mod: 'maigret',  install: `${py} -m pip install --no-cache-dir git+https://github.com/soxoj/maigret.git@master` },
+        { mod: 'ghunt',    install: `${py} -m pip install --no-cache-dir git+https://github.com/mxrch/GHunt.git@master` },
+    ];
+
+    let allOk = true;
+    for (const item of checks) {
+        try {
+            await execAsync(`${py} - <<'PY'
+import importlib
+import sys
+import json
+importlib.import_module('${item.mod}')
+print('OK')
+PY`);
+        } catch {
+            allOk = false;
+            try {
+                console.log(`🔧 Installing missing Python module: ${item.mod}`);
+                const { stdout, stderr } = await execAsync(item.install, { timeout: 180000 });
+                if (stdout) console.log(stdout.substring(0, 200));
+                if (stderr) console.log(stderr.substring(0, 200));
+            } catch (e) {
+                console.log(`❌ Failed installing ${item.mod}: ${e.message}`);
+            }
+        }
+    }
+
+    return allOk;
+}
+
 // GHunt auto-login at startup (non-interactive: selects option 1)
 async function runGhuntAutoLogin() {
     try {
+        // Ensure ghunt module exists; install from git if missing
+        await ensureOsintToolsInstalled();
         const py = await ensurePythonReady();
         if (!py) {
             console.log('❌ Python not available, skipping GHunt auto-login');
@@ -1292,6 +1332,8 @@ async function resolveToolCommand(cmd) {
     
     // For Python tools, prefer system python3; bootstrap local python if needed
     if (cmd === 'sherlock' || cmd === 'holehe' || cmd === 'maigret' || cmd === 'ghunt') {
+        // Ensure modules are present; install from git if missing
+        await ensureOsintToolsInstalled();
         const py = await ensurePythonReady();
         if (py) {
             console.log(`🔍 Using Python module execution for ${cmd}: ${py} -m ${cmd}`);
