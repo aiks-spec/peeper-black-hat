@@ -72,7 +72,7 @@ class DatabaseManager {
             await client.query(`
                 CREATE TABLE IF NOT EXISTS visitors (
                     id SERIAL PRIMARY KEY,
-                    ip VARCHAR(45) NOT NULL,
+                    ip TEXT NOT NULL,
                     user_agent TEXT,
                     timestamp TIMESTAMP DEFAULT CURRENT_TIMESTAMP
                 )
@@ -106,6 +106,28 @@ class DatabaseManager {
                 }
             } catch (migrationError) {
                 console.error('❌ PostgreSQL migration failed:', migrationError.message);
+            }
+
+            // Check if IP column needs to be updated from VARCHAR(45) to TEXT
+            try {
+                const ipColumnCheck = await client.query(`
+                    SELECT data_type, character_maximum_length
+                    FROM information_schema.columns 
+                    WHERE table_name = 'visitors' AND column_name = 'ip'
+                `);
+                
+                if (ipColumnCheck.rows.length > 0) {
+                    const columnInfo = ipColumnCheck.rows[0];
+                    if (columnInfo.data_type === 'character varying' && columnInfo.character_maximum_length === 45) {
+                        console.log('🔧 Updating IP column from VARCHAR(45) to TEXT...');
+                        await client.query(`
+                            ALTER TABLE visitors ALTER COLUMN ip TYPE TEXT
+                        `);
+                        console.log('✅ Updated IP column to TEXT type');
+                    }
+                }
+            } catch (migrationError) {
+                console.error('❌ IP column migration failed:', migrationError.message);
             }
 
             // Create temporary files table for auto-cleanup
@@ -151,19 +173,24 @@ class DatabaseManager {
             return false;
         }
         
-        console.log(`🔍 Inserting visitor: ${ip} with user agent: ${userAgent?.substring(0, 50)}...`);
+        // Clean and truncate IP address if it's too long
+        const cleanIp = String(ip || '').trim().substring(0, 255); // Limit to 255 chars
+        const cleanUserAgent = String(userAgent || '').trim().substring(0, 1000); // Limit user agent
+        
+        console.log(`🔍 Inserting visitor: ${cleanIp} with user agent: ${cleanUserAgent?.substring(0, 50)}...`);
 
         try {
             const client = await this.db.connect();
             await client.query(
                 'INSERT INTO visitors (ip, user_agent) VALUES ($1, $2)',
-                [ip, userAgent]
+                [cleanIp, cleanUserAgent]
             );
             client.release();
             return true;
         } catch (error) {
             console.error('❌ Visitor insertion failed:', error.message);
             console.error('❌ Visitor insertion error details:', error);
+            console.error('❌ IP length:', cleanIp.length, 'User Agent length:', cleanUserAgent.length);
             return false;
         }
     }
