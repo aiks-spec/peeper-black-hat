@@ -81,6 +81,9 @@ RUN npm ci --omit=dev || npm install --omit=dev
 # Copy application code
 COPY . .
 
+# Prepare GHunt config at runtime via entrypoint (no secrets baked)
+ENV GHUNT_CONFIG=/home/appuser/.config/ghunt
+
 # Create persistent temp dir
 RUN mkdir -p /app/temp && chmod 777 /app/temp
 
@@ -95,7 +98,9 @@ RUN chmod +x /entrypoint.sh
 
 # Create non-root user for security
 RUN useradd -r -s /bin/bash -u 1001 appuser \
- && chown -R appuser:appuser /app
+ && mkdir -p /home/appuser/.config/ghunt \
+ && chown -R appuser:appuser /home/appuser/.config/ghunt /app
+
 USER appuser
 
 # Expose port
@@ -105,7 +110,6 @@ EXPOSE 3000
 HEALTHCHECK --interval=30s --timeout=10s --start-period=60s --retries=3 \
   CMD curl -f http://localhost:3000/ || exit 1
 
-# Use entrypoint script
-ENTRYPOINT ["/entrypoint.sh"]
-CMD ["npm", "start"]
+# Use entrypoint script to prepare GHunt, then start app
+CMD node scripts/prepare-ghunt.js && npm start
 
