@@ -13,6 +13,26 @@ const execAsync = promisify(exec);
 const execFileAsync = promisify(execFile);
 const https = require('https');
 
+// Enhanced environment variable logging for debugging
+console.log('🔍 Environment Variables Check:');
+console.log('  - NODE_ENV:', process.env.NODE_ENV || 'undefined');
+console.log('  - DB_TYPE:', process.env.DB_TYPE || 'undefined');
+console.log('  - DATABASE_URL:', process.env.DATABASE_URL ? 'Set (length: ' + process.env.DATABASE_URL.length + ')' : 'Not set');
+console.log('  - PORT:', process.env.PORT || 'undefined');
+console.log('  - PYTHON_PATH:', process.env.PYTHON_PATH || 'undefined');
+
+// Validate critical environment variables
+if (!process.env.DB_TYPE) {
+    console.log('⚠️ WARNING: DB_TYPE not set, defaulting to sqlite');
+    process.env.DB_TYPE = 'sqlite';
+}
+
+if (process.env.DB_TYPE === 'postgresql' && !process.env.DATABASE_URL) {
+    console.log('❌ ERROR: DB_TYPE is postgresql but DATABASE_URL is not set');
+    console.log('🔄 Falling back to SQLite database');
+    process.env.DB_TYPE = 'sqlite';
+}
+
 // File cleanup system for publishing
 const cleanupQueue = new Map(); // Track files to cleanup
 
