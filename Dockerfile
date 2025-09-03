@@ -22,6 +22,14 @@ ENV TERM=dumb \
     BASH_ENV="" \
     ENV=""
 
+# Set environment variables that should be available at runtime
+ENV NODE_ENV=production \
+    PYTHON_PATH=python3 \
+    PYTHONUNBUFFERED=1 \
+    PYTHONIOENCODING=utf-8 \
+    PYTHONUTF8=1 \
+    DOCKER_CONTAINER=true
+
 # OS deps
 RUN apt-get update && apt-get install -y \
     curl wget git ca-certificates build-essential \
