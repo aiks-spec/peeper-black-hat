@@ -179,6 +179,14 @@ const dbManager = new DatabaseManager();
 // Auto-cleanup disabled per user request
 // cron.schedule('*/5 * * * *', async () => {});
 
+// Debug environment variables
+console.log('🔍 Environment Variables Debug:');
+console.log('   - NODE_ENV:', process.env.NODE_ENV);
+console.log('   - DB_TYPE:', process.env.DB_TYPE);
+console.log('   - DATABASE_URL:', process.env.DATABASE_URL ? 'Set (length: ' + process.env.DATABASE_URL.length + ')' : 'Not set');
+console.log('   - PORT:', process.env.PORT);
+console.log('   - All env keys containing DB:', Object.keys(process.env).filter(k => k.toLowerCase().includes('db')));
+
 // Initialize database connection
 dbManager.connect().then(async (connected) => {
     if (connected) {
@@ -2403,13 +2411,4 @@ app.get('/api/db-health', async (req, res) => {
 
 // Search history endpoint
 
-// Initialize database connection
-dbManager.connect().then(() => {
-    console.log('✅ Database connection established');
-}).catch((error) => {
-    console.error('❌ Database connection failed:', error.message);
-    console.log('🔄 Continuing with limited functionality...');
-});
-
-// GHunt auto-login setup (disabled for now to prevent startup issues)
-// runGhuntAutoLogin();
+// Database connection is already initialized above
