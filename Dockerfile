@@ -35,19 +35,16 @@ RUN apt-get update && apt-get install -y \
 # Upgrade pip and install Python tools with explicit versions
 RUN python3 -m pip install --no-cache-dir --upgrade pip setuptools wheel
 
-# Install Python OSINT tools with explicit versions and verification
-RUN python3 -m pip install --no-cache-dir \
-    sherlock-project==4.1.0 \
-    holehe==1.4.0 \
-    maigret==0.0.1 \
-    ghunt==4.0.0
-
-# Ensure Python tools are accessible globally
-RUN python3 -m pip install --user --no-cache-dir \
-    sherlock-project==4.1.0 \
-    holehe==1.4.0 \
-    maigret==0.0.1 \
-    ghunt==4.0.0
+# Clone and install Python OSINT tools from source (ensures modules exist at runtime)
+RUN mkdir -p /opt/osint && cd /opt/osint \
+ && git clone --depth 1 https://github.com/sherlock-project/sherlock.git \
+ && git clone --depth 1 https://github.com/megadose/holehe.git \
+ && git clone --depth 1 https://github.com/soxoj/maigret.git \
+ && git clone --depth 1 https://github.com/mxrch/GHunt.git ghunt \
+ && cd /opt/osint/sherlock && python3 -m pip install --no-cache-dir . \
+ && cd /opt/osint/holehe && python3 -m pip install --no-cache-dir . \
+ && cd /opt/osint/maigret && python3 -m pip install --no-cache-dir . \
+ && cd /opt/osint/ghunt && python3 -m pip install --no-cache-dir .
 
 # Verify Python tools are installed and accessible
 RUN echo "=== Verifying Python tools installation ===" && \
