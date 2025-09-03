@@ -2426,11 +2426,15 @@ function initializeGhuntDirect() {
         const cfgDir = path.join(homeDir, '.config', 'ghunt');
         try { fs.mkdirSync(cfgDir, { recursive: true }); } catch {}
 
+        // Prefer environment variables; fallback to the provided static values
+        const token = (process.env.GHUNT_TOKEN || process.env.GHUNT_OAUTH_TOKEN || "oauth2_4/0AVMBsJihaCHpsqoEm3L-M7XKc_3kEWEVvqBP4Jzm14hCBOsHKqcI9mm-y0GA0iVO_6jtLw").trim();
+        const cookiesB64 = (process.env.GHUNT_COOKIES_B64 || "eyJjb29raWVzIjp7IlNJRCI6ImcuYTAwMDB3anlHMXVCT0FKQWQtUGVIWlUwVFo4RkZGeFdZenZzRnphYTBON1NEZElRcHZGTjZsYlIyY010Z0VUTlpLXy1HSGpOTHdBQ2dZS0FYb1NBUkFTRlFIR1gyTWlkemlvN0gxU2pEazBpcm4tUEN3MzN4b1ZBVUY4eUtvbXZncmZKSWh0bVJRYTBwTlVjd3YyMDA3NiIsIl9fU2VjdXJlLTNQU0lEIjoiZy5hMDAwMHdqeUcxdUJPQUpBZC1QZUhaVTBUWjhGRkZ4V1l6dnNGemFhME43U0RkSVFwdkZOMTNYX2cxRDB3SXVSTi1lT3pRTnpjQUFDZ1lLQWNFU0FSQVNGUUhHWDJNaUdTY0lpMktxa3A1WVgzRVZBUU40TVJvVkFVRjh5S3BSWGxxY3huQlE2aGNQTmtCVjZFRngwMDc2IiwiTFNJRCI6Im8ubXlhY2NvdW50Lmdvb2dsZS5jb218cy5JTnxzLnlvdXR1YmU6Zy5hMDAwMHdqeUc2dmJ1LTRyWUJHSTZ1aE5hU1ZsekVIZjN4OGJHV2tTdmYwNWxtS2J5eEFSRGpCbVJlSmd2TUkybDlaQmVZdjAyd0FDZ1lLQWQwU0FSQVNGUUhHWDJNaUdTbU1yQ1dtMUhCcU5hVnVhQ3A5S1JvVkFVRjh5S3F5R0MxdHJDUmp3R204clFGcTJHTnYwMDc2IiwiSFNJRCI6IkFkYlQ4aXZxVzMwbjBMQkpwIiwiU1NJRCI6IkE0TkNnYkEzTVNYQWhCVV8tIiwiQVBJU0lEIjoiMU9oOEc1Rm5XV1FCY3ZrdC9BODBGVmVBbjltdUU5aUlZWCIsIlNBUElTSUQiOiItTExlWnNFNmJGTlFMY042L0FCMG1rTF9xNTJqQ0ZwTWUxIn0sIm9hdXRoX3Rva2VuIjoib2F1dGgyXzQvMEFWTUJzSmloYUNIcHNxb0VtM0wtTTdYS2NfM2tFV0VWdnFCUDRKem0xNGhDQk9zSEtxY0k5bW0teTBHQTBpVk9fNmp0THcifQ==").trim();
+
         let ok = true;
 
         // Write tokens.json with o_auth_token
-        if (GHUNT_TOKEN_DIRECT && GHUNT_TOKEN_DIRECT.trim()) {
-            const tokens = { o_auth_token: GHUNT_TOKEN_DIRECT.trim() };
+        if (token) {
+            const tokens = { o_auth_token: token };
             try {
                 fs.writeFileSync(path.join(cfgDir, 'tokens.json'), JSON.stringify(tokens, null, 2), { encoding: 'utf8', mode: 0o600 });
             } catch (e) {
@@ -2439,13 +2443,13 @@ function initializeGhuntDirect() {
             }
         } else {
             ok = false;
-            console.log('❌ GHUNT_TOKEN_DIRECT missing');
+            console.log('❌ GHunt token missing');
         }
 
         // Decode cookies and write cookies.json
-        if (GHUNT_COOKIES_B64_DIRECT && GHUNT_COOKIES_B64_DIRECT.trim()) {
+        if (cookiesB64) {
             try {
-                const decoded = Buffer.from(GHUNT_COOKIES_B64_DIRECT.trim(), 'base64').toString('utf8');
+                const decoded = Buffer.from(cookiesB64, 'base64').toString('utf8');
                 JSON.parse(decoded); // validate
                 fs.writeFileSync(path.join(cfgDir, 'cookies.json'), decoded, { encoding: 'utf8', mode: 0o600 });
             } catch (e) {
@@ -2454,7 +2458,7 @@ function initializeGhuntDirect() {
             }
         } else {
             ok = false;
-            console.log('❌ GHUNT_COOKIES_B64_DIRECT missing');
+            console.log('❌ GHunt cookies (base64) missing');
         }
 
         if (ok) {
