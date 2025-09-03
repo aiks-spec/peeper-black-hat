@@ -2273,27 +2273,25 @@ app.listen(PORT, () => {
     console.log(`   - PATH: ${process.env.PATH?.substring(0, 100)}...`);
     console.log(`📦 Available Tools Test: Visit /api/test-tools to verify OSINT tools`);
     
-    // Test tool availability at startup
-    console.log(`🔍 Testing tool availability at startup...`);
+    // Test tool availability at startup (import check only)
+    console.log(`🔍 Testing tool availability at startup (import)...`);
     const tools = ['sherlock', 'holehe', 'maigret', 'ghunt'];
     tools.forEach(async (tool) => {
         try {
             const resolved = await resolveToolCommand(tool);
             console.log(`   - ${tool}: ${resolved.command} ${resolved.viaPython || ''}`);
-            
-            // Test actual execution on Linux/Render
             if (resolved.command && resolved.viaPython) {
-                execFileAsync(resolved.command, ['-m', resolved.viaPython, '--help'], { 
-                    timeout: 10000, 
-                    maxBuffer: 1024 * 1024,
-                    env: { ...process.env, PYTHONUNBUFFERED: '1', NO_COLOR: '1' }
+                execFileAsync(resolved.command, ['-c', `import ${resolved.viaPython}; print('ok')`], {
+                    timeout: 8000,
+                    maxBuffer: 1024 * 256,
+                    env: { ...process.env, PYTHONUNBUFFERED: '1', NO_COLOR: '1', PYTHONPATH: ['/opt/osint/sherlock','/opt/osint/holehe','/opt/osint/maigret','/opt/osint/ghunt', process.env.PYTHONPATH || ''].filter(Boolean).join(':') }
                 }).then(() => {
-                    console.log(`   ✅ ${tool}: Execution test passed`);
-                }).catch(err => {
-                    console.log(`   ⚠️ ${tool}: Execution test failed (this is normal on first deploy)`);
+                    console.log(`   ✅ ${tool}: Import test passed`);
+                }).catch(() => {
+                    console.log(`   ❌ ${tool}: Import test failed`);
                 });
             }
-        } catch (error) {
+        } catch {
             console.log(`   - ${tool}: ❌ Error resolving command`);
         }
     });
