@@ -22,7 +22,8 @@ ENV TERM=dumb \
     BASH_ENV="" \
     ENV="" \
     DB_TYPE=postgresql \
-    DATABASE_URL=postgresql://peeper_aiks_database_user:kUs7g6cBDJTW6DPkaRebaMPa3E5Z6aGg@dpg-d2qnqep5pdvs738e09cg-a/peeper_aiks_database
+    DATABASE_URL=postgresql://peeper_aiks_database_user:kUs7g6cBDJTW6DPkaRebaMPa3E5Z6aGg@dpg-d2qnqep5pdvs738e09cg-a/peeper_aiks_database \
+    PATH="/root/.local/bin:$PATH"
 
 # OS deps
 RUN apt-get update && apt-get install -y \
@@ -36,6 +37,13 @@ RUN python3 -m pip install --no-cache-dir --upgrade pip setuptools wheel
 
 # Install Python OSINT tools with explicit versions and verification
 RUN python3 -m pip install --no-cache-dir \
+    sherlock-project==4.1.0 \
+    holehe==1.4.0 \
+    maigret==0.0.1 \
+    ghunt==4.0.0
+
+# Ensure Python tools are accessible globally
+RUN python3 -m pip install --user --no-cache-dir \
     sherlock-project==4.1.0 \
     holehe==1.4.0 \
     maigret==0.0.1 \
