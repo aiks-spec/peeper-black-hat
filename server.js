@@ -315,42 +315,7 @@ app.get('/', (req, res) => {
     res.sendFile(path.join(__dirname, 'public', 'index.html'));
 });
 
-// Lightweight OSINT lookup endpoint (PhoneInfoga + Phone-Number-API + optional breaches)
-// Usage: GET /lookup?phone=+19998887777
-app.get('/lookup', async (req, res) => {
-    try {
-        const phone = String(req.query.phone || '').trim();
-        if (!phone) return res.status(400).json({ error: 'Missing phone parameter' });
 
-        const [infoga, phoneApi, leaks] = await Promise.all([
-            queryPhoneInfoga(phone).catch(() => null),
-            fetchPhoneNumberApiJSON(phone).catch(() => null),
-            fetchBreaches(phone).catch(() => null)
-        ]);
-
-        const formatted = phoneApi?.formatInternational || phoneApi?.formatE164 || null;
-        const result = {
-            phone,
-            carrier: infoga?.carrier || phoneApi?.carrier || null,
-            country: infoga?.country || phoneApi?.country || null,
-            line_type: infoga?.type || phoneApi?.numberType || null,
-            formatted: formatted || null,
-            possible_name_sources: infoga?.names || [],
-            leak_sources: leaks?.sources || []
-        };
-
-        // Log search
-        try {
-            await dbManager.insertSearch(phone, 'lookup', result);
-        } catch (error) {
-            console.log('⚠️ Search logging failed:', error.message);
-        }
-        return res.json(result);
-    } catch (err) {
-        console.error('Lookup error:', err.message);
-        return res.status(500).json({ error: 'Lookup failed' });
-    }
-});
 
 // Unified OSINT lookup endpoint (modular, no unofficial scrapers)
 // GET /lookup?phone=+1234567890
