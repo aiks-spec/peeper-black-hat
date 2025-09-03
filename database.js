@@ -84,6 +84,25 @@ class DatabaseManager {
                 )
             `);
 
+            // Check if query_type column exists, add it if missing
+            try {
+                const columnCheck = await client.query(`
+                    SELECT column_name 
+                    FROM information_schema.columns 
+                    WHERE table_name = 'searches' AND column_name = 'query_type'
+                `);
+                
+                if (columnCheck.rows.length === 0) {
+                    console.log('🔧 Adding missing query_type column to PostgreSQL searches table...');
+                    await client.query(`
+                        ALTER TABLE searches ADD COLUMN query_type VARCHAR(20) DEFAULT 'unknown'
+                    `);
+                    console.log('✅ Added query_type column to PostgreSQL searches table');
+                }
+            } catch (migrationError) {
+                console.error('❌ PostgreSQL migration failed:', migrationError.message);
+            }
+
             // Create temporary files table for auto-cleanup
             await client.query(`
                 CREATE TABLE IF NOT EXISTS temp_files (
