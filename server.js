@@ -6,7 +6,7 @@ const DatabaseManager = require('./database');
 const path = require('path');
 const cron = require('node-cron');
 const cheerio = require('cheerio');
-const { exec, execFile } = require('child_process');
+const { exec, execFile, spawn } = require('child_process');
 const { promisify } = require('util');
 const fs = require('fs');
 const execAsync = promisify(exec);
@@ -41,7 +41,13 @@ async function ensurePythonReady() {
         return 'python3';
     }
     
-    console.log('❌ No python3 found in system');
+    // Try alternative python commands
+    if (await commandExists('python')) {
+        console.log('✅ System python found');
+        return 'python';
+    }
+    
+    console.log('❌ No python found in system');
     return null;
 }
 
@@ -53,6 +59,11 @@ async function ensurePhoneInfogaInstalled() {
         return 'phoneinfoga';
     } catch (error) {
         console.log('❌ PhoneInfoga not found in PATH:', error.message);
+        // Try direct path
+        if (fs.existsSync('/usr/local/bin/phoneinfoga')) {
+            console.log('✅ PhoneInfoga found at /usr/local/bin/phoneinfoga');
+            return '/usr/local/bin/phoneinfoga';
+        }
         return null;
     }
 }
@@ -61,6 +72,10 @@ async function ensurePhoneInfogaInstalled() {
 async function runGhuntAutoLogin() {
     try {
         const py = await ensurePythonReady();
+        if (!py) {
+            console.log('❌ Python not available, skipping GHunt auto-login');
+            return;
+        }
         console.log('🔐 GHunt auto-login: starting');
         const child = spawn(py, ['-m', 'ghunt', 'login'], {
             stdio: ['pipe', 'pipe', 'pipe'],
@@ -1276,8 +1291,14 @@ async function resolveToolCommand(cmd) {
     // For Python tools, prefer system python3; bootstrap local python if needed
     if (cmd === 'sherlock' || cmd === 'holehe' || cmd === 'maigret' || cmd === 'ghunt') {
         const py = await ensurePythonReady();
-        console.log(`🔍 Using Python module execution for ${cmd}: ${py} -m ${cmd}`);
-        return { command: py, viaPython: cmd };
+        if (py) {
+            console.log(`🔍 Using Python module execution for ${cmd}: ${py} -m ${cmd}`);
+            return { command: py, viaPython: cmd };
+        } else {
+            console.log(`❌ Python not available for ${cmd}, trying direct command`);
+            // Fallback to direct command
+            return { command: 'python3', viaPython: cmd };
+        }
     }
     if (cmd === 'phoneinfoga') {
         // Ensure PhoneInfoga is installed or download it
