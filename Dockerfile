@@ -29,15 +29,29 @@ RUN apt-get update && apt-get install -y \
     libpq-dev postgresql-client \
  && rm -rf /var/lib/apt/lists/*
 
-# Python tools
-RUN python3 -m pip install --no-cache-dir --upgrade pip \
- && python3 -m pip install --no-cache-dir \
-    sherlock-project \
-    holehe \
-    maigret \
-    ghunt
+# Upgrade pip and install Python tools with explicit versions
+RUN python3 -m pip install --no-cache-dir --upgrade pip setuptools wheel
 
-# PhoneInfoga native binary
+# Install Python OSINT tools with explicit versions and verification
+RUN python3 -m pip install --no-cache-dir \
+    sherlock-project==4.1.0 \
+    holehe==1.4.0 \
+    maigret==0.0.1 \
+    ghunt==4.0.0
+
+# Verify Python tools are installed and accessible
+RUN echo "=== Verifying Python tools installation ===" && \
+    python3 -c "import sherlock; print('✅ Sherlock version:', sherlock.__version__)" && \
+    python3 -c "import holehe; print('✅ Holehe version:', holehe.__version__)" && \
+    python3 -c "import maigret; print('✅ Maigret version:', maigret.__version__)" && \
+    python3 -c "import ghunt; print('✅ GHunt version:', ghunt.__version__)" && \
+    echo "=== Testing tool execution ===" && \
+    python3 -m sherlock --help 2>&1 | head -3 && \
+    python3 -m holehe --help 2>&1 | head -3 && \
+    python3 -m maigret --help 2>&1 | head -3 && \
+    python3 -m ghunt --help 2>&1 | head -3
+
+# Install PhoneInfoga native binary
 RUN mkdir -p /tmp/phoneinfoga \
  && cd /tmp/phoneinfoga \
  && curl -sSL -o phoneinfoga.tgz https://github.com/sundowndev/phoneinfoga/releases/latest/download/phoneinfoga_Linux_x86_64.tar.gz \
