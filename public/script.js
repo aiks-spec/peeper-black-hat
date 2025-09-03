@@ -635,7 +635,12 @@ class OSINTLookupEngine {
             const response = await fetch('/api/stats');
             const data = await response.json();
 
-            document.getElementById('visitor-count').textContent = data.visitors_today || 0;
+            // Prefer total_hits if available so the number changes on refresh
+            const visitorsDisplay = typeof data.total_hits === 'number'
+                ? data.total_hits
+                : (data.visitors_today || 0);
+
+            document.getElementById('visitor-count').textContent = visitorsDisplay;
             document.getElementById('search-count').textContent = data.searches || 0;
         } catch (error) {
             console.error('Failed to load stats:', error);
