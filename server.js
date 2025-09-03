@@ -6,40 +6,12 @@ const DatabaseManager = require('./database');
 const path = require('path');
 const cron = require('node-cron');
 const cheerio = require('cheerio');
-const { exec, execFile, spawn } = require('child_process');
+const { exec, execFile } = require('child_process');
 const { promisify } = require('util');
 const fs = require('fs');
 const execAsync = promisify(exec);
 const execFileAsync = promisify(execFile);
 const https = require('https');
-
-// Check if .env file exists and reload if it does (for Docker container)
-const envPath = path.join(process.cwd(), '.env');
-if (fs.existsSync(envPath)) {
-    console.log('🔍 .env file found, reloading environment variables...');
-    require('dotenv').config({ path: envPath });
-    console.log('✅ Environment variables reloaded from .env file');
-}
-
-// Enhanced environment variable logging for debugging
-console.log('🔍 Environment Variables Check:');
-console.log('  - NODE_ENV:', process.env.NODE_ENV || 'undefined');
-console.log('  - DB_TYPE:', process.env.DB_TYPE || 'undefined');
-console.log('  - DATABASE_URL:', process.env.DATABASE_URL ? 'Set (length: ' + process.env.DATABASE_URL.length + ')' : 'Not set');
-console.log('  - PORT:', process.env.PORT || 'undefined');
-console.log('  - PYTHON_PATH:', process.env.PYTHON_PATH || 'undefined');
-
-// Validate critical environment variables
-if (!process.env.DB_TYPE) {
-    console.log('⚠️ WARNING: DB_TYPE not set, defaulting to sqlite');
-    process.env.DB_TYPE = 'sqlite';
-}
-
-if (process.env.DB_TYPE === 'postgresql' && !process.env.DATABASE_URL) {
-    console.log('❌ ERROR: DB_TYPE is postgresql but DATABASE_URL is not set');
-    console.log('🔄 Falling back to SQLite database');
-    process.env.DB_TYPE = 'sqlite';
-}
 
 // File cleanup system for publishing
 const cleanupQueue = new Map(); // Track files to cleanup
@@ -52,112 +24,37 @@ if (!fs.existsSync(localBinDir)) {
     try { fs.mkdirSync(localBinDir, { recursive: true }); } catch {}
 }
 
-// Local user-space Python (Miniconda) bootstrap for Render native Node runtime
-const pythonHome = path.join(process.cwd(), 'python');
-const pythonBinDir = path.join(pythonHome, 'bin');
-const pythonCmdPath = path.join(pythonBinDir, 'python');
-const pipCmdPath = path.join(pythonBinDir, 'pip');
-
+// Simple Python tool availability check for Docker environment
 async function commandExists(cmd) {
-    try { await execAsync(`which ${cmd}`); return true; } catch { return false; }
+    try { 
+        await execAsync(`which ${cmd}`); 
+        return true; 
+    } catch { 
+        return false; 
+    }
 }
 
 async function ensurePythonReady() {
-    // If system python3 exists, prefer it
+    // In Docker environment, python3 should be available with tools pre-installed
     if (await commandExists('python3')) {
+        console.log('✅ System python3 found');
         return 'python3';
     }
-
-    // If local python already installed, ensure PATH updated and return
-    if (fs.existsSync(pythonCmdPath)) {
-        if (!process.env.PATH.includes(pythonBinDir)) {
-            process.env.PATH = `${pythonBinDir}:${process.env.PATH || ''}`;
-        }
-        return pythonCmdPath;
-    }
-
-    // Install Miniconda user-space
-    try { if (!fs.existsSync(tempDir)) fs.mkdirSync(tempDir, { recursive: true }); } catch {}
-    const installerPath = path.join(tempDir, 'Miniconda3.sh');
-    const url = 'https://repo.anaconda.com/miniconda/Miniconda3-latest-Linux-x86_64.sh';
-    await new Promise((resolve, reject) => {
-        const file = fs.createWriteStream(installerPath);
-        https.get(url, (res) => {
-            if (res.statusCode !== 200) return reject(new Error(`Miniconda download failed: ${res.statusCode}`));
-            res.pipe(file);
-            file.on('finish', () => file.close(resolve));
-        }).on('error', (err) => {
-            try { fs.unlinkSync(installerPath); } catch {}
-            reject(err);
-        });
-    });
-
-    await execAsync(`bash "${installerPath}" -b -p "${pythonHome}"`);
-    if (!process.env.PATH.includes(pythonBinDir)) {
-        process.env.PATH = `${pythonBinDir}:${process.env.PATH || ''}`;
-    }
-
-    // Upgrade pip and install required tools
-    try {
-        await execAsync(`"${pythonCmdPath}" -m pip install --upgrade pip`);
-        await execAsync(`"${pythonCmdPath}" -m pip install --no-cache-dir sherlock-project holehe maigret ghunt`);
-    } catch (e) {
-        console.log('❌ Python tool install failed:', e.message);
-    }
-
-    return pythonCmdPath;
+    
+    console.log('❌ No python3 found in system');
+    return null;
 }
 
 async function ensurePhoneInfogaInstalled() {
     try {
-        // check existing in PATH
+        // In Docker environment, phoneinfoga should be pre-installed in /usr/local/bin
         await execAsync('which phoneinfoga');
+        console.log('✅ PhoneInfoga found in system PATH');
         return 'phoneinfoga';
-    } catch {}
-
-    const targetPath = path.join(localBinDir, 'phoneinfoga');
-    if (fs.existsSync(targetPath)) {
-        try { await execAsync(`chmod +x "${targetPath}"`); } catch {}
-        if (!process.env.PATH.includes(localBinDir)) {
-            process.env.PATH = `${localBinDir}:${process.env.PATH || ''}`;
-        }
-        return targetPath;
+    } catch (error) {
+        console.log('❌ PhoneInfoga not found in PATH:', error.message);
+        return null;
     }
-
-    // download Linux x86_64 tarball
-    const tgzPath = path.join(tempDir, 'phoneinfoga.tgz');
-    try { if (!fs.existsSync(tempDir)) fs.mkdirSync(tempDir, { recursive: true }); } catch {}
-
-    const url = 'https://github.com/sundowndev/phoneinfoga/releases/latest/download/phoneinfoga_Linux_x86_64.tar.gz';
-    await new Promise((resolve, reject) => {
-        const file = fs.createWriteStream(tgzPath);
-        https.get(url, (res) => {
-            if (res.statusCode !== 200) {
-                return reject(new Error(`Download failed: ${res.statusCode}`));
-            }
-            res.pipe(file);
-            file.on('finish', () => file.close(resolve));
-        }).on('error', (err) => {
-            try { fs.unlinkSync(tgzPath); } catch {}
-            reject(err);
-        });
-    });
-
-    // extract and move binary
-    await execAsync(`tar -xzf "${tgzPath}" -C "${tempDir}"`);
-    const extracted = path.join(tempDir, 'phoneinfoga');
-    if (!fs.existsSync(extracted)) {
-        throw new Error('PhoneInfoga binary not found after extraction');
-    }
-    try { fs.renameSync(extracted, targetPath); } catch (e) {
-        // fallback: copy
-        fs.copyFileSync(extracted, targetPath);
-    }
-    await execAsync(`chmod +x "${targetPath}"`);
-    if (!process.env.PATH.includes(localBinDir)) {
-        process.env.PATH = `${localBinDir}:${process.env.PATH || ''}`;
-    }
-    return targetPath;
 }
 
 // GHunt auto-login at startup (non-interactive: selects option 1)
@@ -320,19 +217,17 @@ app.use((req, res, next) => {
     
     const userAgent = req.get('User-Agent') || 'Unknown';
     
-    // Only track unique visitors (not every request) and ensure database is connected
-    if ((req.path === '/' || req.path.includes('/api/')) && dbManager.isConnected) {
+    // Only track unique visitors (not every request)
+    if (req.path === '/' || req.path.includes('/api/')) {
         dbManager.insertVisitor(ip, userAgent).then((success) => {
             if (success) {
                 console.log('✅ Visitor tracked:', ip);
             } else {
-                console.log('⚠️ Visitor tracking failed');
+                console.log('⚠️ Visitor tracking failed (database may not be connected)');
             }
         }).catch((error) => {
             console.log('⚠️ Visitor tracking error:', error.message);
         });
-    } else if (!dbManager.isConnected) {
-        console.log('⚠️ Database not connected, skipping visitor tracking');
     }
     
     next();
@@ -343,7 +238,42 @@ app.get('/', (req, res) => {
     res.sendFile(path.join(__dirname, 'public', 'index.html'));
 });
 
+// Lightweight OSINT lookup endpoint (PhoneInfoga + Phone-Number-API + optional breaches)
+// Usage: GET /lookup?phone=+19998887777
+app.get('/lookup', async (req, res) => {
+    try {
+        const phone = String(req.query.phone || '').trim();
+        if (!phone) return res.status(400).json({ error: 'Missing phone parameter' });
 
+        const [infoga, phoneApi, leaks] = await Promise.all([
+            queryPhoneInfoga(phone).catch(() => null),
+            fetchPhoneNumberApiJSON(phone).catch(() => null),
+            fetchBreaches(phone).catch(() => null)
+        ]);
+
+        const formatted = phoneApi?.formatInternational || phoneApi?.formatE164 || null;
+        const result = {
+            phone,
+            carrier: infoga?.carrier || phoneApi?.carrier || null,
+            country: infoga?.country || phoneApi?.country || null,
+            line_type: infoga?.type || phoneApi?.numberType || null,
+            formatted: formatted || null,
+            possible_name_sources: infoga?.names || [],
+            leak_sources: leaks?.sources || []
+        };
+
+        // Log search
+        try {
+            await dbManager.insertSearch(phone, 'lookup', result);
+        } catch (error) {
+            console.log('⚠️ Search logging failed:', error.message);
+        }
+        return res.json(result);
+    } catch (err) {
+        console.error('Lookup error:', err.message);
+        return res.status(500).json({ error: 'Lookup failed' });
+    }
+});
 
 // Unified OSINT lookup endpoint (modular, no unofficial scrapers)
 // GET /lookup?phone=+1234567890
@@ -1115,41 +1045,6 @@ app.get('/api/stats', async (req, res) => {
     }
 });
 
-// Debug endpoint for troubleshooting environment and database
-app.get('/api/debug-env', async (req, res) => {
-    try {
-        const debugInfo = {
-            timestamp: new Date().toISOString(),
-            environment: {
-                NODE_ENV: process.env.NODE_ENV || 'undefined',
-                DB_TYPE: process.env.DB_TYPE || 'undefined',
-                DATABASE_URL: process.env.DATABASE_URL ? 'Set (length: ' + process.env.DATABASE_URL.length + ')' : 'Not set',
-                PORT: process.env.PORT || 'undefined',
-                PYTHON_PATH: process.env.PYTHON_PATH || 'undefined',
-                DB_PATH: process.env.DB_PATH || 'undefined'
-            },
-            database: {
-                type: dbManager.dbType,
-                connected: dbManager.isConnected,
-                path: process.env.DB_PATH || './osint.db'
-            },
-            platform: process.platform,
-            nodeVersion: process.version,
-            pythonPath: process.env.PYTHON_PATH || 'python3'
-        };
-        
-        res.json({
-            success: true,
-            debug: debugInfo
-        });
-    } catch (error) {
-        res.status(500).json({
-            success: false,
-            error: error.message
-        });
-    }
-});
-
 // Tool test endpoint to verify OSINT tools are working
 app.get('/api/test-tools', async (req, res) => {
     const results = {};
@@ -1169,51 +1064,26 @@ app.get('/api/test-tools', async (req, res) => {
             if (resolved.command) {
                 // Try a simple help command
                 try {
-                    let testArgs;
-                    if (resolved.viaPython) {
-                        if (resolved.viaPython.startsWith('-m ')) {
-                            const moduleName = resolved.viaPython.replace('-m ', '');
-                            testArgs = ['-m', moduleName, '--help'];
-                        } else if (resolved.viaPython.startsWith('-m')) {
-                            const moduleName = resolved.viaPython.replace('-m', '');
-                            testArgs = ['-m', moduleName, '--help'];
-                        } else {
-                            testArgs = ['-m', resolved.viaPython, '--help'];
-                        }
-                    } else {
-                        testArgs = ['--help'];
-                    }
-                    
-                    console.log(`🧪 Testing ${tool} with: ${resolved.command} ${testArgs.join(' ')}`);
-                    
-                    const { stdout, stderr } = await execFileAsync(resolved.command, testArgs, { 
-                        timeout: 15000,
-                        maxBuffer: 1024 * 1024,
-                        env: { 
-                            ...process.env, 
-                            PYTHONUNBUFFERED: '1', 
-                            NO_COLOR: '1',
-                            PYTHONUTF8: '1',
-                            PYTHONIOENCODING: 'utf-8'
-                        }
-                    });
-                    
+                    const { stdout, stderr } = await execFileAsync(resolved.command, 
+                        resolved.viaPython 
+                            ? (resolved.viaPython.startsWith('-m ') 
+                                ? ['-m', resolved.viaPython.replace('-m ', ''), '--help']
+                                : resolved.viaPython.startsWith('-m')
+                                ? [resolved.viaPython, '--help']
+                                : [resolved.viaPython, '--help'])
+                            : ['--help'], 
+                        { timeout: 10000 }
+                    );
                     results[tool].helpTest = {
                         success: true,
                         stdoutLength: stdout?.length || 0,
-                        stderrLength: stderr?.length || 0,
-                        command: `${resolved.command} ${testArgs.join(' ')}`
+                        stderrLength: stderr?.length || 0
                     };
-                    
-                    console.log(`✅ ${tool} help test passed`);
                 } catch (helpError) {
                     results[tool].helpTest = {
                         success: false,
-                        error: helpError.message,
-                        code: helpError.code,
-                        command: `${resolved.command} ${testArgs?.join(' ') || 'unknown'}`
+                        error: helpError.message
                     };
-                    console.log(`❌ ${tool} help test failed:`, helpError.message);
                 }
             }
         } catch (error) {
@@ -1222,7 +1092,6 @@ app.get('/api/test-tools', async (req, res) => {
                 available: false,
                 error: error.message
             };
-            console.log(`❌ ${tool} resolution failed:`, error.message);
         }
     }
     
@@ -1230,10 +1099,7 @@ app.get('/api/test-tools', async (req, res) => {
         success: true,
         tools: results,
         pythonVersion: process.env.PYTHON_VERSION || 'unknown',
-        nodeVersion: process.version,
-        platform: process.platform,
-        pythonPath: process.env.PYTHON_PATH || 'python3',
-        environment: process.env.NODE_ENV || 'development'
+        nodeVersion: process.version
     });
 });
 
@@ -2537,5 +2403,13 @@ app.get('/api/db-health', async (req, res) => {
 
 // Search history endpoint
 
+// Initialize database connection
+dbManager.connect().then(() => {
+    console.log('✅ Database connection established');
+}).catch((error) => {
+    console.error('❌ Database connection failed:', error.message);
+    console.log('🔄 Continuing with limited functionality...');
+});
 
-
+// GHunt auto-login setup (disabled for now to prevent startup issues)
+// runGhuntAutoLogin();
