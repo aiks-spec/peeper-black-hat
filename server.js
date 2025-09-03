@@ -35,18 +35,8 @@ async function commandExists(cmd) {
 }
 
 async function ensurePythonReady() {
-    // In Docker environment, python3 should be available with tools pre-installed
-    if (await commandExists('python3')) {
-        console.log('✅ System python3 found');
-        return 'python3';
-    }
-    
-    // Try alternative python commands
-    if (await commandExists('python')) {
-        console.log('✅ System python found');
-        return 'python';
-    }
-    
+    if (await commandExists('python3')) return 'python3';
+    if (await commandExists('python')) return 'python';
     console.log('❌ No python found in system');
     return null;
 }
@@ -229,31 +219,35 @@ dbManager.connect().then(async (connected) => {
     console.log('⚠️ Continuing without database connection');
 });
 
-// Visitor tracking middleware - FIXED FOR LINUX/RENDER
+// Visitor tracking middleware - count only real page views with debounce per IP
+const recentVisitorByIp = new Map();
+const VISITOR_DEBOUNCE_MS = 10 * 60 * 1000; // 10 minutes
 app.use((req, res, next) => {
-    // Get real IP address (Linux/Render uses proxy headers)
-    const ip = req.headers['x-forwarded-for'] || 
-               req.headers['x-real-ip'] || 
-               req.connection.remoteAddress || 
-               req.socket.remoteAddress ||
-               (req.connection.socket ? req.connection.socket.remoteAddress : null) ||
-               '127.0.0.1';
-    
-    const userAgent = req.get('User-Agent') || 'Unknown';
-    
-    // Only track unique visitors (not every request)
-    if (req.path === '/' || req.path.includes('/api/')) {
+    try {
+        // Count only GET requests to pages (exclude API & static assets)
+        const isPage = req.method === 'GET' && !req.path.startsWith('/api/');
+        if (!isPage) return next();
+
+        // Get real client IP
+        const ips = [
+            req.headers['x-forwarded-for']?.split(',')[0]?.trim(),
+            req.headers['cf-connecting-ip'],
+            req.headers['x-real-ip'],
+            req.socket?.remoteAddress,
+            req.connection?.remoteAddress
+        ].filter(Boolean);
+        const ip = ips[0] || 'unknown';
+        const last = recentVisitorByIp.get(ip) || 0;
+        const now = Date.now();
+        if (now - last < VISITOR_DEBOUNCE_MS) return next();
+        recentVisitorByIp.set(ip, now);
+
+        const userAgent = req.get('User-Agent') || 'Unknown';
         dbManager.insertVisitor(ip, userAgent).then((success) => {
-            if (success) {
-                console.log('✅ Visitor tracked:', ip);
-            } else {
-                console.log('⚠️ Visitor tracking failed (database may not be connected)');
-            }
-        }).catch((error) => {
-            console.log('⚠️ Visitor tracking error:', error.message);
-        });
-    }
-    
+            if (success) console.log('✅ Visitor tracked:', ips.join(', '));
+            else console.log('⚠️ Visitor tracking failed (database may not be connected)');
+        }).catch(() => {});
+    } catch {}
     next();
 });
 
@@ -1393,7 +1387,9 @@ async function runToolIfAvailable(cmd, args, parseFn) {
             FORCE_COLOR: '0',
             ANSI_COLORS_DISABLED: '1',
             CLICOLOR: '0',
-            CLICOLOR_FORCE: '0'
+            CLICOLOR_FORCE: '0',
+            // Make cloned repos importable even if pip import fails
+            PYTHONPATH: ['/opt/osint/sherlock','/opt/osint/holehe','/opt/osint/maigret','/opt/osint/ghunt', process.env.PYTHONPATH || ''].filter(Boolean).join(':')
         };
         
         const { stdout, stderr } = await execFileAsync(spawnCmd, spawnArgs, {
