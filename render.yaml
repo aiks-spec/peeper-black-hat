@@ -63,5 +63,4 @@ services:
     autoDeploy: true
     branch: main
     numInstances: 1
-    buildCommand: echo "Building Docker image..."
     dockerContext: .
