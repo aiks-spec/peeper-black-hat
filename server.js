@@ -197,7 +197,6 @@ const dbManager = new DatabaseManager();
 // Debug environment variables
 console.log('🔍 Environment Variables Debug:');
 console.log('   - NODE_ENV:', process.env.NODE_ENV);
-console.log('   - DB_TYPE:', process.env.DB_TYPE);
 console.log('   - DATABASE_URL:', process.env.DATABASE_URL ? 'Set (length: ' + process.env.DATABASE_URL.length + ')' : 'Not set');
 console.log('   - PORT:', process.env.PORT);
 console.log('   - All env keys containing DB:', Object.keys(process.env).filter(k => k.toLowerCase().includes('db')));
@@ -2254,7 +2253,7 @@ app.get('/api/test-tools', async (req, res) => {
         platform: process.platform,
         pythonPath: process.env.PYTHON_PATH,
         environment: process.env.NODE_ENV,
-        databaseType: process.env.DB_TYPE,
+        databaseType: 'postgresql',
         results
     });
 });
@@ -2263,12 +2262,11 @@ app.listen(PORT, () => {
     console.log(`🚀 OSINT Lookup Engine running on port ${PORT}`);
     console.log(`🌐 Access at: http://localhost:${PORT}`);
     console.log(`📊 Environment: ${process.env.NODE_ENV || 'development'}`);
-    console.log(`🗄️ Database Type: ${process.env.DB_TYPE || 'sqlite'}`);
+    console.log(`🗄️ Database Type: PostgreSQL`);
     console.log(`🐍 Python Path: ${process.env.PYTHON_PATH || 'python3'}`);
     console.log(`📁 Working Directory: ${process.cwd()}`);
     console.log(`🔧 Node Version: ${process.version}`);
     console.log(`🔍 Environment Variables Debug:`);
-    console.log(`   - DB_TYPE: ${process.env.DB_TYPE}`);
     console.log(`   - DATABASE_URL: ${process.env.DATABASE_URL ? 'Set' : 'Not set'}`);
     console.log(`   - PYTHON_PATH: ${process.env.PYTHON_PATH}`);
     console.log(`   - PATH: ${process.env.PATH?.substring(0, 100)}...`);
@@ -2378,40 +2376,21 @@ app.get('/api/db-health', async (req, res) => {
     try {
         const health = {
             status: 'unknown',
-            type: dbManager.dbType,
+            type: 'postgresql',
             connected: dbManager.isConnected,
             timestamp: new Date().toISOString()
         };
 
         if (dbManager.isConnected && dbManager.db) {
             try {
-                if (dbManager.dbType === 'postgresql') {
-                    const client = await dbManager.db.connect();
-                    const result = await client.query('SELECT NOW() as time, version() as version');
-                    client.release();
-                    health.status = 'healthy';
-                    health.details = {
-                        time: result.rows[0].time,
-                        version: result.rows[0].version.substring(0, 50)
-                    };
-                } else {
-                    // SQLite health check
-                    return new Promise((resolve) => {
-                        dbManager.db.get('SELECT datetime("now") as time, sqlite_version() as version', (err, row) => {
-                            if (err) {
-                                health.status = 'unhealthy';
-                                health.error = err.message;
-                            } else {
-                                health.status = 'healthy';
-                                health.details = {
-                                    time: row.time,
-                                    version: row.version
-                                };
-                            }
-                            resolve(res.json(health));
-                        });
-                    });
-                }
+                const client = await dbManager.db.connect();
+                const result = await client.query('SELECT NOW() as time, version() as version');
+                client.release();
+                health.status = 'healthy';
+                health.details = {
+                    time: result.rows[0].time,
+                    version: result.rows[0].version.substring(0, 50)
+                };
             } catch (error) {
                 health.status = 'unhealthy';
                 health.error = error.message;
