@@ -10,6 +10,11 @@ class OSINTLookupEngine {
         console.log('🚀 OSINT Lookup Engine Initialized');
         this.updateStatus('ONLINE');
         this.startStatusBlink();
+        
+        // Refresh stats every 30 seconds to keep visitor count updated
+        setInterval(() => {
+            this.loadStats();
+        }, 30000);
     }
 
     setupEventListeners() {
@@ -630,10 +635,13 @@ class OSINTLookupEngine {
             const response = await fetch('/api/stats');
             const data = await response.json();
 
-            document.getElementById('visitor-count').textContent = data.visitors || 0;
+            document.getElementById('visitor-count').textContent = data.visitors_today || 0;
             document.getElementById('search-count').textContent = data.searches || 0;
         } catch (error) {
             console.error('Failed to load stats:', error);
+            // Set default values on error
+            document.getElementById('visitor-count').textContent = '0';
+            document.getElementById('search-count').textContent = '0';
         }
     }
 
