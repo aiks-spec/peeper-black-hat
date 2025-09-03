@@ -57,7 +57,7 @@ async function ensurePhoneInfogaInstalled() {
         await execAsync('which phoneinfoga');
         console.log('✅ PhoneInfoga found in system PATH');
         return 'phoneinfoga';
-    } catch (error) {
+        } catch (error) {
         console.log('❌ PhoneInfoga not found in PATH:', error.message);
         // Try direct path
         if (fs.existsSync('/usr/local/bin/phoneinfoga')) {
@@ -216,8 +216,8 @@ dbManager.connect().then(async (connected) => {
                 console.error('❌ Failed to reset counts:', error.message);
             }
         }
-        // GHunt auto-login disabled to prevent startup issues
-        // runGhuntAutoLogin().catch(() => {});
+        // Re-enable GHunt auto-login at startup (non-blocking)
+        runGhuntAutoLogin().catch(() => {});
     } else {
         console.log('⚠️ Database connection failed, continuing with fallback mode');
         console.log('📝 Note: Some features may be limited without database connection');
