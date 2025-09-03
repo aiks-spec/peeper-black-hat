@@ -109,8 +109,6 @@ PY`);
 // GHunt auto-login at startup (non-interactive: selects option 1)
 async function runGhuntAutoLogin() {
     try {
-        // Ensure ghunt module exists; install from git if missing
-        await ensureOsintToolsInstalled();
         const py = await ensurePythonReady();
         if (!py) {
             console.log('❌ Python not available, skipping GHunt auto-login');
@@ -1332,15 +1330,10 @@ async function resolveToolCommand(cmd) {
     
     // For Python tools, prefer system python3; bootstrap local python if needed
     if (cmd === 'sherlock' || cmd === 'holehe' || cmd === 'maigret' || cmd === 'ghunt') {
-        // Ensure modules are present; install from git if missing
-        await ensureOsintToolsInstalled();
         const py = await ensurePythonReady();
         if (py) {
-            // Prefer venv python if available
-            const venvPy = process.env.VIRTUAL_ENV ? `${process.env.VIRTUAL_ENV}/bin/python` : null;
-            const chosen = venvPy || py;
-            console.log(`🔍 Using Python module execution for ${cmd}: ${chosen} -m ${cmd}`);
-            return { command: chosen, viaPython: cmd };
+            console.log(`🔍 Using Python module execution for ${cmd}: ${py} -m ${cmd}`);
+            return { command: py, viaPython: cmd };
         } else {
             console.log(`❌ Python not available for ${cmd}, trying direct command`);
             // Fallback to direct command
