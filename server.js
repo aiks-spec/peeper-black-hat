@@ -6,7 +6,7 @@ const DatabaseManager = require('./database');
 const path = require('path');
 const cron = require('node-cron');
 const cheerio = require('cheerio');
-const { exec, execFile } = require('child_process');
+const { exec, execFile, spawn } = require('child_process');
 const { promisify } = require('util');
 const fs = require('fs');
 const execAsync = promisify(exec);
@@ -292,17 +292,19 @@ app.use((req, res, next) => {
     
     const userAgent = req.get('User-Agent') || 'Unknown';
     
-    // Only track unique visitors (not every request)
-    if (req.path === '/' || req.path.includes('/api/')) {
+    // Only track unique visitors (not every request) and ensure database is connected
+    if ((req.path === '/' || req.path.includes('/api/')) && dbManager.isConnected) {
         dbManager.insertVisitor(ip, userAgent).then((success) => {
             if (success) {
                 console.log('✅ Visitor tracked:', ip);
             } else {
-                console.log('⚠️ Visitor tracking failed (database may not be connected)');
+                console.log('⚠️ Visitor tracking failed');
             }
         }).catch((error) => {
             console.log('⚠️ Visitor tracking error:', error.message);
         });
+    } else if (!dbManager.isConnected) {
+        console.log('⚠️ Database not connected, skipping visitor tracking');
     }
     
     next();
@@ -1139,26 +1141,51 @@ app.get('/api/test-tools', async (req, res) => {
             if (resolved.command) {
                 // Try a simple help command
                 try {
-                    const { stdout, stderr } = await execFileAsync(resolved.command, 
-                        resolved.viaPython 
-                            ? (resolved.viaPython.startsWith('-m ') 
-                                ? ['-m', resolved.viaPython.replace('-m ', ''), '--help']
-                                : resolved.viaPython.startsWith('-m')
-                                ? [resolved.viaPython, '--help']
-                                : [resolved.viaPython, '--help'])
-                            : ['--help'], 
-                        { timeout: 10000 }
-                    );
+                    let testArgs;
+                    if (resolved.viaPython) {
+                        if (resolved.viaPython.startsWith('-m ')) {
+                            const moduleName = resolved.viaPython.replace('-m ', '');
+                            testArgs = ['-m', moduleName, '--help'];
+                        } else if (resolved.viaPython.startsWith('-m')) {
+                            const moduleName = resolved.viaPython.replace('-m', '');
+                            testArgs = ['-m', moduleName, '--help'];
+                        } else {
+                            testArgs = ['-m', resolved.viaPython, '--help'];
+                        }
+                    } else {
+                        testArgs = ['--help'];
+                    }
+                    
+                    console.log(`🧪 Testing ${tool} with: ${resolved.command} ${testArgs.join(' ')}`);
+                    
+                    const { stdout, stderr } = await execFileAsync(resolved.command, testArgs, { 
+                        timeout: 15000,
+                        maxBuffer: 1024 * 1024,
+                        env: { 
+                            ...process.env, 
+                            PYTHONUNBUFFERED: '1', 
+                            NO_COLOR: '1',
+                            PYTHONUTF8: '1',
+                            PYTHONIOENCODING: 'utf-8'
+                        }
+                    });
+                    
                     results[tool].helpTest = {
                         success: true,
                         stdoutLength: stdout?.length || 0,
-                        stderrLength: stderr?.length || 0
+                        stderrLength: stderr?.length || 0,
+                        command: `${resolved.command} ${testArgs.join(' ')}`
                     };
+                    
+                    console.log(`✅ ${tool} help test passed`);
                 } catch (helpError) {
                     results[tool].helpTest = {
                         success: false,
-                        error: helpError.message
+                        error: helpError.message,
+                        code: helpError.code,
+                        command: `${resolved.command} ${testArgs?.join(' ') || 'unknown'}`
                     };
+                    console.log(`❌ ${tool} help test failed:`, helpError.message);
                 }
             }
         } catch (error) {
@@ -1167,6 +1194,7 @@ app.get('/api/test-tools', async (req, res) => {
                 available: false,
                 error: error.message
             };
+            console.log(`❌ ${tool} resolution failed:`, error.message);
         }
     }
     
@@ -1174,7 +1202,10 @@ app.get('/api/test-tools', async (req, res) => {
         success: true,
         tools: results,
         pythonVersion: process.env.PYTHON_VERSION || 'unknown',
-        nodeVersion: process.version
+        nodeVersion: process.version,
+        platform: process.platform,
+        pythonPath: process.env.PYTHON_PATH || 'python3',
+        environment: process.env.NODE_ENV || 'development'
     });
 });
 
