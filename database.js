@@ -8,6 +8,12 @@ class DatabaseManager {
         this.dbType = process.env.DB_TYPE || 'sqlite';
         this.databaseUrl = process.env.DATABASE_URL;
         this.isConnected = false;
+        
+        // Enhanced logging for debugging
+        console.log('🗄️ DatabaseManager initialized:');
+        console.log('  - DB_TYPE:', this.dbType);
+        console.log('  - DATABASE_URL:', this.databaseUrl ? 'Set (length: ' + this.databaseUrl.length + ')' : 'Not set');
+        console.log('  - DB_PATH:', process.env.DB_PATH || './osint.db');
     }
 
     async connect() {
@@ -16,6 +22,13 @@ class DatabaseManager {
             
             if (this.dbType === 'postgresql' && this.databaseUrl) {
                 console.log('🐘 Connecting to PostgreSQL database...');
+                console.log('🔍 Database URL preview:', this.databaseUrl.substring(0, 50) + '...');
+                
+                // Validate DATABASE_URL format
+                if (!this.databaseUrl.startsWith('postgresql://')) {
+                    console.log('⚠️ DATABASE_URL format warning: should start with postgresql://');
+                }
+                
                 this.db = new Pool({
                     connectionString: this.databaseUrl,
                     ssl: {
@@ -43,6 +56,26 @@ class DatabaseManager {
                 const testResult = await client.query('SELECT NOW()');
                 console.log('✅ Database query test successful:', testResult.rows[0]);
                 
+            } else if (this.dbType === 'postgresql' && !this.databaseUrl) {
+                console.log('❌ DB_TYPE is postgresql but DATABASE_URL is not set');
+                console.log('🔄 Falling back to SQLite...');
+                this.dbType = 'sqlite';
+                const dbPath = process.env.DB_PATH || './osint.db';
+                this.db = new sqlite3.Database(dbPath);
+                
+                // Test SQLite connection
+                return new Promise((resolve, reject) => {
+                    this.db.get('SELECT 1 as test', (err, row) => {
+                        if (err) {
+                            console.error('❌ SQLite connection test failed:', err.message);
+                            reject(err);
+                        } else {
+                            console.log('✅ SQLite fallback successful');
+                            this.isConnected = true;
+                            resolve(true);
+                        }
+                    });
+                });
             } else {
                 console.log('📁 Using SQLite database (fallback)...');
                 const dbPath = process.env.DB_PATH || './osint.db';
