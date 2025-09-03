@@ -32,31 +32,37 @@ RUN apt-get update && apt-get install -y \
     libpq-dev postgresql-client \
  && rm -rf /var/lib/apt/lists/*
 
-# Upgrade pip and install Python tools with explicit versions
-RUN python3 -m pip install --no-cache-dir --upgrade pip setuptools wheel
+# Create isolated Python virtual environment to avoid PEP 668 and ensure tools availability
+RUN python3 -m venv /opt/venv
+ENV VIRTUAL_ENV=/opt/venv
+ENV PATH="/opt/venv/bin:${PATH}"
 
-# Clone and install Python OSINT tools from source (ensures modules exist at runtime)
+# Upgrade pip in venv and install build helpers
+RUN python -m pip install --no-cache-dir --upgrade pip setuptools wheel
+
+# Clone and install Python OSINT tools from source (install into venv)
 RUN mkdir -p /opt/osint && cd /opt/osint \
  && git clone --depth 1 https://github.com/sherlock-project/sherlock.git \
  && git clone --depth 1 https://github.com/megadose/holehe.git \
  && git clone --depth 1 https://github.com/soxoj/maigret.git \
  && git clone --depth 1 https://github.com/mxrch/GHunt.git ghunt \
- && cd /opt/osint/sherlock && python3 -m pip install --no-cache-dir . \
- && cd /opt/osint/holehe && python3 -m pip install --no-cache-dir . \
- && cd /opt/osint/maigret && python3 -m pip install --no-cache-dir . \
- && cd /opt/osint/ghunt && python3 -m pip install --no-cache-dir .
+ && cd /opt/osint/sherlock && python -m pip install --no-cache-dir . \
+ && cd /opt/osint/holehe && python -m pip install --no-cache-dir . \
+ && cd /opt/osint/maigret && python -m pip install --no-cache-dir . \
+ && cd /opt/osint/ghunt && python -m pip install --no-cache-dir .
 
-# Verify Python tools are installed and accessible
-RUN echo "=== Verifying Python tools installation ===" && \
-    python3 -c "import sherlock; print('✅ Sherlock version:', sherlock.__version__)" && \
-    python3 -c "import holehe; print('✅ Holehe version:', holehe.__version__)" && \
-    python3 -c "import maigret; print('✅ Maigret version:', maigret.__version__)" && \
-    python3 -c "import ghunt; print('✅ GHunt version:', ghunt.__version__)" && \
-    echo "=== Testing tool execution ===" && \
-    python3 -m sherlock --help 2>&1 | head -3 && \
-    python3 -m holehe --help 2>&1 | head -3 && \
-    python3 -m maigret --help 2>&1 | head -3 && \
-    python3 -m ghunt --help 2>&1 | head -3
+# Verify Python tools are installed and accessible in the venv
+RUN echo "=== Verifying Python tools installation (venv) ===" && \
+    python -c "import sys; print(sys.executable)" && \
+    python -c "import sherlock; print('✅ Sherlock version:', getattr(sherlock,'__version__','unknown'))" && \
+    python -c "import holehe; print('✅ Holehe version:', getattr(holehe,'__version__','unknown'))" && \
+    python -c "import maigret; print('✅ Maigret version:', getattr(maigret,'__version__','unknown'))" && \
+    python -c "import ghunt; print('✅ GHunt import ok')" && \
+    echo "=== Testing tool execution (venv) ===" && \
+    python -m sherlock --help 2>&1 | head -3 && \
+    python -m holehe --help 2>&1 | head -3 && \
+    python -m maigret --help 2>&1 | head -3 && \
+    python -m ghunt --help 2>&1 | head -3
 
 # Install PhoneInfoga native binary
 RUN mkdir -p /tmp/phoneinfoga \
