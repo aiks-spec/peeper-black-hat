@@ -5,6 +5,7 @@ class DatabaseManager {
         this.db = null;
         this.databaseUrl = process.env.DATABASE_URL;
         this.isConnected = false;
+        this.dbType = 'postgresql';
     }
 
     async connect() {
@@ -245,101 +246,42 @@ class DatabaseManager {
         }
 
         try {
-            if (this.dbType === 'postgresql') {
-                const client = await this.db.connect();
-                
-                // Unique visitors today
-                const todayUniqueResult = await client.query(`
-                    SELECT COUNT(DISTINCT ip) as visitors 
-                    FROM visitors 
-                    WHERE timestamp > NOW() - INTERVAL '24 hours'
-                `);
-                
-                // Total unique visitors overall
-                const totalUniqueResult = await client.query(`
-                    SELECT COUNT(DISTINCT ip) as total_visitors 
-                    FROM visitors
-                `);
+            const client = await this.db.connect();
+            
+            // Unique visitors today
+            const todayUniqueResult = await client.query(`
+                SELECT COUNT(DISTINCT ip) as visitors 
+                FROM visitors 
+                WHERE timestamp > NOW() - INTERVAL '24 hours'
+            `);
+            
+            // Total unique visitors overall
+            const totalUniqueResult = await client.query(`
+                SELECT COUNT(DISTINCT ip) as total_visitors 
+                FROM visitors
+            `);
 
-                // Total hits today
-                const todayHitsResult = await client.query(`
-                    SELECT COUNT(*) as hits_today 
-                    FROM visitors 
-                    WHERE timestamp > NOW() - INTERVAL '24 hours'
-                `);
+            // Total hits today
+            const todayHitsResult = await client.query(`
+                SELECT COUNT(*) as hits_today 
+                FROM visitors 
+                WHERE timestamp > NOW() - INTERVAL '24 hours'
+            `);
 
-                // Total hits overall
-                const totalHitsResult = await client.query(`
-                    SELECT COUNT(*) as total_hits 
-                    FROM visitors
-                `);
-                
-                client.release();
-                
-                return {
-                    visitors_today: parseInt(todayUniqueResult.rows[0].visitors) || 0,
-                    total_visitors: parseInt(totalUniqueResult.rows[0].total_visitors) || 0,
-                    hits_today: parseInt(todayHitsResult.rows[0].hits_today) || 0,
-                    total_hits: parseInt(totalHitsResult.rows[0].total_hits) || 0
-                };
-            } else {
-                return new Promise((resolve, reject) => {
-                    const oneDayAgo = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
-                    
-                    // Unique visitors today
-                    this.db.get(`
-                        SELECT COUNT(DISTINCT ip) as visitors 
-                        FROM visitors 
-                        WHERE timestamp > ?
-                    `, [oneDayAgo], (err, visitorResult) => {
-                        if (err) {
-                            reject(err);
-                            return;
-                        }
-                        
-                        // Total unique visitors overall
-                        this.db.get(`
-                            SELECT COUNT(DISTINCT ip) as total_visitors 
-                            FROM visitors
-                        `, (err, totalVisitorResult) => {
-                            if (err) {
-                                reject(err);
-                                return;
-                            }
-
-                            // Total hits today
-                            this.db.get(`
-                                SELECT COUNT(*) as hits_today 
-                                FROM visitors 
-                                WHERE timestamp > ?
-                            `, [oneDayAgo], (err, hitsTodayResult) => {
-                                if (err) {
-                                    reject(err);
-                                    return;
-                                }
-
-                                // Total hits overall
-                                this.db.get(`
-                                    SELECT COUNT(*) as total_hits 
-                                    FROM visitors
-                                `, (err, totalHitsResult) => {
-                                    if (err) {
-                                        reject(err);
-                                        return;
-                                    }
-
-                                    resolve({
-                                        visitors_today: visitorResult?.visitors || 0,
-                                        total_visitors: totalVisitorResult?.total_visitors || 0,
-                                        hits_today: hitsTodayResult?.hits_today || 0,
-                                        total_hits: totalHitsResult?.total_hits || 0
-                                    });
-                                });
-                            });
-                        });
-                    });
-                });
-            }
+            // Total hits overall
+            const totalHitsResult = await client.query(`
+                SELECT COUNT(*) as total_hits 
+                FROM visitors
+            `);
+            
+            client.release();
+            
+            return {
+                visitors_today: parseInt(todayUniqueResult.rows[0].visitors) || 0,
+                total_visitors: parseInt(totalUniqueResult.rows[0].total_visitors) || 0,
+                hits_today: parseInt(todayHitsResult.rows[0].hits_today) || 0,
+                total_hits: parseInt(totalHitsResult.rows[0].total_hits) || 0
+            };
         } catch (error) {
             console.error('❌ Visitor stats failed:', error.message);
             return { visitors_today: 0, total_visitors: 0, hits_today: 0, total_hits: 0 };
