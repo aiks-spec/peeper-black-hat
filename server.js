@@ -13,6 +13,14 @@ const execAsync = promisify(exec);
 const execFileAsync = promisify(execFile);
 const https = require('https');
 
+// Check if .env file exists and reload if it does (for Docker container)
+const envPath = path.join(process.cwd(), '.env');
+if (fs.existsSync(envPath)) {
+    console.log('🔍 .env file found, reloading environment variables...');
+    require('dotenv').config({ path: envPath });
+    console.log('✅ Environment variables reloaded from .env file');
+}
+
 // Enhanced environment variable logging for debugging
 console.log('🔍 Environment Variables Check:');
 console.log('  - NODE_ENV:', process.env.NODE_ENV || 'undefined');
