@@ -1057,6 +1057,8 @@ app.get('/api/stats', async (req, res) => {
         res.json({
             visitors_today: visitorStats.visitors_today,
             total_visitors: visitorStats.total_visitors,
+            hits_today: visitorStats.hits_today,
+            total_hits: visitorStats.total_hits,
             searches: searchCount,
             timestamp: new Date().toISOString()
         });
@@ -1290,8 +1292,8 @@ async function resolveToolCommand(cmd) {
     if (cmd === 'sherlock' || cmd === 'holehe' || cmd === 'maigret' || cmd === 'ghunt') {
         const py = await ensurePythonReady();
         if (py) {
-            console.log(`🔍 Using Python module execution for ${cmd}: ${py} -m ${cmd}`);
-            return { command: py, viaPython: cmd };
+        console.log(`🔍 Using Python module execution for ${cmd}: ${py} -m ${cmd}`);
+        return { command: py, viaPython: cmd };
         } else {
             console.log(`❌ Python not available for ${cmd}, trying direct command`);
             // Fallback to direct command
@@ -2382,14 +2384,14 @@ app.get('/api/db-health', async (req, res) => {
 
         if (dbManager.isConnected && dbManager.db) {
             try {
-                const client = await dbManager.db.connect();
-                const result = await client.query('SELECT NOW() as time, version() as version');
-                client.release();
-                health.status = 'healthy';
-                health.details = {
-                    time: result.rows[0].time,
-                    version: result.rows[0].version.substring(0, 50)
-                };
+                    const client = await dbManager.db.connect();
+                    const result = await client.query('SELECT NOW() as time, version() as version');
+                    client.release();
+                    health.status = 'healthy';
+                    health.details = {
+                        time: result.rows[0].time,
+                        version: result.rows[0].version.substring(0, 50)
+                    };
             } catch (error) {
                 health.status = 'unhealthy';
                 health.error = error.message;
