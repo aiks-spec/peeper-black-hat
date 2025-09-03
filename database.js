@@ -13,6 +13,7 @@ class DatabaseManager {
     async connect() {
         try {
             console.log(`🔍 Database connection attempt - Type: ${this.dbType}, URL: ${this.databaseUrl ? 'Set' : 'Not set'}`);
+            console.log(`🔍 Environment check - DB_TYPE: ${process.env.DB_TYPE}, DATABASE_URL: ${process.env.DATABASE_URL ? 'Set' : 'Not set'}`);
             
             if (this.dbType === 'postgresql' && this.databaseUrl) {
                 console.log('🐘 Connecting to PostgreSQL database...');
@@ -68,6 +69,8 @@ class DatabaseManager {
         } catch (error) {
             console.error('❌ Database connection failed:', error.message);
             console.error('❌ Database error details:', error);
+            console.error('❌ Error code:', error.code);
+            console.error('❌ Error stack:', error.stack);
             this.isConnected = false;
             
             // Try SQLite fallback if PostgreSQL fails
