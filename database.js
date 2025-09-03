@@ -8,12 +8,6 @@ class DatabaseManager {
         this.dbType = process.env.DB_TYPE || 'sqlite';
         this.databaseUrl = process.env.DATABASE_URL;
         this.isConnected = false;
-        
-        // Enhanced logging for debugging
-        console.log('🗄️ DatabaseManager initialized:');
-        console.log('  - DB_TYPE:', this.dbType);
-        console.log('  - DATABASE_URL:', this.databaseUrl ? 'Set (length: ' + this.databaseUrl.length + ')' : 'Not set');
-        console.log('  - DB_PATH:', process.env.DB_PATH || './osint.db');
     }
 
     async connect() {
@@ -22,13 +16,6 @@ class DatabaseManager {
             
             if (this.dbType === 'postgresql' && this.databaseUrl) {
                 console.log('🐘 Connecting to PostgreSQL database...');
-                console.log('🔍 Database URL preview:', this.databaseUrl.substring(0, 50) + '...');
-                
-                // Validate DATABASE_URL format
-                if (!this.databaseUrl.startsWith('postgresql://')) {
-                    console.log('⚠️ DATABASE_URL format warning: should start with postgresql://');
-                }
-                
                 this.db = new Pool({
                     connectionString: this.databaseUrl,
                     ssl: {
@@ -56,26 +43,6 @@ class DatabaseManager {
                 const testResult = await client.query('SELECT NOW()');
                 console.log('✅ Database query test successful:', testResult.rows[0]);
                 
-            } else if (this.dbType === 'postgresql' && !this.databaseUrl) {
-                console.log('❌ DB_TYPE is postgresql but DATABASE_URL is not set');
-                console.log('🔄 Falling back to SQLite...');
-                this.dbType = 'sqlite';
-                const dbPath = process.env.DB_PATH || './osint.db';
-                this.db = new sqlite3.Database(dbPath);
-                
-                // Test SQLite connection
-                return new Promise((resolve, reject) => {
-                    this.db.get('SELECT 1 as test', (err, row) => {
-                        if (err) {
-                            console.error('❌ SQLite connection test failed:', err.message);
-                            reject(err);
-                        } else {
-                            console.log('✅ SQLite fallback successful');
-                            this.isConnected = true;
-                            resolve(true);
-                        }
-                    });
-                });
             } else {
                 console.log('📁 Using SQLite database (fallback)...');
                 const dbPath = process.env.DB_PATH || './osint.db';
@@ -253,22 +220,76 @@ class DatabaseManager {
                         return;
                     }
                     
-                    this.db.run(`
-                        CREATE TABLE IF NOT EXISTS temp_files (
-                            id INTEGER PRIMARY KEY AUTOINCREMENT,
-                            search_id INTEGER,
-                            file_path TEXT NOT NULL,
-                            created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-                            expires_at DATETIME NOT NULL
-                        )
-                    `, (err) => {
+                    // Check if query_type column exists, add it if missing
+                    this.db.get("PRAGMA table_info(searches)", (err, rows) => {
                         if (err) {
-                            console.error('❌ SQLite temp_files table initialization failed:', err.message);
+                            console.error('❌ SQLite table info check failed:', err.message);
                             reject(err);
-                        } else {
-                            console.log('✅ SQLite tables initialized');
-                            resolve();
+                            return;
                         }
+                        
+                        // Check if query_type column exists
+                        this.db.all("PRAGMA table_info(searches)", (err, columns) => {
+                            if (err) {
+                                console.error('❌ SQLite column check failed:', err.message);
+                                reject(err);
+                                return;
+                            }
+                            
+                            const hasQueryType = columns.some(col => col.name === 'query_type');
+                            if (!hasQueryType) {
+                                console.log('🔧 Adding missing query_type column to SQLite searches table...');
+                                this.db.run(`
+                                    ALTER TABLE searches ADD COLUMN query_type TEXT DEFAULT 'unknown'
+                                `, (err) => {
+                                    if (err) {
+                                        console.error('❌ SQLite migration failed:', err.message);
+                                        // Don't fail, just log the error
+                                        console.log('⚠️ Migration failed, but continuing...');
+                                    } else {
+                                        console.log('✅ Added query_type column to SQLite searches table');
+                                    }
+                                    
+                                    // Continue with temp_files table
+                                    this.db.run(`
+                                        CREATE TABLE IF NOT EXISTS temp_files (
+                                            id INTEGER PRIMARY KEY AUTOINCREMENT,
+                                            search_id INTEGER,
+                                            file_path TEXT NOT NULL,
+                                            created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+                                            expires_at DATETIME NOT NULL
+                                        )
+                                    `, (err) => {
+                                        if (err) {
+                                            console.error('❌ SQLite temp_files table initialization failed:', err.message);
+                                            reject(err);
+                                        } else {
+                                            console.log('✅ SQLite tables initialized');
+                                            resolve();
+                                        }
+                                    });
+                                });
+                            } else {
+                                // query_type column already exists, continue with temp_files
+                                this.db.run(`
+                                    CREATE TABLE IF NOT EXISTS temp_files (
+                                        id INTEGER PRIMARY KEY AUTOINCREMENT,
+                                        search_id INTEGER,
+                                        file_path TEXT NOT NULL,
+                                        created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+                                        expires_at DATETIME NOT NULL
+                                    )
+                                `, (err) => {
+                                    if (err) {
+                                        console.error('❌ SQLite temp_files table initialization failed:', err.message);
+                                        reject(err);
+                                    } else {
+                                        console.log('✅ SQLite tables initialized');
+                                        resolve();
+                                    }
+                                });
+                            }
+                        });
                     });
                 });
             });
