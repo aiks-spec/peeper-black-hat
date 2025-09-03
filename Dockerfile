@@ -1,4 +1,7 @@
-FROM ubuntu:22.04
+FROM node:20-bookworm-slim
+
+# Update and install ncurses-bin which contains tput
+RUN apt-get update && apt-get install -y ncurses-bin
 
 # Prevent interactive prompts
 ENV DEBIAN_FRONTEND=noninteractive
@@ -17,21 +20,12 @@ ENV TERM=dumb \
     LANG=C.UTF-8 \
     LANGUAGE=C.UTF-8
 
-# Add ncurses to your Alpine-based Dockerfile
-RUN apk add ncurses
-
 # OS deps
 RUN apt-get update && apt-get install -y \
     curl wget git ca-certificates build-essential \
     python3 python3-pip python3-venv \
     libpq-dev postgresql-client \
-    ncurses-bin \
  && rm -rf /var/lib/apt/lists/*
-
-# Node.js 20.x
-RUN curl -fsSL https://deb.nodesource.com/setup_20.x | bash - \
- && apt-get install -y nodejs \
- && node --version && npm --version
 
 # Python tools
 RUN python3 -m pip install --no-cache-dir --upgrade pip \
@@ -72,5 +66,4 @@ EXPOSE 3000
 
 ENTRYPOINT ["/entrypoint.sh"]
 CMD ["npm", "start"]
-
 
