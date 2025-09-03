@@ -216,8 +216,8 @@ dbManager.connect().then(async (connected) => {
                 console.error('❌ Failed to reset counts:', error.message);
             }
         }
-        // Kick off GHunt auto-login (non-blocking)
-        runGhuntAutoLogin().catch(() => {});
+        // GHunt auto-login disabled to prevent startup issues
+        // runGhuntAutoLogin().catch(() => {});
     } else {
         console.log('⚠️ Database connection failed, continuing with fallback mode');
         console.log('📝 Note: Some features may be limited without database connection');
