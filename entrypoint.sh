@@ -20,8 +20,7 @@ export FORCE_COLOR=0
 export ANSI_COLORS_DISABLED=1
 export CLICOLOR=0
 export CLICOLOR_FORCE=0
-export VIRTUAL_ENV=/opt/venv
-export PATH="/opt/venv/bin:$PATH"
+# Use system python only (no venv)
 
 echo "=== Environment Setup ==="
 echo "Node: $(node -v)"
