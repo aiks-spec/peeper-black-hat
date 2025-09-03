@@ -1107,6 +1107,41 @@ app.get('/api/stats', async (req, res) => {
     }
 });
 
+// Debug endpoint for troubleshooting environment and database
+app.get('/api/debug-env', async (req, res) => {
+    try {
+        const debugInfo = {
+            timestamp: new Date().toISOString(),
+            environment: {
+                NODE_ENV: process.env.NODE_ENV || 'undefined',
+                DB_TYPE: process.env.DB_TYPE || 'undefined',
+                DATABASE_URL: process.env.DATABASE_URL ? 'Set (length: ' + process.env.DATABASE_URL.length + ')' : 'Not set',
+                PORT: process.env.PORT || 'undefined',
+                PYTHON_PATH: process.env.PYTHON_PATH || 'undefined',
+                DB_PATH: process.env.DB_PATH || 'undefined'
+            },
+            database: {
+                type: dbManager.dbType,
+                connected: dbManager.isConnected,
+                path: process.env.DB_PATH || './osint.db'
+            },
+            platform: process.platform,
+            nodeVersion: process.version,
+            pythonPath: process.env.PYTHON_PATH || 'python3'
+        };
+        
+        res.json({
+            success: true,
+            debug: debugInfo
+        });
+    } catch (error) {
+        res.status(500).json({
+            success: false,
+            error: error.message
+        });
+    }
+});
+
 // Tool test endpoint to verify OSINT tools are working
 app.get('/api/test-tools', async (req, res) => {
     const results = {};
