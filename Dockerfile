@@ -18,7 +18,9 @@ ENV TERM=dumb \
     PYTHONUTF8=1 \
     LC_ALL=C.UTF-8 \
     LANG=C.UTF-8 \
-    LANGUAGE=C.UTF-8
+    LANGUAGE=C.UTF-8 \
+    BASH_ENV="" \
+    ENV=""
 
 # OS deps
 RUN apt-get update && apt-get install -y \
@@ -44,11 +46,16 @@ RUN mkdir -p /tmp/phoneinfoga \
  && chmod +x /usr/local/bin/phoneinfoga \
  && phoneinfoga version || true
 
+# Set working directory
 WORKDIR /app
 
+# Copy package files first for better layer caching
 COPY package*.json ./
+
+# Install Node.js dependencies
 RUN npm ci --omit=dev || npm install --omit=dev
 
+# Copy application code
 COPY . .
 
 # Create persistent temp dir
@@ -59,11 +66,23 @@ RUN mkdir -p /home/render \
  && printf '#!/bin/sh\n# disabled\nexport NO_COLOR=1\nexport TERM=dumb\n' > /home/render/colors.sh \
  && chmod +x /home/render/colors.sh
 
+# Copy entrypoint script
 COPY entrypoint.sh /entrypoint.sh
 RUN chmod +x /entrypoint.sh
 
+# Create non-root user for security
+RUN useradd -r -s /bin/bash -u 1001 appuser \
+ && chown -R appuser:appuser /app
+USER appuser
+
+# Expose port
 EXPOSE 3000
 
+# Health check
+HEALTHCHECK --interval=30s --timeout=10s --start-period=60s --retries=3 \
+  CMD curl -f http://localhost:3000/ || exit 1
+
+# Use entrypoint script
 ENTRYPOINT ["/entrypoint.sh"]
 CMD ["npm", "start"]
 
