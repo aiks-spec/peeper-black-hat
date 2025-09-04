@@ -23,6 +23,14 @@ services:
       echo "📚 Installing Python packages from requirements.txt..."
       pip install -r requirements.txt
       
+      # Ensure Sherlock is available as a script
+      if [ ! -d sherlock ]; then
+        echo "🔧 Cloning Sherlock repository..."
+        git clone https://github.com/sherlock-project/sherlock.git
+        echo "📚 Installing Sherlock requirements..."
+        source venv/bin/activate && pip install -r sherlock/requirements.txt || pip install -r sherlock/requirements.txt
+      fi
+      
       echo "🔍 Verifying installations and command availability..."
       python -c "import sherlock; print('✅ Sherlock module installed')" || echo "❌ Sherlock module failed"
       python -c "import maigret; print('✅ Maigret module installed')" || echo "❌ Maigret module failed"
