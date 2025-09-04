@@ -25,52 +25,27 @@ def _run_command(cmd: list, cwd: str = PROJECT_ROOT) -> Tuple[int, str, str]:
 def run_sherlock(username: str) -> str:
     sherlock_script = os.path.join(PROJECT_ROOT, "tools", "sherlock", "sherlock.py")
     if not os.path.exists(sherlock_script):
-        return f"Sherlock not found at {sherlock_script}"
+        return f"Error: Sherlock not found at {sherlock_script}"
     code, out, err = _run_command(["python3", sherlock_script, username])
-    return out if code == 0 else (err or out)
+    return out if code == 0 else (err or out or "Error: Sherlock execution failed")
 
 
 def run_phoneinfoga(phone: str) -> str:
-    # Prefer local binary in tools/PhoneInfoga if present
-    bin_path = os.path.join(PROJECT_ROOT, "tools", "PhoneInfoga", "phoneinfoga")
-    if os.path.exists(bin_path) and os.access(bin_path, os.X_OK):
-        code, out, err = _run_command([bin_path, "scan", "--number", phone])
-        return out if code == 0 else (err or out)
-
-    # Fallback: try python entrypoint inside tools/PhoneInfoga if there is any
     py_entry = os.path.join(PROJECT_ROOT, "tools", "PhoneInfoga", "phoneinfoga.py")
-    if os.path.exists(py_entry):
-        code, out, err = _run_command(["python3", py_entry, "scan", "--number", phone])
-        return out if code == 0 else (err or out)
-
-    return f"PhoneInfoga binary or script not found under {os.path.join(PROJECT_ROOT, 'tools', 'PhoneInfoga')}"
+    if not os.path.exists(py_entry):
+        return f"Error: PhoneInfoga script not found at {py_entry}"
+    # Requirement: python3 tools/PhoneInfoga/phoneinfoga.py -n <phone>
+    code, out, err = _run_command(["python3", py_entry, "-n", phone])
+    return out if code == 0 else (err or out or "Error: PhoneInfoga execution failed")
 
 
 def run_holehe(email: str) -> str:
-    # Try direct script path
-    holehe_script = os.path.join(PROJECT_ROOT, "tools", "holehe", "holehe.py")
-    if os.path.exists(holehe_script):
-        code, out, err = _run_command(["python3", holehe_script, email])
-        return out if code == 0 else (err or out)
-
-    # Try package-style runner inside repo if present: python3 -m holehe
-    holehe_pkg_dir = os.path.join(PROJECT_ROOT, "tools", "holehe")
-    if os.path.isdir(holehe_pkg_dir):
-        env = {**os.environ}
-        env["PYTHONPATH"] = f"{holehe_pkg_dir}{os.pathsep}{env.get('PYTHONPATH', '')}"
-        try:
-            result = subprocess.run(
-                ["python3", "-m", "holehe", email],
-                cwd=PROJECT_ROOT,
-                capture_output=True,
-                text=True,
-                env=env,
-            )
-            return result.stdout if result.returncode == 0 else (result.stderr or result.stdout)
-        except Exception as e:
-            return str(e)
-
-    return f"Holehe not found under {os.path.join(PROJECT_ROOT, 'tools', 'holehe')}"
+    # Requirement: python3 tools/holehe/cli.py <email>
+    holehe_cli = os.path.join(PROJECT_ROOT, "tools", "holehe", "cli.py")
+    if not os.path.exists(holehe_cli):
+        return f"Error: Holehe CLI not found at {holehe_cli}"
+    code, out, err = _run_command(["python3", holehe_cli, email])
+    return out if code == 0 else (err or out or "Error: Holehe execution failed")
 
 
 def _ghunt_is_authenticated() -> bool:
@@ -82,32 +57,21 @@ def _ghunt_is_authenticated() -> bool:
 
 def run_ghunt(email: str) -> str:
     if not _ghunt_is_authenticated():
-        return "GHunt not authenticated. Ensure tokens.json and cookies.json are present in ~/.config/ghunt."
+        return "Error: GHunt not authenticated. Ensure tokens.json and cookies.json are present in ~/.config/ghunt."
+    ghunt_cli = os.path.join(PROJECT_ROOT, "tools", "ghunt", "ghunt.py")
+    if not os.path.exists(ghunt_cli):
+        return f"Error: GHunt CLI not found at {ghunt_cli}"
+    code, out, err = _run_command(["python3", ghunt_cli, email])
+    return out if code == 0 else (err or out or "Error: GHunt execution failed")
 
-    # Prefer local repo invocation if a cli or module entry is present
-    ghunt_repo = os.path.join(PROJECT_ROOT, "tools", "ghunt")
-    ghunt_cli = os.path.join(ghunt_repo, "ghunt.py")
-    if os.path.exists(ghunt_cli):
-        code, out, err = _run_command(["python3", ghunt_cli, email])
-        return out if code == 0 else (err or out)
 
-    # If no local CLI script, try module in repo via PYTHONPATH
-    if os.path.isdir(ghunt_repo):
-        env = {**os.environ}
-        env["PYTHONPATH"] = f"{ghunt_repo}{os.pathsep}{env.get('PYTHONPATH', '')}"
-        try:
-            result = subprocess.run(
-                ["python3", "-m", "ghunt", email],
-                cwd=PROJECT_ROOT,
-                capture_output=True,
-                text=True,
-                env=env,
-            )
-            return result.stdout if result.returncode == 0 else (result.stderr or result.stdout)
-        except Exception as e:
-            return str(e)
-
-    return f"GHunt not found under {ghunt_repo}"
+def run_maigret(username: str) -> str:
+    # Requirement: python3 tools/maigret/maigret.py <username>
+    maigret_script = os.path.join(PROJECT_ROOT, "tools", "maigret", "maigret.py")
+    if not os.path.exists(maigret_script):
+        return f"Error: Maigret not found at {maigret_script}"
+    code, out, err = _run_command(["python3", maigret_script, username])
+    return out if code == 0 else (err or out or "Error: Maigret execution failed")
 
 
 def main():
@@ -126,6 +90,8 @@ def main():
         print(run_holehe(arg))
     elif tool == "ghunt":
         print(run_ghunt(arg))
+    elif tool == "maigret":
+        print(run_maigret(arg))
     else:
         print(f"Unknown tool: {tool}")
         sys.exit(2)
