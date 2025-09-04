@@ -741,12 +741,6 @@ app.post('/api/email-lookup', async (req, res) => {
             
             // No temp files created for tool outputs
             
-            for (const tempFile of tempFiles) {
-                if (fs.existsSync(tempFile)) {
-                    await dbManager.insertTempFile(searchId, tempFile);
-                    console.log(`📁 Tracking temp file: ${tempFile}`);
-                }
-            }
             }
         } catch (error) {
             console.log('⚠️ Result storage failed:', error.message);
@@ -925,12 +919,6 @@ app.post('/api/phone-lookup', async (req, res) => {
             
             // No temp files created for tool outputs
             
-            for (const tempFile of tempFiles) {
-                if (fs.existsSync(tempFile)) {
-                    await dbManager.insertTempFile(searchId, tempFile);
-                    console.log(`📁 Tracking temp file: ${tempFile}`);
-                }
-            }
             }
         } catch (error) {
             console.log('⚠️ Result storage failed:', error.message);
@@ -995,12 +983,6 @@ app.post('/api/ip-lookup', async (req, res) => {
                 path.join(tempDir, `ipinfo_${Date.now()}.json`)
             ];
             
-            for (const tempFile of tempFiles) {
-                if (fs.existsSync(tempFile)) {
-                    await dbManager.insertTempFile(searchId, tempFile);
-                    console.log(`📁 Tracking temp file: ${tempFile}`);
-                }
-            }
             }
         } catch (error) {
             console.log('⚠️ Result storage failed:', error.message);
@@ -1319,7 +1301,7 @@ async function resolveToolCommand(cmd) {
         let baseArgs = cmd === 'ghunt' ? ['email', placeholder] : [placeholder];
         // Maigret defaults for Render stability with JSON output
         if (cmd === 'maigret') {
-            baseArgs = ['--timeout', '20', '--max-connections', '10', '--json', placeholder];
+            baseArgs = ['--timeout', '20', '-n', '10', placeholder];
         }
         // PhoneInfoga preferred syntax
         if (cmd === 'phoneinfoga') {
@@ -1393,10 +1375,13 @@ async function runToolIfAvailable(cmd, args, parseFn) {
         // Add JSON output file for tools that support it
         if (jsonOutputFile && ['maigret', 'holehe', 'sherlock'].includes(cmd)) {
             if (cmd === 'maigret') {
-                allArgs = [...allArgs, '--output', jsonOutputFile];
+                // Maigret uses --folderoutput for directory and -J for JSON format
+                allArgs = [...allArgs, '--folderoutput', path.dirname(jsonOutputFile), '-J', 'simple'];
             } else if (cmd === 'holehe') {
-                allArgs = [...allArgs, '--output', jsonOutputFile];
+                // Holehe doesn't support JSON output, just use stdout
+                console.log(`⚠️ Holehe doesn't support JSON output, using stdout parsing`);
             } else if (cmd === 'sherlock') {
+                // Sherlock uses --output for file
                 allArgs = [...allArgs, '--output', jsonOutputFile];
             }
         }
