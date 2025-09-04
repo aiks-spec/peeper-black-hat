@@ -1293,7 +1293,7 @@ async function resolveToolCommand(cmd) {
     
     // Template-driven tools (native Python execution)
     if (toolTemplates[cmd]) {
-        // Use CLI entrypoints provided by pipx (~/.local/bin): sherlock, holehe, maigret, ghunt, phoneinfoga
+        // Use CLI entrypoints provided by pipx - just use tool names directly
         const cliMap = {
             sherlock: 'sherlock',
             holehe: 'holehe',
@@ -1302,36 +1302,8 @@ async function resolveToolCommand(cmd) {
             phoneinfoga: 'phoneinfoga',
         };
         const cliName = cliMap[cmd] || cmd;
-        const resolvedCli = resolveCliExecutable(cliName);
-        if (!resolvedCli) {
-            if (cmd === 'sherlock') {
-                // Try common sherlock locations as fallback
-                const sherlockFallbacks = [
-                    'sherlock',
-                    '/usr/local/bin/sherlock',
-                    '/usr/bin/sherlock',
-                    '/opt/render/project/src/.venv/bin/sherlock',
-                    path.join(process.env.HOME || '', '.local', 'bin', 'sherlock')
-                ];
-                
-                for (const fallback of sherlockFallbacks) {
-                    try {
-                        if (fs.existsSync(fallback) || fallback === 'sherlock') {
-                            console.log(`🔍 Using sherlock fallback: ${fallback}`);
-                            return {
-                                command: fallback,
-                                viaTemplate: true,
-                                templateArgs: [placeholder],
-                                placeholder
-                            };
-                        }
-                    } catch {}
-                }
-                throw new Error('Sherlock CLI not found. Ensure pipx installed it and PATH exposes ~/.local/bin');
-            }
-        }
-        const command = resolvedCli || cliName;
         const placeholder = toolTemplates[cmd].placeholder;
+        
         // GHunt requires subcommand "email"
         let baseArgs = cmd === 'ghunt' ? ['email', placeholder] : [placeholder];
         // Maigret defaults for Render stability
@@ -1342,8 +1314,9 @@ async function resolveToolCommand(cmd) {
         if (cmd === 'phoneinfoga') {
             baseArgs = ['scan', '-n', placeholder];
         }
+        
         return {
-            command,
+            command: cliName,
             viaTemplate: true,
             templateArgs: baseArgs,
             placeholder
