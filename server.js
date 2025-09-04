@@ -25,7 +25,7 @@ if (!fs.existsSync(localBinDir)) {
     try { fs.mkdirSync(localBinDir, { recursive: true }); } catch {}
 }
 
-// Simple Python tool availability check for Docker environment
+// Simple Python tool availability check for Render environment
 async function commandExists(cmd) {
     try { 
         await execAsync(`which ${cmd}`); 
@@ -44,7 +44,7 @@ async function ensurePythonReady() {
 
 async function ensurePhoneInfogaInstalled() {
     try {
-        // In Docker environment, phoneinfoga should be pre-installed in /usr/local/bin
+        // In Render environment, phoneinfoga should be pre-installed in /usr/local/bin
         await execAsync('which phoneinfoga');
         console.log('✅ PhoneInfoga found in system PATH');
         return 'phoneinfoga';
@@ -59,7 +59,7 @@ async function ensurePhoneInfogaInstalled() {
     }
 }
 
-// Removed external runtime installers; tools are preinstalled in system python via Dockerfile
+// Removed external runtime installers; tools are preinstalled in system python via requirements.txt
 
 // GHunt auto-login at startup (non-interactive: selects option 1)
 async function runGhuntAutoLogin() {
@@ -746,12 +746,12 @@ app.post('/api/phone-lookup', async (req, res) => {
             metadata: {}
         };
         
-                 // 1. PhoneInfoga (primary phone OSINT tool) - LINUX/RENDER DOCKER APPROACH
+                 // 1. PhoneInfoga (primary phone OSINT tool) - LINUX/RENDER NATIVE APPROACH
         try {
             console.log('📱 Running PhoneInfoga...');
             let infoga = null;
             
-                         // Method 1: Try Docker PhoneInfoga first (most reliable on Linux/Render)
+                         // Method 1: Try native PhoneInfoga first (most reliable on Linux/Render)
             // Native PhoneInfoga only (Docker removed)
             try {
                 console.log('🔍 Attempting PhoneInfoga (native)...');
@@ -1393,7 +1393,7 @@ async function runToolIfAvailable(cmd, args, parseFn) {
             CLICOLOR: '0',
             CLICOLOR_FORCE: '0',
             // Make cloned repos importable even if pip import fails
-            PYTHONPATH: ['/opt/osint/sherlock','/opt/osint/holehe','/opt/osint/maigret','/opt/osint/ghunt', process.env.PYTHONPATH || ''].filter(Boolean).join(':')
+            PYTHONPATH: process.env.PYTHONPATH || ''
         };
         
         const { stdout, stderr } = await execFileAsync(spawnCmd, spawnArgs, {
@@ -2288,7 +2288,7 @@ app.listen(PORT, () => {
                 execFileAsync(resolved.command, ['-c', `import ${resolved.viaPython}; print('ok')`], {
                     timeout: 8000,
                     maxBuffer: 1024 * 256,
-                    env: { ...process.env, PYTHONUNBUFFERED: '1', NO_COLOR: '1', PYTHONPATH: ['/opt/osint/sherlock','/opt/osint/holehe','/opt/osint/maigret','/opt/osint/ghunt', process.env.PYTHONPATH || ''].filter(Boolean).join(':') }
+                    env: { ...process.env, PYTHONUNBUFFERED: '1', NO_COLOR: '1' }
                 }).then(() => {
                     console.log(`   ✅ ${tool}: Import test passed`);
                 }).catch(() => {
@@ -2443,7 +2443,7 @@ function initializeGhuntDirect() {
             }
         } else {
             ok = false;
-            console.log('❌ GHunt token missing');
+            console.log('❌ GHunt token missing');webkitURL
         }
 
         // Decode cookies and write cookies.json
