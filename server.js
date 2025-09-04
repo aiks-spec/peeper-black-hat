@@ -592,8 +592,8 @@ app.post('/api/email-lookup', async (req, res) => {
                 console.log('✅ Holehe data received:', JSON.stringify(holeheResult).substring(0, 200) + '...');
                 
                 // Extract breaches and registrations
-                if (holeheResult.leaks && Array.isArray(holeheResult.breaches)) {
-                    results.leaks = holeheResult.breaches;
+                if (Array.isArray(holeheResult.leaks)) {
+                    results.leaks = holeheResult.leaks;
                     console.log('✅ Found breaches:', results.leaks.length);
                 }
                 
@@ -1244,7 +1244,7 @@ const toolTemplates = {
         args: ['<email>'],
         placeholder: '<email>',
         extractUsername: true, // Extract username from email for Sherlock
-        moduleName: 'sherlock_project' // Correct module name for import
+        moduleName: 'sherlock' // Use correct module import name for fallback
     },
     maigret: {
         command: 'maigret',
