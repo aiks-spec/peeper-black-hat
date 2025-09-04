@@ -36,15 +36,16 @@ async function commandExists(cmd) {
 }
 
 async function ensurePythonReady() {
-    // Check for virtual environment first (preferred)
+    // Check for virtual environment first (preferred) - Linux path
     const venvPython = path.join(process.cwd(), 'venv', 'bin', 'python3');
-    const venvPythonWin = path.join(process.cwd(), 'venv', 'Scripts', 'python.exe');
     
     if (fs.existsSync(venvPython)) {
         console.log('✅ Using virtual environment Python:', venvPython);
         return venvPython;
     }
     
+    // Check for Windows virtual environment (for local development)
+    const venvPythonWin = path.join(process.cwd(), 'venv', 'Scripts', 'python.exe');
     if (fs.existsSync(venvPythonWin)) {
         console.log('✅ Using virtual environment Python (Windows):', venvPythonWin);
         return venvPythonWin;
@@ -52,11 +53,13 @@ async function ensurePythonReady() {
     
     // Fallback to system Python
     if (await commandExists('python3')) {
-        console.log('✅ Using system Python3');
+        console.log('⚠️ Using system Python3 (virtual environment not found)');
+        console.log('💡 Run setup_python_env.sh to create virtual environment for proper tool execution');
         return 'python3';
     }
     if (await commandExists('python')) {
-        console.log('✅ Using system Python');
+        console.log('⚠️ Using system Python (virtual environment not found)');
+        console.log('💡 Run setup_python_env.sh to create virtual environment for proper tool execution');
         return 'python';
     }
     
