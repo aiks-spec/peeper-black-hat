@@ -1285,7 +1285,7 @@ async function ensureSherlockInstalled() {
             // Prefer venv pip if available
             const py = await ensurePythonReady();
             const pipCmd = py ? `${py} -m pip` : 'pip';
-            await execAsync(`${pipCmd} install -r sherlock/requirements.txt`);
+            // await execAsync(`${pipCmd} install -r sherlock/requirements.txt`);
             console.log('✅ Sherlock installed');
         }
     } catch (e) {
