@@ -172,6 +172,8 @@ try {
             '/usr/bin',
             '/bin',
             '/opt/python/bin',
+            // Dynamic home-local bin for pipx shims
+            path.join(process.env.HOME || '', '.local', 'bin'),
             '/home/render/.local/bin',
             '/root/.local/bin',
             '/usr/local/lib/python3.11/bin',
@@ -2553,6 +2555,11 @@ function resolveCliExecutable(cliName) {
         const home = process.env.HOME || process.env.USERPROFILE || '';
         const extraLinux = [
             path.join(home, '.local', 'bin'),
+            path.join(home, '.local', 'pipx', 'venvs', 'sherlock-project', 'bin'),
+            path.join(home, '.local', 'pipx', 'venvs', 'holehe', 'bin'),
+            path.join(home, '.local', 'pipx', 'venvs', 'ghunt', 'bin'),
+            path.join(home, '.local', 'pipx', 'venvs', 'maigret', 'bin'),
+            path.join(home, '.local', 'pipx', 'venvs', 'phoneinfoga', 'bin'),
             '/usr/local/bin',
             '/usr/bin',
             '/bin'
