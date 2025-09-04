@@ -1268,28 +1268,32 @@ function extractUsernameFromEmail(email) {
 // Dynamic command templates for tools with placeholders (native Python execution)
 const toolTemplates = {
     sherlock: {
-        command: 'python3',
-        args: ['-m', 'sherlock', '<email>'],
+        command: 'sherlock',
+        args: ['<email>'],
         placeholder: '<email>',
-        extractUsername: true // Extract username from email for Sherlock
+        extractUsername: true, // Extract username from email for Sherlock
+        moduleName: 'sherlock-project' // Correct module name for import
     },
     maigret: {
-        command: 'python3',
-        args: ['-m', 'maigret', '<email>'],
+        command: 'maigret',
+        args: ['<email>'],
         placeholder: '<email>',
-        extractUsername: true // Extract username from email for Maigret
+        extractUsername: true, // Extract username from email for Maigret
+        moduleName: 'maigret' // Correct module name for import
     },
     holehe: {
-        command: 'python3',
-        args: ['-m', 'holehe', '<email>'],
+        command: 'holehe',
+        args: ['<email>'],
         placeholder: '<email>',
-        extractUsername: false // Use full email for Holehe
+        extractUsername: false, // Use full email for Holehe
+        moduleName: 'holehe' // Correct module name for import
     },
     phoneinfoga: {
-        command: 'python3',
-        args: ['-m', 'phoneinfoga', 'scan', '--number', '<phone_number>'],
+        command: 'phoneinfoga',
+        args: ['scan', '--number', '<phone_number>'],
         placeholder: '<phone_number>',
-        extractUsername: false // Use phone number as is
+        extractUsername: false, // Use phone number as is
+        moduleName: 'phoneinfoga' // Correct module name for import
     }
 };
 
@@ -1299,20 +1303,33 @@ async function resolveToolCommand(cmd) {
     
     // Template-driven tools (native Python execution)
     if (toolTemplates[cmd]) {
+        // First try to find the command directly in PATH
+        const commandExists = await isCommandAvailable(toolTemplates[cmd].command);
+        if (commandExists) {
+            console.log(`✅ Found ${cmd} command directly: ${toolTemplates[cmd].command}`);
+            return { 
+                command: toolTemplates[cmd].command, 
+                viaTemplate: true, 
+                templateArgs: toolTemplates[cmd].args, 
+                placeholder: toolTemplates[cmd].placeholder 
+            };
+        }
+        
+        // Fallback to Python module execution
         const py = await ensurePythonReady();
         if (py) {
-            // Use virtual environment Python if available
-            const templateArgs = toolTemplates[cmd].args.map(arg => 
-                arg === toolTemplates[cmd].command ? py : arg
-            );
+            console.log(`🔍 Falling back to Python module execution for ${cmd}`);
+            // Convert to module execution using correct module name
+            const moduleName = toolTemplates[cmd].moduleName || toolTemplates[cmd].command;
+            const moduleArgs = ['-m', moduleName, ...toolTemplates[cmd].args];
             return { 
                 command: py, 
                 viaTemplate: true, 
-                templateArgs: templateArgs, 
+                templateArgs: moduleArgs, 
                 placeholder: toolTemplates[cmd].placeholder 
             };
         } else {
-            // Fallback to original template
+            // Final fallback to original template
             return { 
                 command: toolTemplates[cmd].command, 
                 viaTemplate: true, 
