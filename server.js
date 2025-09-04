@@ -1305,6 +1305,28 @@ async function resolveToolCommand(cmd) {
         const resolvedCli = resolveCliExecutable(cliName);
         if (!resolvedCli) {
             if (cmd === 'sherlock') {
+                // Try common sherlock locations as fallback
+                const sherlockFallbacks = [
+                    'sherlock',
+                    '/usr/local/bin/sherlock',
+                    '/usr/bin/sherlock',
+                    '/opt/render/project/src/.venv/bin/sherlock',
+                    path.join(process.env.HOME || '', '.local', 'bin', 'sherlock')
+                ];
+                
+                for (const fallback of sherlockFallbacks) {
+                    try {
+                        if (fs.existsSync(fallback) || fallback === 'sherlock') {
+                            console.log(`🔍 Using sherlock fallback: ${fallback}`);
+                            return {
+                                command: fallback,
+                                viaTemplate: true,
+                                templateArgs: [placeholder],
+                                placeholder
+                            };
+                        }
+                    } catch {}
+                }
                 throw new Error('Sherlock CLI not found. Ensure pipx installed it and PATH exposes ~/.local/bin');
             }
         }
