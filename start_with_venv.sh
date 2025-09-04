@@ -71,17 +71,11 @@ which maigret && echo "✅ Maigret command available" || echo "❌ Maigret comma
 which holehe && echo "✅ Holehe command available" || echo "❌ Holehe command not found"
 which phoneinfoga && echo "✅ PhoneInfoga command available" || echo "❌ PhoneInfoga command not found"
 
-echo "🔍 Testing module execution..."
-if [ ! -d "sherlock" ]; then
-  echo "🔧 Cloning Sherlock repository..."
-  git clone https://github.com/sherlock-project/sherlock.git || true
-  echo "📚 Installing Sherlock requirements..."
-  pip install -r sherlock/requirements.txt || true
-fi
-python sherlock/sherlock.py --help >/dev/null 2>&1 && echo "✅ Sherlock script executable" || echo "❌ Sherlock script not executable"
-python -m maigret --help >/dev/null 2>&1 && echo "✅ Maigret module executable" || echo "❌ Maigret module not executable"
-python -m holehe --help >/dev/null 2>&1 && echo "✅ Holehe module executable" || echo "❌ Holehe module not executable"
-python -m phoneinfoga --help >/dev/null 2>&1 && echo "✅ PhoneInfoga module executable" || echo "❌ PhoneInfoga module not executable"
+echo "🔍 Skipping external clones; using local tools/ copies"
+
+# Prepare GHunt tokens/cookies from env or uploaded files
+echo "🔐 Preparing GHunt credentials..."
+node scripts/prepare-ghunt.js || true
 
 # Start the application
 echo "🚀 Starting Node.js application..."
