@@ -1288,37 +1288,37 @@ async function isCommandAvailable(cmd) {
         }
     }
 
-// Dynamic Docker command templates for tools with placeholders
-const dockerTemplates = {
+// Dynamic command templates for tools with placeholders (native Python execution)
+const toolTemplates = {
     sherlock: {
-        command: 'docker',
-        args: ['run', '-it', '--rm', 'python:3.11-slim', 'bash', '-c', 'apt-get update && apt-get install -y git && pip install sherlock-project && sherlock <username>'],
+        command: 'python3',
+        args: ['-m', 'sherlock', '<username>'],
         placeholder: '<username>'
     },
     maigret: {
-        command: 'docker',
-        args: ['run', '-it', '--rm', 'python:3.11-slim', 'bash', '-c', 'pip install maigret && maigret <username>'],
+        command: 'python3',
+        args: ['-m', 'maigret', '<username>'],
         placeholder: '<username>'
     },
     holehe: {
-        command: 'docker',
-        args: ['run', '-it', '--rm', 'python:3.11-slim', 'bash', '-c', 'pip install holehe && holehe <email>'],
+        command: 'python3',
+        args: ['-m', 'holehe', '<email>'],
         placeholder: '<email>'
     },
     phoneinfoga: {
-        command: 'docker',
-        args: ['run', '-it', '--rm', 'sundowndev/phoneinfoga:latest', 'scan', '--number', '<phone_number>'],
+        command: 'python3',
+        args: ['-m', 'phoneinfoga', 'scan', '--number', '<phone_number>'],
         placeholder: '<phone_number>'
     }
 };
 
-// Extend resolver to map to docker templates for these tools
+// Extend resolver to map to tool templates for these tools
 async function resolveToolCommand(cmd) {
     console.log(`🔍 Resolving tool command for: ${cmd}`);
 
-    // Docker-driven tools
-    if (dockerTemplates[cmd]) {
-        return { command: dockerTemplates[cmd].command, viaDocker: true, dockerArgs: dockerTemplates[cmd].args, placeholder: dockerTemplates[cmd].placeholder };
+    // Template-driven tools (native Python execution)
+    if (toolTemplates[cmd]) {
+        return { command: toolTemplates[cmd].command, viaTemplate: true, templateArgs: toolTemplates[cmd].args, placeholder: toolTemplates[cmd].placeholder };
     }
 
     // GHunt via python module
@@ -1353,26 +1353,26 @@ async function runToolIfAvailable(cmd, args, parseFn) {
         return null;
     }
 
-    // Docker execution branch
-    if (resolved.viaDocker) {
+    // Template execution branch (native Python)
+    if (resolved.viaTemplate) {
         const userInput = args[0] || '';
         if (!userInput) {
             console.log(`❌ No user input provided for ${cmd}`);
             return null;
         }
-        const dockerArgs = resolved.dockerArgs.map((a) => typeof a === 'string' && resolved.placeholder ? a.replace(resolved.placeholder, userInput) : a);
+        const templateArgs = resolved.templateArgs.map((a) => typeof a === 'string' && resolved.placeholder ? a.replace(resolved.placeholder, userInput) : a);
         try {
-            const { stdout, stderr } = await execFileAsync(resolved.command, dockerArgs, {
+            const { stdout, stderr } = await execFileAsync(resolved.command, templateArgs, {
                 timeout: 300000,
                 maxBuffer: 1024 * 1024 * 20,
-                env: { ...process.env },
+                env: { ...process.env, PYTHONUNBUFFERED: '1', NO_COLOR: '1' },
                 encoding: 'utf8'
             });
             const parsed = parseFn(stdout, stderr);
             if (parsed && typeof parsed === 'object') parsed.__source = cmd;
             return parsed;
         } catch (err) {
-            console.log(`❌ Docker tool ${cmd} failed:`, err.message);
+            console.log(`❌ Template tool ${cmd} failed:`, err.message);
             return null;
         }
     }
@@ -2595,39 +2595,32 @@ async function ghuntIsAuthenticated() {
     }
 }
 
-async function ghuntDockerLoginIfNeeded() {
+async function ghuntNativeLoginIfNeeded() {
     const authed = await ghuntIsAuthenticated();
     if (authed) {
         console.log('🔐 GHunt token already authenticated');
         return true;
     }
-    console.log('🔐 GHunt not authenticated, attempting Docker-based login with expect script');
-    const expectPath = path.join(process.cwd(), 'ghunt_login.expect');
-    if (!fs.existsSync(expectPath)) {
-        try {
-            const expectScript = `#!/usr/bin/expect -f
-set timeout 30
-spawn bash -c "python3 -m ghunt login"
-expect {
-    -re {.*\[?\s*1\s*\]?.*} { send "1\r" }
-    timeout { exit 1 }
-}
-expect eof
-`;
-            fs.writeFileSync(expectPath, expectScript, { encoding: 'utf8', mode: 0o644 });
-        } catch (e) {
-            console.log('❌ Failed to write ghunt_login.expect:', e.message);
+    console.log('🔐 GHunt not authenticated, attempting native Python login');
+    
+    try {
+        const py = await ensurePythonReady();
+        if (!py) {
+            console.log('❌ Python not available for GHunt login');
             return false;
         }
-    }
-    const args = ['run', '-it', '--rm', '-v', `${process.cwd()}/ghunt_login.expect:/ghunt_login.expect`, 'python:3.11-slim', 'bash', '-c', 'apt-get update && apt-get install -y git expect && pip install ghunt && expect /ghunt_login.expect'];
-    try {
-        await execFileAsync('docker', args, { timeout: 300000, maxBuffer: 1024 * 1024 * 20 });
-        console.log('✅ GHunt Docker login completed');
+        
+        // Try to run ghunt login with Python module
+        await execFileAsync(py, ['-m', 'ghunt', 'login'], { 
+            timeout: 300000, 
+            maxBuffer: 1024 * 1024 * 20,
+            env: { ...process.env, PYTHONUNBUFFERED: '1' }
+        });
+        console.log('✅ GHunt native login completed');
         // Re-check
         return await ghuntIsAuthenticated();
     } catch (e) {
-        console.log('❌ GHunt Docker login failed:', e.message);
+        console.log('❌ GHunt native login failed:', e.message);
         return false;
     }
 }
@@ -2635,7 +2628,7 @@ expect eof
 async function runGhuntEmailSmart(targetEmail) {
     try {
         let authed = await ghuntIsAuthenticated();
-        if (!authed) authed = await ghuntDockerLoginIfNeeded();
+        if (!authed) authed = await ghuntNativeLoginIfNeeded();
         const py = await ensurePythonReady();
         if (!py) throw new Error('Python not available');
         const { stdout } = await execFileAsync(py, ['-m', 'ghunt', 'email', targetEmail], { timeout: 180000, maxBuffer: 1024 * 1024 * 20 });
