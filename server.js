@@ -43,9 +43,20 @@ async function ensurePythonReady() {
 }
 
 async function ensurePhoneInfogaInstalled() {
-    // PhoneInfoga now uses Docker container
-    console.log('🐳 PhoneInfoga now uses Docker container: sundowndev/phoneinfoga:latest');
-    return null; // Not needed for Docker execution
+    try {
+        // In Render environment, phoneinfoga should be pre-installed in /usr/local/bin
+        await execAsync('which phoneinfoga');
+        console.log('✅ PhoneInfoga found in system PATH');
+        return 'phoneinfoga';
+        } catch (error) {
+        console.log('❌ PhoneInfoga not found in PATH:', error.message);
+        // Try direct path
+        if (fs.existsSync('/usr/local/bin/phoneinfoga')) {
+            console.log('✅ PhoneInfoga found at /usr/local/bin/phoneinfoga');
+            return '/usr/local/bin/phoneinfoga';
+        }
+        return null;
+    }
 }
 
 // Removed external runtime installers; tools are preinstalled in system python via requirements.txt
@@ -212,7 +223,8 @@ dbManager.connect().then(async (connected) => {
 
 // Visitor tracking middleware - count only real page views with debounce per IP
 const recentVisitorByIp = new Map();
-const VISITOR_DEBOUNCE_MS = 1 * 60 * 1000; // 1 minute for testing
+// Make debounce configurable; default to 0ms so visitor count changes on refresh
+const VISITOR_DEBOUNCE_MS = parseInt(process.env.VISITOR_DEBOUNCE_MS || '0', 10);
 app.use((req, res, next) => {
     try {
         // Count only GET requests to pages (exclude API & static assets)
@@ -232,23 +244,13 @@ app.use((req, res, next) => {
         const now = Date.now();
         if (now - last < VISITOR_DEBOUNCE_MS) return next();
         recentVisitorByIp.set(ip, now);
-    
-    const userAgent = req.get('User-Agent') || 'Unknown';
-    
-        // Only track visitors if database is connected
-        if (dbManager.isConnected && dbManager.db) {
+
+        const userAgent = req.get('User-Agent') || 'Unknown';
         dbManager.insertVisitor(ip, userAgent).then((success) => {
-                if (success) console.log('✅ Visitor tracked:', ips.join(', '));
-                else console.log('⚠️ Visitor tracking failed');
-        }).catch((error) => {
-            console.log('⚠️ Visitor tracking error:', error.message);
-        });
-        } else {
-            console.log('⚠️ Skipping visitor tracking - database not ready');
-    }
-    } catch (error) {
-        console.log('⚠️ Visitor tracking middleware error:', error.message);
-    }
+            if (success) console.log('✅ Visitor tracked:', ips.join(', '));
+            else console.log('⚠️ Visitor tracking failed (database may not be connected)');
+        }).catch(() => {});
+    } catch {}
     next();
 });
 
@@ -294,7 +296,37 @@ app.get('/lookup', async (req, res) => {
     }
 });
 
+// Unified OSINT lookup endpoint (modular, no unofficial scrapers)
+// GET /lookup?phone=+1234567890
+app.get('/lookup', async (req, res) => {
+    const phone = String(req.query.phone || '').trim();
+    if (!phone) return res.status(400).json({ error: 'Missing phone' });
 
+    try {
+        const [infoga, pna, leaks] = await Promise.all([
+            fetchFromPhoneInfoga(phone).catch(() => null),
+            fetchFromPhoneNumberApi(phone).catch(() => null),
+            fetchFromLeaksApis(phone).catch(() => null)
+        ]);
+
+        const response = {
+            phone,
+            carrier: infoga?.carrier || pna?.carrier || null,
+            country: infoga?.basic?.country || pna?.country || null,
+            line_type: infoga?.basic?.type || pna?.numberType || null,
+            formatted: pna?.formatInternational || pna?.formatE164 || null,
+            possible_name_sources: Array.isArray(infoga?.metadata?.names)
+                ? infoga.metadata.names
+                : [],
+            leak_sources: leaks?.sources || []
+        };
+
+        return res.json(response);
+    } catch (err) {
+        console.error('Lookup error:', err.message);
+        return res.status(500).json({ error: 'Lookup failed' });
+    }
+});
 
 // Aggregate OSINT endpoint
 app.post('/api/aggregate', async (req, res) => {
@@ -1022,12 +1054,8 @@ app.post('/api/ip-lookup', async (req, res) => {
 // Stats endpoint - FIXED FOR LINUX/RENDER
 app.get('/api/stats', async (req, res) => {
     try {
-        console.log('📊 Stats request received, database connected:', dbManager.isConnected);
         const visitorStats = await dbManager.getVisitorStats();
         const searchCount = await dbManager.getSearchCount();
-        
-        console.log('📊 Visitor stats:', visitorStats);
-        console.log('📊 Search count:', searchCount);
         
         res.json({
             visitors_today: visitorStats.visitors_today,
@@ -1040,38 +1068,6 @@ app.get('/api/stats', async (req, res) => {
     } catch (error) {
         console.log('❌ Stats error:', error.message);
         res.status(500).json({ error: 'Database error' });
-    }
-});
-
-// Test endpoint to manually increment visitor count
-app.post('/api/test-visitor', async (req, res) => {
-    try {
-        const testIp = 'test-' + Date.now();
-        const testUserAgent = 'Test-Bot/1.0';
-        
-        console.log('🧪 Testing visitor insertion with IP:', testIp);
-        const success = await dbManager.insertVisitor(testIp, testUserAgent);
-        
-        if (success) {
-            console.log('✅ Test visitor inserted successfully');
-            const stats = await dbManager.getVisitorStats();
-            res.json({
-                success: true,
-                message: 'Test visitor added',
-                new_stats: stats
-            });
-        } else {
-            res.status(500).json({
-                success: false,
-                message: 'Failed to insert test visitor'
-            });
-        }
-    } catch (error) {
-        console.log('❌ Test visitor error:', error.message);
-        res.status(500).json({
-            success: false,
-            error: error.message
-        });
     }
 });
 
@@ -1295,74 +1291,43 @@ async function isCommandAvailable(cmd) {
 async function resolveToolCommand(cmd) {
     console.log(`🔍 Resolving tool command for: ${cmd}`);
     
-    // Docker-based OSINT tools with dynamic input replacement
-    if (cmd === 'sherlock') {
-        console.log(`🐳 Using Docker for Sherlock`);
-        return { 
-            command: 'docker', 
-            viaDocker: true,
-            dockerArgs: ['run', '-it', '--rm', 'python:3.11-slim', 'bash', '-c', 'apt-get update && apt-get install -y git && pip install sherlock-project && sherlock <username>'],
-            placeholder: '<username>'
-        };
-    }
-    
-    if (cmd === 'maigret') {
-        console.log(`🐳 Using Docker for Maigret`);
-        return { 
-            command: 'docker', 
-            viaDocker: true,
-            dockerArgs: ['run', '-it', '--rm', 'python:3.11-slim', 'bash', '-c', 'pip install maigret && maigret <username>'],
-            placeholder: '<username>'
-        };
-    }
-    
-    if (cmd === 'holehe') {
-        console.log(`🐳 Using Docker for Holehe`);
-        return { 
-            command: 'docker', 
-            viaDocker: true,
-            dockerArgs: ['run', '-it', '--rm', 'python:3.11-slim', 'bash', '-c', 'pip install holehe && holehe <email>'],
-            placeholder: '<email>'
-        };
-    }
-    
-    if (cmd === 'phoneinfoga') {
-        console.log(`🐳 Using Docker for PhoneInfoga`);
-        return { 
-            command: 'docker', 
-            viaDocker: true,
-            dockerArgs: ['run', '-it', '--rm', 'sundowndev/phoneinfoga:latest', 'scan', '--number', '<phone_number>'],
-            placeholder: '<phone_number>'
-        };
-    }
-    
-    // For GHunt, keep the existing Python module execution
-    if (cmd === 'ghunt') {
+    // For Python tools, prefer system python3; bootstrap local python if needed
+    if (cmd === 'sherlock' || cmd === 'holehe' || cmd === 'maigret' || cmd === 'ghunt') {
         const py = await ensurePythonReady();
         if (py) {
-            console.log(`🔍 Using Python module execution for ${cmd}: ${py} -m ${cmd}`);
-            return { command: py, viaPython: cmd };
+        console.log(`🔍 Using Python module execution for ${cmd}: ${py} -m ${cmd}`);
+        return { command: py, viaPython: cmd };
         } else {
             console.log(`❌ Python not available for ${cmd}, trying direct command`);
+            // Fallback to direct command
             return { command: 'python3', viaPython: cmd };
+        }
+    }
+    if (cmd === 'phoneinfoga') {
+        // Ensure PhoneInfoga is installed or download it
+        try {
+            const bin = await ensurePhoneInfogaInstalled(); 
+            return { command: bin, viaPython: false };
+        } catch (e) {
+            console.log('❌ PhoneInfoga install/resolve failed:', e.message);
         }
     }
     
     // For other tools, check if directly available
     const ok = await isCommandAvailable(cmd);
     console.log(`🔍 Direct command availability for ${cmd}: ${ok}`);
-    if (ok) return { command: cmd, viaPython: false };
+        if (ok) return { command: cmd, viaPython: false };
         
     // Linux/Render: try common locations
-    const pathParts = (process.env.PATH || '').split(':').filter(Boolean);
-    for (const p of pathParts) {
-        try {
-            const toolPath = path.join(p, cmd);
-            if (fs.existsSync(toolPath)) {
-                return { command: toolPath, viaPython: false };
+            const pathParts = (process.env.PATH || '').split(':').filter(Boolean);
+            for (const p of pathParts) {
+                try {
+                    const toolPath = path.join(p, cmd);
+                    if (fs.existsSync(toolPath)) {
+                        return { command: toolPath, viaPython: false };
+                    }
+                } catch {}
             }
-        } catch {}
-    }
             
     // Final fallback for non-Python tools
     console.log(`🔍 Using final fallback for ${cmd}: python3 -m ${cmd}`);
@@ -1380,70 +1345,15 @@ async function runToolIfAvailable(cmd, args, parseFn) {
         return null;
     }
     
-    // Handle Docker-based tools
-    if (resolved.viaDocker) {
-        console.log(`🐳 Using Docker execution for ${cmd}`);
-        
-        // Get the user input from args (first argument is typically the input)
-        const userInput = args[0] || '';
-        if (!userInput) {
-            console.log(`❌ No user input provided for ${cmd}`);
-            return null;
-        }
-        
-        // Replace placeholder with actual user input
-        const dockerCommand = resolved.dockerArgs.map(arg => {
-            if (typeof arg === 'string' && arg.includes(resolved.placeholder)) {
-                return arg.replace(resolved.placeholder, userInput);
-            }
-            return arg;
-        });
-        
-        console.log(`🐳 Docker command: ${resolved.command} ${dockerCommand.join(' ')}`);
-        
-        try {
-            const { stdout, stderr } = await execFileAsync(resolved.command, dockerCommand, {
-                timeout: 300000, // 5 minutes for Docker operations
-                maxBuffer: 1024 * 1024 * 20,
-                env: { ...process.env },
-                encoding: 'utf8'
-            });
-            
-            console.log(`✅ Docker tool ${cmd} executed successfully`);
-            console.log(`📤 stdout length: ${stdout?.length || 0}`);
-            console.log(`📤 stderr length: ${stderr?.length || 0}`);
-            
-            // Debug output for troubleshooting
-            if (stdout && stdout.length > 0) {
-                console.log(`🔍 ${cmd} stdout preview:`, stdout.substring(0, 200) + '...');
-            }
-            if (stderr && stderr.length > 0) {
-                console.log(`🔍 ${cmd} stderr preview:`, stderr.substring(0, 200) + '...');
-            }
-            
-            const parsed = parseFn(stdout, stderr);
-            if (parsed && typeof parsed === 'object') parsed.__source = cmd;
-            
-            return parsed;
-        } catch (err) {
-            console.log(`❌ Docker tool ${cmd} failed:`, err.message);
-            console.log(`❌ Docker tool ${cmd} error details:`, err);
-            
-            if (err.code === 'ETIMEDOUT') {
-                console.log(`❌ Docker tool ${cmd} timed out after 5 minutes`);
-            }
-            
-            return null;
-        }
-    }
-    
-    // Handle Python module execution (for GHunt and other tools)
+    // Additional debugging for Python module execution
     if (resolved.viaPython) {
         console.log(`🐍 Using Python module execution: ${resolved.command} ${resolved.viaPython}`);
-        
-        const spawnCmd = resolved.command;
-        let spawnArgs;
-        
+    }
+    
+    const spawnCmd = resolved.command;
+    let spawnArgs;
+    
+    if (resolved.viaPython) {
         if (resolved.viaPython.startsWith('-m ')) {
             // Format: "-m sherlock" -> ["-m", "sherlock", ...args]
             const moduleName = resolved.viaPython.replace('-m ', '');
@@ -1456,88 +1366,41 @@ async function runToolIfAvailable(cmd, args, parseFn) {
             // Direct module name
             spawnArgs = ['-m', resolved.viaPython, ...args];
         }
-        
-        console.log(`🔧 Executing: ${spawnCmd} ${spawnArgs.join(' ')}`);
-        console.log(`🔍 Final command: ${spawnCmd} ${spawnArgs.join(' ')}`);
-        console.log(`🔍 viaPython: ${resolved.viaPython}`);
-        console.log(`🔍 Original args: ${JSON.stringify(args)}`);
-        
-        try {
-            console.log(`🔧 Executing command: ${spawnCmd} with args: ${JSON.stringify(spawnArgs)}`);
-            
-            // Enhanced environment variables for Linux/Render stdout handling
-            const env = {
-                ...process.env,
-                PYTHONUTF8: '1',
-                PYTHONIOENCODING: 'utf-8',
-                PYTHONUNBUFFERED: '1',
-                LC_ALL: 'C.UTF-8',
-                LANG: 'C.UTF-8',
-                LANGUAGE: 'C.UTF-8',
-                TERM: 'dumb',
-                NO_COLOR: '1',
-                FORCE_COLOR: '0',
-                ANSI_COLORS_DISABLED: '1',
-                CLICOLOR: '0',
-                CLICOLOR_FORCE: '0',
-                // Make cloned repos importable even if pip import fails
-                PYTHONPATH: process.env.PYTHONPATH || ''
-            };
-            
-            const { stdout, stderr } = await execFileAsync(spawnCmd, spawnArgs, {
-                timeout: 180000,
-                maxBuffer: 1024 * 1024 * 20,
-                env: env,
-                encoding: 'utf8'
-            });
-            
-            console.log(`✅ Tool ${cmd} executed successfully`);
-            console.log(`📤 stdout length: ${stdout?.length || 0}`);
-            console.log(`📤 stderr length: ${stderr?.length || 0}`);
-            
-            // Debug output for troubleshooting
-            if (stdout && stdout.length > 0) {
-                console.log(`🔍 ${cmd} stdout preview:`, stdout.substring(0, 200) + '...');
-            }
-            if (stderr && stderr.length > 0) {
-                console.log(`🔍 ${cmd} stdout preview:`, stderr.substring(0, 200) + '...');
-            }
-            
-            const parsed = parseFn(stdout, stderr);
-            if (parsed && typeof parsed === 'object') parsed.__source = cmd;
-            
-            return parsed;
-        } catch (err) {
-            console.log(`❌ Tool ${cmd} failed:`, err.message);
-            console.log(`❌ Tool ${cmd} error details:`, err);
-            
-            if (err.code === 'ENOENT') {
-                console.log(`❌ Tool ${cmd} not found in PATH. This usually means the tool is not installed or not in the system PATH.`);
-                console.log(`🔍 Current PATH: ${process.env.PATH}`);
-                console.log(`🔍 Resolved command: ${resolved.command}`);
-                console.log(`🔍 Platform: ${process.platform}`);
-            }
-            
-            if (err.code === 'ETIMEDOUT') {
-                console.log(`❌ Tool ${cmd} timed out after 3 minutes`);
-            }
-            
-            return null;
-        }
+    } else {
+        spawnArgs = args;
     }
     
-    // Handle direct command execution (fallback)
-    console.log(`🔧 Using direct command execution: ${resolved.command}`);
-    const spawnCmd = resolved.command;
-    const spawnArgs = args;
+    console.log(`🔧 Executing: ${spawnCmd} ${spawnArgs.join(' ')}`);
+    console.log(`🔍 Final command: ${spawnCmd} ${spawnArgs.join(' ')}`);
+    console.log(`🔍 viaPython: ${resolved.viaPython}`);
+    console.log(`🔍 Original args: ${JSON.stringify(args)}`);
     
     try {
         console.log(`🔧 Executing command: ${spawnCmd} with args: ${JSON.stringify(spawnArgs)}`);
         
+        // Enhanced environment variables for Linux/Render stdout handling
+        const env = {
+                ...process.env,
+                PYTHONUTF8: '1',
+                PYTHONIOENCODING: 'utf-8',
+            PYTHONUNBUFFERED: '1',
+            LC_ALL: 'C.UTF-8',
+            LANG: 'C.UTF-8',
+            LANGUAGE: 'C.UTF-8',
+                TERM: 'dumb',
+                NO_COLOR: '1',
+            FORCE_COLOR: '0',
+            ANSI_COLORS_DISABLED: '1',
+            CLICOLOR: '0',
+            CLICOLOR_FORCE: '0',
+            // Make cloned repos importable even if pip import fails
+            PYTHONPATH: process.env.PYTHONPATH || ''
+        };
+        
         const { stdout, stderr } = await execFileAsync(spawnCmd, spawnArgs, {
             timeout: 180000,
             maxBuffer: 1024 * 1024 * 20,
-            env: { ...process.env },
+            env: env,
             encoding: 'utf8'
         });
         
@@ -1545,8 +1408,22 @@ async function runToolIfAvailable(cmd, args, parseFn) {
         console.log(`📤 stdout length: ${stdout?.length || 0}`);
         console.log(`📤 stderr length: ${stderr?.length || 0}`);
         
+        // Debug output for troubleshooting
+        if (stdout && stdout.length > 0) {
+            console.log(`🔍 ${cmd} stdout preview:`, stdout.substring(0, 200) + '...');
+        }
+        if (stderr && stderr.length > 0) {
+            console.log(`🔍 ${cmd} stderr preview:`, stderr.substring(0, 200) + '...');
+        }
+        
         const parsed = parseFn(stdout, stderr);
         if (parsed && typeof parsed === 'object') parsed.__source = cmd;
+        
+        // Debug logging for specific tools
+        if (cmd === 'phoneinfoga') {
+            console.log('🔍 PhoneInfoga raw output preview:', stdout.substring(0, 500) + '...');
+            console.log('🔍 PhoneInfoga parsed result:', parsed);
+        }
         
         return parsed;
     } catch (err) {
@@ -1571,11 +1448,10 @@ async function runToolIfAvailable(cmd, args, parseFn) {
 // -- Modular helpers for /lookup --
 async function queryPhoneInfoga(phone) {
     try {
-        // PhoneInfoga now uses Docker via runToolIfAvailable
-        console.log('🐳 PhoneInfoga using Docker container');
-        return await runToolIfAvailable('phoneinfoga', [phone], parsePhoneInfoga);
-    } catch (error) {
-        console.log('❌ PhoneInfoga Docker execution failed:', error.message);
+        const bin = await ensurePhoneInfogaInstalled();
+        const { stdout } = await execFileAsync(bin, ['scan', '-n', phone, '--no-color'], { timeout: 120000, maxBuffer: 1024 * 1024 * 10 });
+        return parsePhoneInfoga(stdout);
+    } catch {
         return null;
     }
 }
@@ -1625,11 +1501,10 @@ async function fetchBreaches(phone) {
 // ========== Modular source: PhoneInfoga ==========
 async function fetchFromPhoneInfoga(phone) {
     try {
-        // PhoneInfoga now uses Docker via runToolIfAvailable
-        console.log('🐳 PhoneInfoga using Docker container');
-        return await runToolIfAvailable('phoneinfoga', [phone], parsePhoneInfoga);
-    } catch (error) {
-        console.log('❌ PhoneInfoga Docker execution failed:', error.message);
+        const bin = await ensurePhoneInfogaInstalled();
+        const { stdout } = await execFileAsync(bin, ['scan', '-n', phone, '--no-color'], { timeout: 120000, maxBuffer: 1024 * 1024 * 10 });
+        return parsePhoneInfoga(stdout);
+    } catch {
         return null;
     }
 }
