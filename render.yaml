@@ -3,11 +3,13 @@ services:
     name: osint-lookup-engine
     env: node
     buildCommand: |
-      pip3 install --upgrade pip
-      pip3 install -r requirements.txt
+      # Make setup scripts executable
+      chmod +x setup_python_env.sh start_with_venv.sh
+      # Create virtual environment and install Python dependencies
+      ./setup_python_env.sh
+      # Install Node.js dependencies
       npm install
-      echo "🐳 OSINT tools (Sherlock, Maigret, Holehe, PhoneInfoga) will use Docker containers"
-    startCommand: chmod +x start.sh && ./start.sh
+    startCommand: ./start_with_venv.sh
     envVars:
       - key: NODE_ENV
         value: production
