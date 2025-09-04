@@ -244,6 +244,7 @@ console.log('   - All env keys containing DB:', Object.keys(process.env).filter(
 
 // Initialize database connection
 initializeGhuntDirect();
+ensureSherlockInstalled();
 dbManager.connect().then(async (connected) => {
     if (connected) {
         console.log('✅ Database connection established');
@@ -631,31 +632,31 @@ app.post('/api/email-lookup', async (req, res) => {
              
              // First run Sherlock for general search
              const sherlockResult = await runToolIfAvailable('sherlock', [email], (stdout) => {
-                 console.log('🔍 Sherlock raw output length:', stdout.length);
-                 console.log('🔍 Sherlock raw output preview:', stdout.substring(0, 300) + '...');
-                 try {
-                     // Sherlock outputs found profiles line by line
-                     const lines = stdout.split('\n').filter(line => line.trim() && line.includes('http'));
-                     console.log('🔍 Sherlock found lines with URLs:', lines.length);
-                                          const result = lines.map(line => {
-                          const match = line.match(/\[([^\]]+)\]\s*(.+)/);
-                          if (match) {
-                              // Clean the URL by removing any platform prefixes
-                              const cleanUrl = match[2].trim().replace(/^[^h]*https?:\/\//i, 'https://');
-                              return { url: cleanUrl };
-                          }
-                          // Clean the URL by removing any platform prefixes
-                          const cleanUrl = line.trim().replace(/^[^h]*https?:\/\//i, 'https://');
-                          return { url: cleanUrl };
-                      });
-                     console.log('🔍 Sherlock parsed result:', result);
-                     return result;
-                 } catch (e) {
-                     console.log('❌ Sherlock parsing error:', e.message);
-                     return null;
-                 }
-             });
-             
+                console.log('🔍 Sherlock raw output length:', stdout.length);
+                console.log('🔍 Sherlock raw output preview:', stdout.substring(0, 300) + '...');
+                try {
+                    // Sherlock outputs found profiles line by line
+                    const lines = stdout.split('\n').filter(line => line.trim() && line.includes('http'));
+                    console.log('🔍 Sherlock found lines with URLs:', lines.length);
+                                         const result = lines.map(line => {
+                         const match = line.match(/\[([^\]]+)\]\s*(.+)/);
+                         if (match) {
+                             // Clean the URL by removing any platform prefixes
+                             const cleanUrl = match[2].trim().replace(/^[^h]*https?:\/\//i, 'https://');
+                             return { url: cleanUrl };
+                         }
+                         // Clean the URL by removing any platform prefixes
+                         const cleanUrl = line.trim().replace(/^[^h]*https?:\/\//i, 'https://');
+                         return { url: cleanUrl };
+                     });
+                    console.log('🔍 Sherlock parsed result:', result);
+                    return result;
+                } catch (e) {
+                    console.log('❌ Sherlock parsing error:', e.message);
+                    return null;
+                }
+            });
+            
                          if (sherlockResult && Array.isArray(sherlockResult)) {
                  console.log('✅ Sherlock data received, count:', sherlockResult.length);
                  results.social = [...new Set([...results.social, ...sherlockResult])];
@@ -1273,14 +1274,32 @@ function extractUsernameFromEmail(email) {
     return email.substring(0, atIndex);
 }
 
+// Ensure Sherlock repo exists and is installed (Render startup safeguard)
+async function ensureSherlockInstalled() {
+    try {
+        const sherlockDir = path.join(process.cwd(), 'sherlock');
+        if (!fs.existsSync(sherlockDir)) {
+            console.log('🔧 Sherlock not found. Cloning repository...');
+            await execAsync('git clone https://github.com/sherlock-project/sherlock.git');
+            console.log('📚 Installing Sherlock requirements...');
+            // Prefer venv pip if available
+            const py = await ensurePythonReady();
+            const pipCmd = py ? `${py} -m pip` : 'pip';
+            await execAsync(`${pipCmd} install -r sherlock/requirements.txt`);
+            console.log('✅ Sherlock installed');
+        }
+    } catch (e) {
+        console.log('⚠️ Failed to ensure Sherlock installed:', e.message);
+    }
+}
+
 // Dynamic command templates for tools with placeholders (native Python execution)
 const toolTemplates = {
     sherlock: {
-        command: 'sherlock',
-        args: ['<email>'],
+        command: 'python3',
+        args: ['sherlock/sherlock.py', '<email>'],
         placeholder: '<email>',
-        extractUsername: true, // Extract username from email for Sherlock
-        moduleName: 'sherlock.sherlock' // Use correct module entrypoint for fallback (-m sherlock.sherlock)
+        extractUsername: true
     },
     maigret: {
         command: 'maigret',
@@ -1311,40 +1330,13 @@ async function resolveToolCommand(cmd) {
     
     // Template-driven tools (native Python execution)
     if (toolTemplates[cmd]) {
-        // First try to find the command directly in PATH
-        const commandExists = await isCommandAvailable(toolTemplates[cmd].command);
-        if (commandExists) {
-            console.log(`✅ Found ${cmd} command directly: ${toolTemplates[cmd].command}`);
-            return { 
-                command: toolTemplates[cmd].command, 
-                viaTemplate: true, 
-                templateArgs: toolTemplates[cmd].args, 
-                placeholder: toolTemplates[cmd].placeholder 
-            };
-        }
-        
-        // Fallback to Python module execution
-        const py = await ensurePythonReady();
-        if (py) {
-            console.log(`🔍 Falling back to Python module execution for ${cmd}`);
-            // Convert to module execution using correct module name
-            const moduleName = toolTemplates[cmd].moduleName || toolTemplates[cmd].command;
-            const moduleArgs = ['-m', moduleName, ...toolTemplates[cmd].args];
-            return { 
-                command: py, 
-                viaTemplate: true, 
-                templateArgs: moduleArgs, 
-                placeholder: toolTemplates[cmd].placeholder 
-            };
-        } else {
-            // Final fallback to original template
-            return { 
-                command: toolTemplates[cmd].command, 
-                viaTemplate: true, 
-                templateArgs: toolTemplates[cmd].args, 
-                placeholder: toolTemplates[cmd].placeholder 
-            };
-        }
+        // For template tools, return template command directly
+        return { 
+            command: toolTemplates[cmd].command, 
+            viaTemplate: true, 
+            templateArgs: toolTemplates[cmd].args, 
+            placeholder: toolTemplates[cmd].placeholder 
+        };
     }
 
     // GHunt via python module
