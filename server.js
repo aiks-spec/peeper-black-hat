@@ -401,11 +401,11 @@ app.post('/api/aggregate', async (req, res) => {
             tasks.push(scrapePhoneNumberApiHtml(trimmed));
             // Also try social media search with phone number
             const phoneUsername = trimmed.replace(/[^a-zA-Z0-9+]/g, '');
-            tasks.push(runToolIfAvailable('sherlock', [phoneUsername, '--print-found', '--no-color'], parseSherlock));
-                         tasks.push(runToolIfAvailable('maigret', [phoneUsername, '--no-color'], parseMaigretSimple));
+            tasks.push(runToolIfAvailable('sherlock', [phoneUsername], parseSherlock));
+                         tasks.push(runToolIfAvailable('maigret', [phoneUsername], parseMaigretSimple));
         }
         if (qtype === 'email') {
-            tasks.push(runToolIfAvailable('holehe', [trimmed, '-C', '--no-color'], parseHolehe));
+            tasks.push(runToolIfAvailable('holehe', [trimmed], parseHolehe));
             tasks.push(runToolIfAvailable('ghunt', ['email', trimmed], (stdout, stderr) => {
                 if (stdout && stdout.trim()) {
                     const ghuntData = parseGHuntFromText(stdout);
@@ -416,15 +416,15 @@ app.post('/api/aggregate', async (req, res) => {
                             return null;
             }));
             // Sherlock and Maigret now work with email input
-            tasks.push(runToolIfAvailable('sherlock', [trimmed, '--print-found', '--no-color'], parseSherlock));
-            tasks.push(runToolIfAvailable('maigret', [trimmed, '--no-color'], parseMaigretSimple));
+            tasks.push(runToolIfAvailable('sherlock', [trimmed], parseSherlock));
+            tasks.push(runToolIfAvailable('maigret', [trimmed], parseMaigretSimple));
         }
         if (qtype === 'username') {
             // Sherlock and Maigret now require email input, skip for username queries
             // Consider treating username as email if it contains @ symbol
             if (trimmed.includes('@')) {
-            tasks.push(runToolIfAvailable('sherlock', [trimmed, '--print-found', '--no-color'], parseSherlock));
-                         tasks.push(runToolIfAvailable('maigret', [trimmed, '--no-color'], parseMaigretSimple));
+            tasks.push(runToolIfAvailable('sherlock', [trimmed], parseSherlock));
+                         tasks.push(runToolIfAvailable('maigret', [trimmed], parseMaigretSimple));
             }
         }
 
@@ -572,7 +572,7 @@ app.post('/api/email-lookup', async (req, res) => {
                  // 3. Holehe (email breach checker)
          try {
              console.log('🔍 Running Holehe...');
-             const holeheResult = await runToolIfAvailable('holehe', [email, '-C', '--no-color'], async (stdout, stderr) => {
+             const holeheResult = await runToolIfAvailable('holehe', [email], async (stdout, stderr) => {
                 // Wait a bit for the CSV file to be written
                 await new Promise(resolve => setTimeout(resolve, 8000));
                 
@@ -617,32 +617,32 @@ app.post('/api/email-lookup', async (req, res) => {
              console.log('🔍 Using email for Sherlock:', email);
              
              // First run Sherlock for general search
-             const sherlockResult = await runToolIfAvailable('sherlock', [email, '--print-found', '--no-color'], (stdout) => {
-                console.log('🔍 Sherlock raw output length:', stdout.length);
-                console.log('🔍 Sherlock raw output preview:', stdout.substring(0, 300) + '...');
-                try {
-                    // Sherlock outputs found profiles line by line
-                    const lines = stdout.split('\n').filter(line => line.trim() && line.includes('http'));
-                    console.log('🔍 Sherlock found lines with URLs:', lines.length);
-                                         const result = lines.map(line => {
-                         const match = line.match(/\[([^\]]+)\]\s*(.+)/);
-                         if (match) {
-                             // Clean the URL by removing any platform prefixes
-                             const cleanUrl = match[2].trim().replace(/^[^h]*https?:\/\//i, 'https://');
-                             return { url: cleanUrl };
-                         }
-                         // Clean the URL by removing any platform prefixes
-                         const cleanUrl = line.trim().replace(/^[^h]*https?:\/\//i, 'https://');
-                         return { url: cleanUrl };
-                     });
-                    console.log('🔍 Sherlock parsed result:', result);
-                    return result;
-                } catch (e) {
-                    console.log('❌ Sherlock parsing error:', e.message);
-                    return null;
-                }
-            });
-            
+             const sherlockResult = await runToolIfAvailable('sherlock', [email], (stdout) => {
+                 console.log('🔍 Sherlock raw output length:', stdout.length);
+                 console.log('🔍 Sherlock raw output preview:', stdout.substring(0, 300) + '...');
+                 try {
+                     // Sherlock outputs found profiles line by line
+                     const lines = stdout.split('\n').filter(line => line.trim() && line.includes('http'));
+                     console.log('🔍 Sherlock found lines with URLs:', lines.length);
+                                          const result = lines.map(line => {
+                          const match = line.match(/\[([^\]]+)\]\s*(.+)/);
+                          if (match) {
+                              // Clean the URL by removing any platform prefixes
+                              const cleanUrl = match[2].trim().replace(/^[^h]*https?:\/\//i, 'https://');
+                              return { url: cleanUrl };
+                          }
+                          // Clean the URL by removing any platform prefixes
+                          const cleanUrl = line.trim().replace(/^[^h]*https?:\/\//i, 'https://');
+                          return { url: cleanUrl };
+                      });
+                     console.log('🔍 Sherlock parsed result:', result);
+                     return result;
+                 } catch (e) {
+                     console.log('❌ Sherlock parsing error:', e.message);
+                     return null;
+                 }
+             });
+             
                          if (sherlockResult && Array.isArray(sherlockResult)) {
                  console.log('✅ Sherlock data received, count:', sherlockResult.length);
                  results.social = [...new Set([...results.social, ...sherlockResult])];
@@ -660,7 +660,7 @@ app.post('/api/email-lookup', async (req, res) => {
         try {
             console.log('🔍 Running Maigret...');
             console.log('🔍 Using email for Maigret:', email);
-            const maigretResult = await runToolIfAvailable('maigret', [email, '--no-color'], parseMaigretSimple);
+            const maigretResult = await runToolIfAvailable('maigret', [email], parseMaigretSimple);
             
             if (maigretResult && maigretResult.socialProfiles) {
                 console.log('✅ Maigret data received, social profiles:', maigretResult.socialProfiles.length);
@@ -2089,7 +2089,7 @@ async function scrapePhoneNumberApiHtml(phone) {
 
         const metadata = { ...labelToValue };
         text.split(/;|\|/).map(s => s.trim()).filter(Boolean).forEach(s => {
-            const m = s.match(/([A-Za-z][A-Za-z0-9 _-]{2,})\s*[:|-]\s*(.+)/);
+            const m = s.match(/([A-Za-z][A-Za-z0-9 _-]{2,})\s*[:|-]\\s*(.+)/);
             if (m) {
                 const key = m[1].toLowerCase().replace(/[^a-z0-9]+/g, '_');
                 if (!metadata[key]) metadata[key] = m[2].trim();
