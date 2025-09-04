@@ -2531,18 +2531,10 @@ function cleanupGeneratedImages() {
 // GHunt helpers: status check and conditional Docker login
 async function ghuntIsAuthenticated() {
     try {
-        const py = await ensurePythonReady();
-        if (!py) return false;
-        const { stdout } = await execFileAsync(py, ['-m', 'ghunt', 'login', 'status'], { timeout: 15000, maxBuffer: 1024 * 1024 });
+        const { stdout } = await execFileAsync('ghunt', ['login', 'status'], { timeout: 15000, maxBuffer: 1024 * 1024 });
         const out = (stdout || '').toLowerCase();
         return /auth/i.test(out) || /logged/i.test(out) || /already/i.test(out) || /token/i.test(out);
     } catch {
-        // Try direct CLI if available
-        try {
-            const { stdout } = await execFileAsync('ghunt', ['login', 'status'], { timeout: 15000, maxBuffer: 1024 * 1024 });
-            const out = (stdout || '').toLowerCase();
-            return /auth/i.test(out) || /logged/i.test(out) || /already/i.test(out) || /token/i.test(out);
-        } catch {}
         return false;
     }
 }
@@ -2556,14 +2548,8 @@ async function ghuntNativeLoginIfNeeded() {
     console.log('🔐 GHunt not authenticated, attempting native Python login');
     
     try {
-        const py = await ensurePythonReady();
-        if (!py) {
-            console.log('❌ Python not available for GHunt login');
-            return false;
-        }
-        
-        // Try to run ghunt login with Python module
-        await execFileAsync(py, ['-m', 'ghunt', 'login'], { 
+        // Run ghunt login via CLI installed by pipx
+        await execFileAsync('ghunt', ['login'], {
             timeout: 300000, 
             maxBuffer: 1024 * 1024 * 20,
             env: { ...process.env, PYTHONUNBUFFERED: '1' }
@@ -2581,9 +2567,7 @@ async function runGhuntEmailSmart(targetEmail) {
     try {
         let authed = await ghuntIsAuthenticated();
         if (!authed) authed = await ghuntNativeLoginIfNeeded();
-        const py = await ensurePythonReady();
-        if (!py) throw new Error('Python not available');
-        const { stdout } = await execFileAsync(py, ['-m', 'ghunt', 'email', targetEmail], { timeout: 180000, maxBuffer: 1024 * 1024 * 20 });
+        const { stdout } = await execFileAsync('ghunt', ['email', targetEmail], { timeout: 180000, maxBuffer: 1024 * 1024 * 20 });
         return stdout || '';
     } catch (e) {
         console.log('❌ GHunt smart run failed:', e.message);
