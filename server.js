@@ -2540,8 +2540,9 @@ function resolveCliExecutable(cliName) {
             '/usr/bin',
             '/bin'
         ];
+        // Prioritize pipx paths first
         for (const p of extraLinux) {
-            if (!candidates.includes(p)) candidates.push(p);
+            if (!candidates.includes(p)) candidates.unshift(p);
         }
         // Check existence
         for (const base of candidates) {
@@ -2550,6 +2551,8 @@ function resolveCliExecutable(cliName) {
                 if (fs.existsSync(full)) return full;
             } catch {}
         }
+        // Debug: log what we checked
+        console.log(`🔍 CLI resolver checked ${candidates.length} paths for ${cliName}:`, candidates.slice(0, 5).join(', '));
         return null;
     } catch {
         return null;
