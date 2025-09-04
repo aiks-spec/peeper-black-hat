@@ -1267,7 +1267,7 @@ const toolTemplates = {
         args: ['<email>'],
         placeholder: '<email>',
         extractUsername: true, // Extract username from email for Sherlock
-        moduleName: 'sherlock' // Use correct module import name for fallback
+        moduleName: 'sherlock_project' // Use correct module import name for fallback
     },
     maigret: {
         command: 'maigret',
