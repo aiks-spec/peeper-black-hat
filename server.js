@@ -650,36 +650,8 @@ app.post('/api/email-lookup', async (req, res) => {
                  console.log('❌ Sherlock returned no valid data');
              }
              
-             // Add specific platform checks for popular sites
-             console.log('🔍 Running specific platform checks...');
-             const specificPlatforms = [
-                 'instagram', 'facebook', 'twitter', 'linkedin', 'tinder', 'bumble', 
-                 'okcupid', 'hinge', 'pinterest', 'tiktok', 'snapchat', 'reddit',
-                 'github', 'youtube', 'twitch', 'discord', 'telegram', 'whatsapp'
-             ];
-             
-             const specificResults = await runToolIfAvailable('sherlock', [email, '--print-found', '--site', specificPlatforms.join(',')], (stdout) => {
-                 try {
-                     const lines = stdout.split('\n').filter(line => line.trim() && line.includes('http'));
-                     return lines.map(line => {
-                         const match = line.match(/\[([^\]]+)\]\s*(.+)/);
-                         if (match) {
-                             const cleanUrl = match[2].trim().replace(/^[^h]*https?:\/\//i, 'https://');
-                             return { url: cleanUrl };
-                         }
-                         const cleanUrl = line.trim().replace(/^[^h]*https?:\/\//i, 'https://');
-                         return { url: cleanUrl };
-                     });
-                 } catch (e) {
-                     console.log('❌ Specific platform parsing error:', e.message);
-                     return [];
-                 }
-             });
-             
-             if (specificResults && Array.isArray(specificResults)) {
-                 console.log('✅ Specific platform checks completed, found:', specificResults.length);
-                 results.social = [...new Set([...results.social, ...specificResults])];
-             }
+             // Sherlock default search (no specific sites)
+             console.log('✅ Sherlock default search completed');
         } catch (error) {
             console.log('❌ Sherlock failed:', error.message);
         }
