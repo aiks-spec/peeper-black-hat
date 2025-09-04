@@ -23,15 +23,27 @@ services:
       echo "📚 Installing Python packages from requirements.txt..."
       pip install -r requirements.txt
       
-      echo "🔍 Verifying installations..."
-      python -c "import sherlock; print('✅ Sherlock installed')" || echo "❌ Sherlock failed"
-      python -c "import maigret; print('✅ Maigret installed')" || echo "❌ Maigret failed"
-      python -c "import holehe; print('✅ Holehe installed')" || echo "❌ Holehe failed"
-      python -c "import ghunt; print('✅ GHunt installed')" || echo "❌ GHunt failed"
-      python -c "import phoneinfoga; print('✅ PhoneInfoga installed')" || echo "❌ PhoneInfoga failed"
+      echo "🔍 Verifying installations and command availability..."
+      python -c "import sherlock; print('✅ Sherlock module installed')" || echo "❌ Sherlock module failed"
+      python -c "import maigret; print('✅ Maigret module installed')" || echo "❌ Maigret module failed"
+      python -c "import holehe; print('✅ Holehe module installed')" || echo "❌ Holehe module failed"
+      python -c "import ghunt; print('✅ GHunt module installed')" || echo "❌ GHunt module failed"
+      python -c "import phoneinfoga; print('✅ PhoneInfoga module installed')" || echo "❌ PhoneInfoga module failed"
+      
+      echo "🔍 Checking command availability..."
+      which sherlock && echo "✅ Sherlock command available" || echo "❌ Sherlock command not found"
+      which maigret && echo "✅ Maigret command available" || echo "❌ Maigret command not found"
+      which holehe && echo "✅ Holehe command available" || echo "❌ Holehe command not found"
+      which phoneinfoga && echo "✅ PhoneInfoga command available" || echo "❌ PhoneInfoga command not found"
       
       echo "🔍 Final verification - all packages..."
       python -c "import sherlock, maigret, holehe, ghunt, phoneinfoga; print('✅ All packages installed successfully')" || echo "❌ Some packages failed to install"
+      
+      echo "🔍 Testing module execution..."
+      python -m sherlock_project --help >/dev/null 2>&1 && echo "✅ Sherlock module executable" || echo "❌ Sherlock module not executable"
+      python -m maigret --help >/dev/null 2>&1 && echo "✅ Maigret module executable" || echo "❌ Maigret module not executable"
+      python -m holehe --help >/dev/null 2>&1 && echo "✅ Holehe module executable" || echo "❌ Holehe module not executable"
+      python -m phoneinfoga --help >/dev/null 2>&1 && echo "✅ PhoneInfoga module executable" || echo "❌ PhoneInfoga module not executable"
       
       # Install Node.js dependencies
       echo "📦 Installing Node.js dependencies..."
