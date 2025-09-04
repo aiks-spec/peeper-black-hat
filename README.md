@@ -21,19 +21,14 @@ A powerful OSINT (Open Source Intelligence) tool that provides comprehensive inf
 - **Backend**: Node.js, Express.js
 - **Database**: PostgreSQL (Render) with SQLite fallback
 - **Frontend**: HTML, CSS, JavaScript
-- **OSINT Tools**: 
-  - 🐳 **Docker-based**: Sherlock, Maigret, Holehe, PhoneInfoga
-  - 🐍 **Python-based**: GHunt
+- **OSINT Tools**: Sherlock, Maigret, PhoneInfoga, GHunt, Holehe
 - **APIs**: CUFinder, IPInfo, Phone-Number-API
-- **Containerization**: Docker for OSINT tool execution
 
 ## 📋 Prerequisites
 
 - Node.js (v14 or higher)
 - npm or yarn
-- Python 3.7+ (for GHunt only)
-- Docker (for Sherlock, Maigret, Holehe, PhoneInfoga)
- 
+- Python 3.8+ (for OSINT tools)
 
 ## 🔧 Installation
 
@@ -43,21 +38,26 @@ git clone https://github.com/yourusername/osint-lookup-engine.git
 cd osint-lookup-engine
 ```
 
-### 2. Install Dependencies
+### 2. Install Node.js Dependencies
 ```bash
 npm install
 ```
 
-### 3. Install OSINT Tools
-```bash
-# Install Python tools (GHunt only)
-pip install ghunt
+### 3. Set Up Python Virtual Environment
 
-# Docker-based tools are automatically handled:
-# - Sherlock: Uses python:3.11-slim container
-# - Maigret: Uses python:3.11-slim container  
-# - Holehe: Uses python:3.11-slim container
-# - PhoneInfoga: Uses sundowndev/phoneinfoga:latest container
+#### Linux/macOS:
+```bash
+# Make setup script executable
+chmod +x setup_python_env.sh start_with_venv.sh
+
+# Create virtual environment and install Python tools
+./setup_python_env.sh
+```
+
+#### Windows:
+```batch
+# Create virtual environment and install Python tools
+setup_python_env.bat
 ```
 
 ### 4. Set Environment Variables
@@ -72,33 +72,23 @@ DEHASHED_API_KEY=your_api_key
 ```
 
 ### 5. Start the Application
+
+#### Linux/macOS:
+```bash
+./start_with_venv.sh
+```
+
+#### Windows:
+```batch
+start_with_venv.bat
+```
+
+#### Manual Start (if virtual environment is already active):
 ```bash
 npm start
 ```
 
 The application will be available at `http://localhost:3000`
-
-## 🐳 Docker Integration
-
-This project uses Docker containers for most OSINT tools to ensure consistent execution across different environments:
-
-### Docker-based Tools
-- **Sherlock**: Username search across social media platforms
-- **Maigret**: Extended username search with additional sources
-- **Holehe**: Email breach checking
-- **PhoneInfoga**: Phone number intelligence gathering
-
-### How It Works
-1. When you submit a search query, the application automatically:
-   - Determines which tool to use based on input type
-   - Constructs the appropriate Docker command
-   - Replaces placeholders (`<username>`, `<email>`, `<phone_number>`) with your input
-   - Executes the command in a fresh container
-   - Returns the results
-
-2. **No manual Docker setup required** - the application handles everything automatically
-
-3. **Fresh containers for each execution** - ensures clean, isolated tool runs
 
 ## 📱 Usage
 
@@ -133,16 +123,34 @@ This project uses Docker containers for most OSINT tools to ensure consistent ex
 ## 🌐 Deployment
 
 ### Render.com (Recommended)
+The application is configured for automatic deployment on Render.com with Python virtual environment support:
+
 1. Push your code to GitHub
 2. Connect your repository to Render.com
 3. Set environment variables in Render dashboard
 4. Deploy automatically
+
+**Key Features for Render:**
+- ✅ Automatic Python virtual environment setup
+- ✅ Isolated Python dependencies
+- ✅ Pre-configured `render.yaml` for seamless deployment
+- ✅ Comprehensive deployment guide in `RENDER_DEPLOYMENT.md`
 
 ### Other Platforms
 - **Heroku**: Use the Procfile and environment variables
 - **Railway**: Connect GitHub repository directly
 - **DigitalOcean**: App Platform with automatic deployments
 - **Vercel**: Serverless deployment option
+
+## 🐍 Virtual Environment Benefits
+
+The application now uses Python virtual environments for better dependency management:
+
+- **🔒 Dependency Isolation**: Prevents conflicts between system and project Python packages
+- **🔄 Reproducible Environment**: Ensures consistent behavior across different systems
+- **📦 Easy Management**: Simple setup and cleanup of Python dependencies
+- **🚀 Render Compatibility**: Works seamlessly with Render's Node.js environment
+- **🛠️ Development Flexibility**: Easy switching between different Python versions and packages
 
 ## 🔒 Security Features
 
