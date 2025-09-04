@@ -5,19 +5,39 @@ services:
     buildCommand: |
       # Make setup scripts executable
       chmod +x setup_python_env.sh start_with_venv.sh
+      
+      # Ensure Python3 is available
+      echo "🐍 Checking Python3 availability..."
+      python3 --version || (echo "❌ Python3 not found" && exit 1)
+      
       # Create virtual environment and install Python dependencies
       echo "🐍 Creating Python virtual environment..."
       python3 -m venv venv
+      
       echo "🔧 Activating virtual environment..."
       source venv/bin/activate
+      
       echo "⬆️ Upgrading pip..."
       pip install --upgrade pip
-      echo "📚 Installing Python packages..."
+      
+      echo "📚 Installing Python packages from requirements.txt..."
       pip install -r requirements.txt
+      
       echo "🔍 Verifying installations..."
-      python -c "import sherlock, maigret, holehe, ghunt, phoneinfoga" && echo "✅ All packages installed successfully"
+      python -c "import sherlock; print('✅ Sherlock installed')" || echo "❌ Sherlock failed"
+      python -c "import maigret; print('✅ Maigret installed')" || echo "❌ Maigret failed"
+      python -c "import holehe; print('✅ Holehe installed')" || echo "❌ Holehe failed"
+      python -c "import ghunt; print('✅ GHunt installed')" || echo "❌ GHunt failed"
+      python -c "import phoneinfoga; print('✅ PhoneInfoga installed')" || echo "❌ PhoneInfoga failed"
+      
+      echo "🔍 Final verification - all packages..."
+      python -c "import sherlock, maigret, holehe, ghunt, phoneinfoga; print('✅ All packages installed successfully')" || echo "❌ Some packages failed to install"
+      
       # Install Node.js dependencies
+      echo "📦 Installing Node.js dependencies..."
       npm install
+      
+      echo "✅ Build process completed successfully"
     startCommand: ./start_with_venv.sh
     envVars:
       - key: NODE_ENV
