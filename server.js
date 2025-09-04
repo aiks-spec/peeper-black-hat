@@ -1317,9 +1317,9 @@ async function resolveToolCommand(cmd) {
         
         // GHunt requires subcommand "email"
         let baseArgs = cmd === 'ghunt' ? ['email', placeholder] : [placeholder];
-        // Maigret defaults for Render stability
+        // Maigret defaults for Render stability with JSON output
         if (cmd === 'maigret') {
-            baseArgs = ['--timeout', '20', '--max-connections', '10', placeholder];
+            baseArgs = ['--timeout', '20', '--max-connections', '10', '--json', placeholder];
         }
         // PhoneInfoga preferred syntax
         if (cmd === 'phoneinfoga') {
@@ -1380,8 +1380,26 @@ async function runToolIfAvailable(cmd, args, parseFn) {
             console.log(`🔧 Extracted username from email: ${userInput} -> ${processedInput}`);
         }
         
+        // Create JSON output file for tools that support it
+        let jsonOutputFile = null;
+        if (['maigret', 'holehe', 'sherlock'].includes(cmd)) {
+            jsonOutputFile = createToolOutputFile(cmd, processedInput);
+            console.log(`📁 Created JSON output file: ${jsonOutputFile}`);
+        }
+        
         const templateArgs = resolved.templateArgs.map((a) => typeof a === 'string' && resolved.placeholder ? a.replace(resolved.placeholder, processedInput) : a);
-        const allArgs = [...templateArgs, ...args.slice(1)]; // Add all additional arguments after the first one
+        let allArgs = [...templateArgs, ...args.slice(1)]; // Add all additional arguments after the first one
+        
+        // Add JSON output file for tools that support it
+        if (jsonOutputFile && ['maigret', 'holehe', 'sherlock'].includes(cmd)) {
+            if (cmd === 'maigret') {
+                allArgs = [...allArgs, '--output', jsonOutputFile];
+            } else if (cmd === 'holehe') {
+                allArgs = [...allArgs, '--output', jsonOutputFile];
+            } else if (cmd === 'sherlock') {
+                allArgs = [...allArgs, '--output', jsonOutputFile];
+            }
+        }
         
         console.log(`🔧 Executing: ${resolved.command} ${allArgs.join(' ')}`);
         try {
@@ -1391,9 +1409,33 @@ async function runToolIfAvailable(cmd, args, parseFn) {
                 env: { ...process.env, PYTHONUNBUFFERED: '1', NO_COLOR: '1' },
                 encoding: 'utf8'
             });
-            const parsed = parseFn(stdout, stderr);
-            if (parsed && typeof parsed === 'object') parsed.__source = cmd;
-            return parsed;
+            
+            // Try to read from JSON file first, then fallback to stdout parsing
+            let result = null;
+            if (jsonOutputFile && fs.existsSync(jsonOutputFile)) {
+                console.log(`📁 Reading tool output from JSON file: ${jsonOutputFile}`);
+                result = readToolOutputFromFile(jsonOutputFile);
+                if (result) {
+                    console.log(`✅ Tool ${cmd} data loaded from JSON file`);
+                    // Clean up the JSON file after reading
+                    try {
+                        fs.unlinkSync(jsonOutputFile);
+                    } catch (e) {
+                        console.log(`⚠️ Failed to clean up JSON file: ${e.message}`);
+                    }
+                }
+            }
+            
+            // Fallback to stdout parsing if JSON file didn't work
+            if (!result && parseFn) {
+                result = parseFn(stdout, stderr);
+                console.log(`✅ Tool ${cmd} parsed from stdout`);
+            } else if (!result) {
+                result = stdout;
+            }
+            
+            if (result && typeof result === 'object') result.__source = cmd;
+            return result;
         } catch (err) {
             console.log(`❌ Template tool ${cmd} failed:`, err.message);
             return null;
@@ -2522,6 +2564,35 @@ function cleanupGeneratedImages() {
     } catch (e) {
         console.log('⚠️ Image cleanup error:', e.message);
     }
+}
+
+// Create JSON output file for tools that support it
+function createToolOutputFile(toolName, input) {
+    const timestamp = Date.now();
+    const safeInput = String(input).replace(/[^a-zA-Z0-9@._-]/g, '_');
+    const fileName = `${toolName}_${timestamp}_${safeInput}.json`;
+    const filePath = path.join(process.cwd(), 'reports', fileName);
+    
+    // Ensure reports directory exists
+    const reportsDir = path.join(process.cwd(), 'reports');
+    if (!fs.existsSync(reportsDir)) {
+        fs.mkdirSync(reportsDir, { recursive: true });
+    }
+    
+    return filePath;
+}
+
+// Read tool output from JSON file
+function readToolOutputFromFile(filePath) {
+    try {
+        if (fs.existsSync(filePath)) {
+            const content = fs.readFileSync(filePath, 'utf8');
+            return JSON.parse(content);
+        }
+    } catch (e) {
+        console.log(`⚠️ Failed to read tool output from ${filePath}:`, e.message);
+    }
+    return null;
 }
 
 // Resolve CLI executables installed via pipx (or system) robustly
