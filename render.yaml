@@ -26,11 +26,11 @@ services:
       export PATH="$HOME/.local/bin:$PATH"
 
       echo "📚 Installing OSINT tools via pipx..."
-      pipx install sherlock-project || true
-      pipx install holehe || true
-      pipx install ghunt || true
-      pipx install maigret || true
-      pipx install phoneinfoga || true
+      pipx install sherlock-project -y || true
+      pipx install holehe -y || true
+      pipx install ghunt -y || true
+      pipx install maigret -y || true
+      pipx install phoneinfoga -y || true
       
       echo "🔍 Verifying installations and command availability..."
       python -c "import sherlock; print('✅ Sherlock module installed')" || echo "❌ Sherlock module failed"
