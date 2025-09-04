@@ -65,6 +65,18 @@ python -c "import holehe; print('✅ Holehe ready')" || echo "❌ Holehe not rea
 python -c "import ghunt; print('✅ GHunt ready')" || echo "❌ GHunt not ready"
 python -c "import phoneinfoga; print('✅ PhoneInfoga ready')" || echo "❌ PhoneInfoga not ready"
 
+echo "🔍 Checking command availability in virtual environment..."
+which sherlock && echo "✅ Sherlock command available" || echo "❌ Sherlock command not found"
+which maigret && echo "✅ Maigret command available" || echo "❌ Maigret command not found"
+which holehe && echo "✅ Holehe command available" || echo "❌ Holehe command not found"
+which phoneinfoga && echo "✅ PhoneInfoga command available" || echo "❌ PhoneInfoga command not found"
+
+echo "🔍 Testing module execution..."
+python -m sherlock_project --help >/dev/null 2>&1 && echo "✅ Sherlock module executable" || echo "❌ Sherlock module not executable"
+python -m maigret --help >/dev/null 2>&1 && echo "✅ Maigret module executable" || echo "❌ Maigret module not executable"
+python -m holehe --help >/dev/null 2>&1 && echo "✅ Holehe module executable" || echo "❌ Holehe module not executable"
+python -m phoneinfoga --help >/dev/null 2>&1 && echo "✅ PhoneInfoga module executable" || echo "❌ PhoneInfoga module not executable"
+
 # Start the application
 echo "🚀 Starting Node.js application..."
 node server.js
