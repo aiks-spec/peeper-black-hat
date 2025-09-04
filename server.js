@@ -1288,51 +1288,132 @@ async function isCommandAvailable(cmd) {
         }
     }
 
+// Dynamic Docker command templates for tools with placeholders
+const dockerTemplates = {
+    sherlock: {
+        command: 'docker',
+        args: ['run', '-it', '--rm', 'python:3.11-slim', 'bash', '-c', 'apt-get update && apt-get install -y git && pip install sherlock-project && sherlock <username>'],
+        placeholder: '<username>'
+    },
+    maigret: {
+        command: 'docker',
+        args: ['run', '-it', '--rm', 'python:3.11-slim', 'bash', '-c', 'pip install maigret && maigret <username>'],
+        placeholder: '<username>'
+    },
+    holehe: {
+        command: 'docker',
+        args: ['run', '-it', '--rm', 'python:3.11-slim', 'bash', '-c', 'pip install holehe && holehe <email>'],
+        placeholder: '<email>'
+    },
+    phoneinfoga: {
+        command: 'docker',
+        args: ['run', '-it', '--rm', 'sundowndev/phoneinfoga:latest', 'scan', '--number', '<phone_number>'],
+        placeholder: '<phone_number>'
+    }
+};
+
+// Extend resolver to map to docker templates for these tools
 async function resolveToolCommand(cmd) {
     console.log(`🔍 Resolving tool command for: ${cmd}`);
-    
-    // For Python tools, prefer system python3; bootstrap local python if needed
-    if (cmd === 'sherlock' || cmd === 'holehe' || cmd === 'maigret' || cmd === 'ghunt') {
+
+    // Docker-driven tools
+    if (dockerTemplates[cmd]) {
+        return { command: dockerTemplates[cmd].command, viaDocker: true, dockerArgs: dockerTemplates[cmd].args, placeholder: dockerTemplates[cmd].placeholder };
+    }
+
+    // GHunt via python module
+    if (cmd === 'ghunt') {
         const py = await ensurePythonReady();
         if (py) {
-        console.log(`🔍 Using Python module execution for ${cmd}: ${py} -m ${cmd}`);
-        return { command: py, viaPython: cmd };
+            console.log(`🔍 Using Python module execution for ${cmd}: ${py} -m ${cmd}`);
+            return { command: py, viaPython: cmd };
         } else {
             console.log(`❌ Python not available for ${cmd}, trying direct command`);
-            // Fallback to direct command
             return { command: 'python3', viaPython: cmd };
         }
     }
-    if (cmd === 'phoneinfoga') {
-        // Ensure PhoneInfoga is installed or download it
-        try {
-            const bin = await ensurePhoneInfogaInstalled(); 
-            return { command: bin, viaPython: false };
-        } catch (e) {
-            console.log('❌ PhoneInfoga install/resolve failed:', e.message);
-        }
-    }
-    
-    // For other tools, check if directly available
+
+    // Fallback to direct availability
     const ok = await isCommandAvailable(cmd);
     console.log(`🔍 Direct command availability for ${cmd}: ${ok}`);
-        if (ok) return { command: cmd, viaPython: false };
-        
-    // Linux/Render: try common locations
-            const pathParts = (process.env.PATH || '').split(':').filter(Boolean);
-            for (const p of pathParts) {
-                try {
-                    const toolPath = path.join(p, cmd);
-                    if (fs.existsSync(toolPath)) {
-                        return { command: toolPath, viaPython: false };
-                    }
-                } catch {}
-            }
-            
-    // Final fallback for non-Python tools
+    if (ok) return { command: cmd, viaPython: false };
+
+    // Final fallback
     console.log(`🔍 Using final fallback for ${cmd}: python3 -m ${cmd}`);
     return { command: 'python3', viaPython: cmd };
 }
+
+// Update runToolIfAvailable to handle docker inputs
+async function runToolIfAvailable(cmd, args, parseFn) {
+    console.log(`🔧 Running tool: ${cmd} with args:`, args);
+    const resolved = await resolveToolCommand(cmd);
+    console.log(`🔍 Tool resolution result:`, resolved);
+    if (!resolved.command) {
+        console.log(`❌ Tool ${cmd} not available`);
+        return null;
+    }
+
+    // Docker execution branch
+    if (resolved.viaDocker) {
+        const userInput = args[0] || '';
+        if (!userInput) {
+            console.log(`❌ No user input provided for ${cmd}`);
+            return null;
+        }
+        const dockerArgs = resolved.dockerArgs.map((a) => typeof a === 'string' && resolved.placeholder ? a.replace(resolved.placeholder, userInput) : a);
+        try {
+            const { stdout, stderr } = await execFileAsync(resolved.command, dockerArgs, {
+                timeout: 300000,
+                maxBuffer: 1024 * 1024 * 20,
+                env: { ...process.env },
+                encoding: 'utf8'
+            });
+            const parsed = parseFn(stdout, stderr);
+            if (parsed && typeof parsed === 'object') parsed.__source = cmd;
+            return parsed;
+        } catch (err) {
+            console.log(`❌ Docker tool ${cmd} failed:`, err.message);
+            return null;
+        }
+    }
+
+    // Python module/direct execution (existing logic)
+    const spawnCmd = resolved.command;
+    let spawnArgs;
+    if (resolved.viaPython) {
+        if (resolved.viaPython.startsWith('-m ')) {
+            const moduleName = resolved.viaPython.replace('-m ', '');
+            spawnArgs = ['-m', moduleName, ...args];
+        } else if (resolved.viaPython.startsWith('-m')) {
+            const moduleName = resolved.viaPython.replace('-m', '');
+            spawnArgs = ['-m', moduleName, ...args];
+        } else {
+            spawnArgs = ['-m', resolved.viaPython, ...args];
+        }
+    } else {
+        spawnArgs = args;
+    }
+    try {
+        const { stdout, stderr } = await execFileAsync(spawnCmd, spawnArgs, {
+            timeout: 180000,
+            maxBuffer: 1024 * 1024 * 20,
+            env: { ...process.env, PYTHONUNBUFFERED: '1', NO_COLOR: '1' },
+            encoding: 'utf8'
+        });
+        const parsed = parseFn(stdout, stderr);
+        if (parsed && typeof parsed === 'object') parsed.__source = cmd;
+        return parsed;
+    } catch (err) {
+        console.log(`❌ Tool ${cmd} failed:`, err.message);
+        return null;
+    }
+}
+
+// Use GHunt smart runner in email-lookup
+// Replace previous ghunt module call
+// In the GHunt section of /api/email-lookup, replace with:
+// const ghuntOutput = await runGhuntEmailSmart(email);
+// const ghuntData = parseGHuntFromText(ghuntOutput);
 
 // PhoneInfoga Docker helper removed (Docker not used)
 
@@ -2468,5 +2549,99 @@ function initializeGhuntDirect() {
         }
     } catch (e) {
         console.log('❌ GHunt direct initialization error:', e.message);
+    }
+}
+
+// Utility: cleanup previously generated image files in the project (non-recursive critical dirs)
+function cleanupGeneratedImages() {
+    try {
+        const imageGlobs = [/\.png$/i, /\.jpg$/i, /\.jpeg$/i, /\.gif$/i, /\.webp$/i];
+        const dirs = [process.cwd(), path.join(process.cwd(), 'public'), path.join(process.cwd(), 'temp')];
+        let removed = 0;
+        for (const dir of dirs) {
+            try {
+                if (!fs.existsSync(dir)) continue;
+                const entries = fs.readdirSync(dir);
+                entries.forEach((f) => {
+                    if (imageGlobs.some((re) => re.test(f))) {
+                        const fp = path.join(dir, f);
+                        try { fs.unlinkSync(fp); removed++; } catch {}
+                    }
+                });
+            } catch {}
+        }
+        if (removed > 0) console.log(`🧹 Removed ${removed} generated image files`);
+    } catch (e) {
+        console.log('⚠️ Image cleanup error:', e.message);
+    }
+}
+
+// GHunt helpers: status check and conditional Docker login
+async function ghuntIsAuthenticated() {
+    try {
+        const py = await ensurePythonReady();
+        if (!py) return false;
+        const { stdout } = await execFileAsync(py, ['-m', 'ghunt', 'login', 'status'], { timeout: 15000, maxBuffer: 1024 * 1024 });
+        const out = (stdout || '').toLowerCase();
+        return /auth/i.test(out) || /logged/i.test(out) || /already/i.test(out) || /token/i.test(out);
+    } catch {
+        // Try direct CLI if available
+        try {
+            const { stdout } = await execFileAsync('ghunt', ['login', 'status'], { timeout: 15000, maxBuffer: 1024 * 1024 });
+            const out = (stdout || '').toLowerCase();
+            return /auth/i.test(out) || /logged/i.test(out) || /already/i.test(out) || /token/i.test(out);
+        } catch {}
+        return false;
+    }
+}
+
+async function ghuntDockerLoginIfNeeded() {
+    const authed = await ghuntIsAuthenticated();
+    if (authed) {
+        console.log('🔐 GHunt token already authenticated');
+        return true;
+    }
+    console.log('🔐 GHunt not authenticated, attempting Docker-based login with expect script');
+    const expectPath = path.join(process.cwd(), 'ghunt_login.expect');
+    if (!fs.existsSync(expectPath)) {
+        try {
+            const expectScript = `#!/usr/bin/expect -f
+set timeout 30
+spawn bash -c "python3 -m ghunt login"
+expect {
+    -re {.*\[?\s*1\s*\]?.*} { send "1\r" }
+    timeout { exit 1 }
+}
+expect eof
+`;
+            fs.writeFileSync(expectPath, expectScript, { encoding: 'utf8', mode: 0o644 });
+        } catch (e) {
+            console.log('❌ Failed to write ghunt_login.expect:', e.message);
+            return false;
+        }
+    }
+    const args = ['run', '-it', '--rm', '-v', `${process.cwd()}/ghunt_login.expect:/ghunt_login.expect`, 'python:3.11-slim', 'bash', '-c', 'apt-get update && apt-get install -y git expect && pip install ghunt && expect /ghunt_login.expect'];
+    try {
+        await execFileAsync('docker', args, { timeout: 300000, maxBuffer: 1024 * 1024 * 20 });
+        console.log('✅ GHunt Docker login completed');
+        // Re-check
+        return await ghuntIsAuthenticated();
+    } catch (e) {
+        console.log('❌ GHunt Docker login failed:', e.message);
+        return false;
+    }
+}
+
+async function runGhuntEmailSmart(targetEmail) {
+    try {
+        let authed = await ghuntIsAuthenticated();
+        if (!authed) authed = await ghuntDockerLoginIfNeeded();
+        const py = await ensurePythonReady();
+        if (!py) throw new Error('Python not available');
+        const { stdout } = await execFileAsync(py, ['-m', 'ghunt', 'email', targetEmail], { timeout: 180000, maxBuffer: 1024 * 1024 * 20 });
+        return stdout || '';
+    } catch (e) {
+        console.log('❌ GHunt smart run failed:', e.message);
+        return '';
     }
 }
