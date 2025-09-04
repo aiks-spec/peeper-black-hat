@@ -1275,23 +1275,8 @@ function extractUsernameFromEmail(email) {
 }
 
 // Ensure Sherlock repo exists and is installed (Render startup safeguard)
-async function ensureSherlockInstalled() {
-    try {
-        const sherlockDir = path.join(process.cwd(), 'sherlock');
-        if (!fs.existsSync(sherlockDir)) {
-            console.log('🔧 Sherlock not found. Cloning repository...');
-            await execAsync('git clone https://github.com/sherlock-project/sherlock.git');
-            console.log('📚 Installing Sherlock requirements...');
-            // Prefer venv pip if available
-            const py = await ensurePythonReady();
-            const pipCmd = py ? `${py} -m pip` : 'pip';
-            // await execAsync(`${pipCmd} install -r sherlock/requirements.txt`);
-            console.log('✅ Sherlock installed');
-        }
-    } catch (e) {
-        console.log('⚠️ Failed to ensure Sherlock installed:', e.message);
-    }
-}
+// Local tools: no cloning/install; rely on tools/ checked into repo
+async function ensureSherlockInstalled() { return; }
 
 // Dynamic command templates for tools with placeholders (native Python execution)
 const toolTemplates = {
@@ -1330,12 +1315,15 @@ async function resolveToolCommand(cmd) {
     
     // Template-driven tools (native Python execution)
     if (toolTemplates[cmd]) {
-        // For template tools, return template command directly
-        return { 
-            command: toolTemplates[cmd].command, 
-            viaTemplate: true, 
-            templateArgs: toolTemplates[cmd].args, 
-            placeholder: toolTemplates[cmd].placeholder 
+        // Route all template tools through Python wrapper to run local copies
+        const py = await ensurePythonReady();
+        const command = py || 'python3';
+        const placeholder = toolTemplates[cmd].placeholder;
+        return {
+            command,
+            viaTemplate: true,
+            templateArgs: ['tools/wrappers.py', cmd, placeholder],
+            placeholder
         };
     }
 
