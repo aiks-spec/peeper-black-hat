@@ -1315,14 +1315,22 @@ async function resolveToolCommand(cmd) {
     
     // Template-driven tools (native Python execution)
     if (toolTemplates[cmd]) {
-        // Route all template tools through Python wrapper to run local copies
+        // Use python -m <module> style to match Windows usage, inside venv
         const py = await ensurePythonReady();
         const command = py || 'python3';
         const placeholder = toolTemplates[cmd].placeholder;
+        // Map template name to module invocation
+        const moduleMap = {
+            sherlock: ['-m', 'sherlock'],
+            holehe: ['-m', 'holehe'],
+            maigret: ['-m', 'maigret'],
+            phoneinfoga: ['-m', 'phoneinfoga']
+        };
+        const baseArgs = moduleMap[cmd] || [];
         return {
             command,
             viaTemplate: true,
-            templateArgs: ['tools/wrappers.py', cmd, placeholder],
+            templateArgs: baseArgs.concat(placeholder),
             placeholder
         };
     }
