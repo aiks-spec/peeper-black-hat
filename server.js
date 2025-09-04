@@ -1257,27 +1257,39 @@ async function isCommandAvailable(cmd) {
         }
     }
 
+// Helper function to extract username from email
+function extractUsernameFromEmail(email) {
+    if (!email || typeof email !== 'string') return email;
+    const atIndex = email.indexOf('@');
+    if (atIndex === -1) return email; // Not an email, return as is
+    return email.substring(0, atIndex);
+}
+
 // Dynamic command templates for tools with placeholders (native Python execution)
 const toolTemplates = {
     sherlock: {
         command: 'python3',
         args: ['-m', 'sherlock', '<email>'],
-        placeholder: '<email>'
+        placeholder: '<email>',
+        extractUsername: true // Extract username from email for Sherlock
     },
     maigret: {
         command: 'python3',
         args: ['-m', 'maigret', '<email>'],
-        placeholder: '<email>'
+        placeholder: '<email>',
+        extractUsername: true // Extract username from email for Maigret
     },
     holehe: {
         command: 'python3',
         args: ['-m', 'holehe', '<email>'],
-        placeholder: '<email>'
+        placeholder: '<email>',
+        extractUsername: false // Use full email for Holehe
     },
     phoneinfoga: {
         command: 'python3',
         args: ['-m', 'phoneinfoga', 'scan', '--number', '<phone_number>'],
-        placeholder: '<phone_number>'
+        placeholder: '<phone_number>',
+        extractUsername: false // Use phone number as is
     }
 };
 
@@ -1350,7 +1362,15 @@ async function runToolIfAvailable(cmd, args, parseFn) {
             return null;
         }
         // Replace placeholder with user input, then add remaining arguments
-        const templateArgs = resolved.templateArgs.map((a) => typeof a === 'string' && resolved.placeholder ? a.replace(resolved.placeholder, userInput) : a);
+        let processedInput = userInput;
+        
+        // Extract username from email if the tool requires it
+        if (toolTemplates[cmd] && toolTemplates[cmd].extractUsername) {
+            processedInput = extractUsernameFromEmail(userInput);
+            console.log(`🔧 Extracted username from email: ${userInput} -> ${processedInput}`);
+        }
+        
+        const templateArgs = resolved.templateArgs.map((a) => typeof a === 'string' && resolved.placeholder ? a.replace(resolved.placeholder, processedInput) : a);
         const allArgs = [...templateArgs, ...args.slice(1)]; // Add all additional arguments after the first one
         
         console.log(`🔧 Executing: ${resolved.command} ${allArgs.join(' ')}`);
