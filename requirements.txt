@@ -1,5 +1,5 @@
-# OSINT tools now use Docker containers
-# sherlock-project - using Docker
-# maigret - using Docker  
-# holehe - using Docker
+sherlock-project
+maigret
+holehe
 ghunt
+phoneinfoga
