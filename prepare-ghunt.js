@@ -59,7 +59,68 @@ function writeFileSafe(filePath, content) {
     }
 
     if (!wroteSomething) {
-      console.log('No GHunt credentials found in env; skipping config preparation');
+      // Try reading uploaded files from repo
+      const projectRoot = process.cwd();
+      const candidates = [
+        // tools/ghunt/ tokens/cookies
+        { tokens: ['tools', 'ghunt', 'tokens.json'], cookies: ['tools', 'ghunt', 'cookies.json'] },
+        // root-level fallback
+        { tokens: ['ghunt_tokens.json'], cookies: ['ghunt_cookies.json'] },
+        // plain token text + cookies json
+        { tokensTxt: ['tools', 'ghunt', 'token.txt'], cookies: ['tools', 'ghunt', 'cookies.json'] },
+      ];
+
+      for (const entry of candidates) {
+        try {
+          let used = false;
+          if (entry.tokens) {
+            const tPath = require('path').join(projectRoot, ...entry.tokens);
+            if (fs.existsSync(tPath)) {
+              const raw = fs.readFileSync(tPath, 'utf8');
+              const parsed = JSON.parse(raw);
+              if (parsed && typeof parsed.o_auth_token === 'string' && parsed.o_auth_token.trim()) {
+                if (writeFileSafe(path.join(cfgDir, 'tokens.json'), JSON.stringify({ o_auth_token: parsed.o_auth_token.trim() }, null, 2))) {
+                  used = true;
+                  wroteSomething = true;
+                  console.log('GHunt tokens.json copied from repository');
+                }
+              }
+            }
+          }
+          if (!used && entry.tokensTxt) {
+            const tTxtPath = require('path').join(projectRoot, ...entry.tokensTxt);
+            if (fs.existsSync(tTxtPath)) {
+              const rawTxt = fs.readFileSync(tTxtPath, 'utf8').trim();
+              if (rawTxt) {
+                if (writeFileSafe(path.join(cfgDir, 'tokens.json'), JSON.stringify({ o_auth_token: rawTxt }, null, 2))) {
+                  wroteSomething = true;
+                  console.log('GHunt token.txt converted to tokens.json');
+                }
+              }
+            }
+          }
+          if (entry.cookies) {
+            const cPath = require('path').join(projectRoot, ...entry.cookies);
+            if (fs.existsSync(cPath)) {
+              const rawC = fs.readFileSync(cPath, 'utf8');
+              try {
+                JSON.parse(rawC);
+                if (writeFileSafe(path.join(cfgDir, 'cookies.json'), rawC)) {
+                  wroteSomething = true;
+                  console.log('GHunt cookies.json copied from repository');
+                }
+              } catch (e) {
+                console.error('GHunt cookies.json in repo is not valid JSON:', e.message);
+              }
+            }
+          }
+          if (wroteSomething) break;
+        } catch {}
+      }
+
+      if (!wroteSomething) {
+        console.log('No GHunt credentials found in env or repository; skipping config preparation');
+      }
     }
   } catch (e) {
     console.error('prepare-ghunt error:', e.message);
