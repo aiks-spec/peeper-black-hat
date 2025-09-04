@@ -367,10 +367,17 @@ app.post('/api/aggregate', async (req, res) => {
                             }
                             return null;
             }));
+            // Sherlock and Maigret now work with email input
+            tasks.push(runToolIfAvailable('sherlock', [trimmed, '--print-found', '--no-color'], parseSherlock));
+            tasks.push(runToolIfAvailable('maigret', [trimmed, '--no-color'], parseMaigretSimple));
         }
         if (qtype === 'username') {
-            tasks.push(runToolIfAvailable('sherlock', [trimmed, '--print-found', '--no-color'], parseSherlock));
-                         tasks.push(runToolIfAvailable('maigret', [trimmed, '--no-color'], parseMaigretSimple));
+            // Sherlock and Maigret now require email input, skip for username queries
+            // Consider treating username as email if it contains @ symbol
+            if (trimmed.includes('@')) {
+                tasks.push(runToolIfAvailable('sherlock', [trimmed, '--print-found', '--no-color'], parseSherlock));
+                tasks.push(runToolIfAvailable('maigret', [trimmed, '--no-color'], parseMaigretSimple));
+            }
         }
 
         const results = await Promise.all(tasks.map(p => p.catch(() => null)));
@@ -556,14 +563,13 @@ app.post('/api/email-lookup', async (req, res) => {
             console.log('❌ Holehe failed:', error.message);
         }
         
-                 // 4. Sherlock (username search across social media) + Specific Platform Checks
+                 // 4. Sherlock (email search across social media) + Specific Platform Checks
          try {
              console.log('🔍 Running Sherlock...');
-             const username = email.split('@')[0];
-             console.log('🔍 Username extracted:', username);
+             console.log('🔍 Using email for Sherlock:', email);
              
              // First run Sherlock for general search
-             const sherlockResult = await runToolIfAvailable('sherlock', [username, '--print-found', '--no-color'], (stdout) => {
+             const sherlockResult = await runToolIfAvailable('sherlock', [email, '--print-found', '--no-color'], (stdout) => {
                 console.log('🔍 Sherlock raw output length:', stdout.length);
                 console.log('🔍 Sherlock raw output preview:', stdout.substring(0, 300) + '...');
                 try {
@@ -604,7 +610,7 @@ app.post('/api/email-lookup', async (req, res) => {
                  'github', 'youtube', 'twitch', 'discord', 'telegram', 'whatsapp'
              ];
              
-             const specificResults = await runToolIfAvailable('sherlock', [username, '--print-found', '--site', specificPlatforms.join(',')], (stdout) => {
+             const specificResults = await runToolIfAvailable('sherlock', [email, '--print-found', '--site', specificPlatforms.join(',')], (stdout) => {
                  try {
                      const lines = stdout.split('\n').filter(line => line.trim() && line.includes('http'));
                      return lines.map(line => {
@@ -633,8 +639,8 @@ app.post('/api/email-lookup', async (req, res) => {
         // 5. Maigret (extended Sherlock sources)
         try {
             console.log('🔍 Running Maigret...');
-            const username = email.split('@')[0];
-            const maigretResult = await runToolIfAvailable('maigret', [username, '--no-color'], parseMaigretSimple);
+            console.log('🔍 Using email for Maigret:', email);
+            const maigretResult = await runToolIfAvailable('maigret', [email, '--no-color'], parseMaigretSimple);
             
             if (maigretResult && maigretResult.socialProfiles) {
                 console.log('✅ Maigret data received, social profiles:', maigretResult.socialProfiles.length);
@@ -823,96 +829,11 @@ app.post('/api/phone-lookup', async (req, res) => {
             console.log('❌ phone-number-api.com failed:', error.message);
         }
         
-                 // 3. Sherlock (username search across social media) + Specific Platform Checks
-         try {
-             console.log('🔍 Running Sherlock...');
-             // For phone numbers, try both with and without + symbol
-             const username = phone.replace(/[^a-zA-Z0-9+]/g, '');
-             
-             // First run Sherlock for general search
-             const sherlockResult = await runToolIfAvailable('sherlock', [username, '--print-found'], (stdout) => {
-                try {
-                    // Sherlock outputs found profiles line by line
-                    const lines = stdout.split('\n').filter(line => line.trim() && line.includes('http'));
-                                         return lines.map(line => {
-                         const match = line.match(/\[([^\]]+)\]\s*(.+)/);
-                         if (match) {
-                             // Clean the URL by removing any platform prefixes
-                             const cleanUrl = match[2].trim().replace(/^[^h]*https?:\/\//i, 'https://');
-                             return { url: cleanUrl };
-                         }
-                         // Clean the URL by removing any platform prefixes
-                         const cleanUrl = line.trim().replace(/^[^h]*https?:\/\//i, 'https://');
-                         return { url: cleanUrl };
-                     });
-                } catch (e) {
-                    return null;
-                }
-            });
-            
-                         if (sherlockResult && Array.isArray(sherlockResult)) {
-                 console.log('✅ Sherlock data received');
-                 results.social = [...new Set([...results.social, ...sherlockResult])];
-             }
-             
-             // Add specific platform checks for popular sites
-             console.log('🔍 Running specific platform checks for phone...');
-             const specificPlatforms = [
-                 'instagram', 'facebook', 'twitter', 'linkedin', 'tinder', 'bumble', 
-                 'okcupid', 'hinge', 'pinterest', 'tiktok', 'snapchat', 'reddit',
-                 'github', 'youtube', 'twitch', 'discord', 'telegram', 'whatsapp'
-             ];
-             
-             const specificResults = await runToolIfAvailable('sherlock', [username, '--print-found', '--site', specificPlatforms.join(',')], (stdout) => {
-                 try {
-                     const lines = stdout.split('\n').filter(line => line.trim() && line.includes('http'));
-                     return lines.map(line => {
-                         const match = line.match(/\[([^\]]+)\]\s*(.+)/);
-                         if (match) {
-                             const cleanUrl = match[2].trim().replace(/^[^h]*https?:\/\//i, 'https://');
-                             return { url: cleanUrl };
-                         }
-                         const cleanUrl = line.trim().replace(/^[^h]*https?:\/\//i, 'https://');
-                         return { url: cleanUrl };
-                     });
-                 } catch (e) {
-                     console.log('❌ Specific platform parsing error:', e.message);
-                     return [];
-                 }
-             });
-             
-             if (specificResults && Array.isArray(specificResults)) {
-                 console.log('✅ Specific platform checks completed for phone, found:', specificResults.length);
-                 results.social = [...new Set([...results.social, ...specificResults])];
-             }
-        } catch (error) {
-            console.log('❌ Sherlock failed:', error.message);
-        }
+                 // 3. Sherlock - SKIP for phone numbers (now requires email input)
+        console.log('⏭️ Skipping Sherlock for phone number (now requires email input)');
         
-                 // 4. Maigret (extended Sherlock sources)
-         try {
-             console.log('🔍 Running Maigret...');
-             // For phone numbers, try both with and without + symbol
-             const username = phone.replace(/[^a-zA-Z0-9+]/g, '');
-             const maigretResult = await runToolIfAvailable('maigret', [username, '--no-color'], parseMaigretSimple);
-            
-            if (maigretResult && maigretResult.socialProfiles) {
-                console.log('✅ Maigret data received, social profiles:', maigretResult.socialProfiles.length);
-                
-                // Add Maigret social profiles to results
-                const maigretProfiles = maigretResult.socialProfiles.map(url => ({ url }));
-                results.social = [...new Set([...results.social, ...maigretProfiles])];
-                
-                results.metadata.maigret = maigretResult;
-            } else {
-                console.log('❌ Maigret returned no valid data');
-            }
-            
-            // Debug: Log current social profiles
-            console.log('🔍 Total social profiles after Maigret:', results.social.length);
-        } catch (error) {
-            console.log('❌ Maigret failed:', error.message);
-        }
+        // 4. Maigret - SKIP for phone numbers (now requires email input)
+        console.log('⏭️ Skipping Maigret for phone number (now requires email input)');
         
         // 5. Holehe (phone breach checker) - SKIP for phone numbers, only works with emails
         console.log('⏭️ Skipping Holehe for phone number (only works with emails)');
@@ -1292,13 +1213,13 @@ async function isCommandAvailable(cmd) {
 const toolTemplates = {
     sherlock: {
         command: 'python3',
-        args: ['-m', 'sherlock', '<username>'],
-        placeholder: '<username>'
+        args: ['-m', 'sherlock', '<email>'],
+        placeholder: '<email>'
     },
     maigret: {
         command: 'python3',
-        args: ['-m', 'maigret', '<username>'],
-        placeholder: '<username>'
+        args: ['-m', 'maigret', '<email>'],
+        placeholder: '<email>'
     },
     holehe: {
         command: 'python3',
@@ -1360,9 +1281,13 @@ async function runToolIfAvailable(cmd, args, parseFn) {
             console.log(`❌ No user input provided for ${cmd}`);
             return null;
         }
+        // Replace placeholder with user input, then add remaining arguments
         const templateArgs = resolved.templateArgs.map((a) => typeof a === 'string' && resolved.placeholder ? a.replace(resolved.placeholder, userInput) : a);
+        const allArgs = [...templateArgs, ...args.slice(1)]; // Add all additional arguments after the first one
+        
+        console.log(`🔧 Executing: ${resolved.command} ${allArgs.join(' ')}`);
         try {
-            const { stdout, stderr } = await execFileAsync(resolved.command, templateArgs, {
+            const { stdout, stderr } = await execFileAsync(resolved.command, allArgs, {
                 timeout: 300000,
                 maxBuffer: 1024 * 1024 * 20,
                 env: { ...process.env, PYTHONUNBUFFERED: '1', NO_COLOR: '1' },
@@ -1416,115 +1341,6 @@ async function runToolIfAvailable(cmd, args, parseFn) {
 // const ghuntData = parseGHuntFromText(ghuntOutput);
 
 // PhoneInfoga Docker helper removed (Docker not used)
-
-async function runToolIfAvailable(cmd, args, parseFn) {
-    console.log(`🔧 Running tool: ${cmd} with args:`, args);
-    const resolved = await resolveToolCommand(cmd);
-    console.log(`🔍 Tool resolution result:`, resolved);
-    if (!resolved.command) {
-        console.log(`❌ Tool ${cmd} not available`);
-        return null;
-    }
-    
-    // Additional debugging for Python module execution
-    if (resolved.viaPython) {
-        console.log(`🐍 Using Python module execution: ${resolved.command} ${resolved.viaPython}`);
-    }
-    
-    const spawnCmd = resolved.command;
-    let spawnArgs;
-    
-    if (resolved.viaPython) {
-        if (resolved.viaPython.startsWith('-m ')) {
-            // Format: "-m sherlock" -> ["-m", "sherlock", ...args]
-            const moduleName = resolved.viaPython.replace('-m ', '');
-            spawnArgs = ['-m', moduleName, ...args];
-        } else if (resolved.viaPython.startsWith('-m')) {
-            // Format: "-msherlock" -> ["-m", "sherlock", ...args]
-            const moduleName = resolved.viaPython.replace('-m', '');
-            spawnArgs = ['-m', moduleName, ...args];
-        } else {
-            // Direct module name
-            spawnArgs = ['-m', resolved.viaPython, ...args];
-        }
-    } else {
-        spawnArgs = args;
-    }
-    
-    console.log(`🔧 Executing: ${spawnCmd} ${spawnArgs.join(' ')}`);
-    console.log(`🔍 Final command: ${spawnCmd} ${spawnArgs.join(' ')}`);
-    console.log(`🔍 viaPython: ${resolved.viaPython}`);
-    console.log(`🔍 Original args: ${JSON.stringify(args)}`);
-    
-    try {
-        console.log(`🔧 Executing command: ${spawnCmd} with args: ${JSON.stringify(spawnArgs)}`);
-        
-        // Enhanced environment variables for Linux/Render stdout handling
-        const env = {
-                ...process.env,
-                PYTHONUTF8: '1',
-                PYTHONIOENCODING: 'utf-8',
-            PYTHONUNBUFFERED: '1',
-            LC_ALL: 'C.UTF-8',
-            LANG: 'C.UTF-8',
-            LANGUAGE: 'C.UTF-8',
-                TERM: 'dumb',
-                NO_COLOR: '1',
-            FORCE_COLOR: '0',
-            ANSI_COLORS_DISABLED: '1',
-            CLICOLOR: '0',
-            CLICOLOR_FORCE: '0',
-            // Make cloned repos importable even if pip import fails
-            PYTHONPATH: process.env.PYTHONPATH || ''
-        };
-        
-        const { stdout, stderr } = await execFileAsync(spawnCmd, spawnArgs, {
-            timeout: 180000,
-            maxBuffer: 1024 * 1024 * 20,
-            env: env,
-            encoding: 'utf8'
-        });
-        
-        console.log(`✅ Tool ${cmd} executed successfully`);
-        console.log(`📤 stdout length: ${stdout?.length || 0}`);
-        console.log(`📤 stderr length: ${stderr?.length || 0}`);
-        
-        // Debug output for troubleshooting
-        if (stdout && stdout.length > 0) {
-            console.log(`🔍 ${cmd} stdout preview:`, stdout.substring(0, 200) + '...');
-        }
-        if (stderr && stderr.length > 0) {
-            console.log(`🔍 ${cmd} stderr preview:`, stderr.substring(0, 200) + '...');
-        }
-        
-        const parsed = parseFn(stdout, stderr);
-        if (parsed && typeof parsed === 'object') parsed.__source = cmd;
-        
-        // Debug logging for specific tools
-        if (cmd === 'phoneinfoga') {
-            console.log('🔍 PhoneInfoga raw output preview:', stdout.substring(0, 500) + '...');
-            console.log('🔍 PhoneInfoga parsed result:', parsed);
-        }
-        
-        return parsed;
-    } catch (err) {
-        console.log(`❌ Tool ${cmd} failed:`, err.message);
-        console.log(`❌ Tool ${cmd} error details:`, err);
-        
-        if (err.code === 'ENOENT') {
-            console.log(`❌ Tool ${cmd} not found in PATH. This usually means the tool is not installed or not in the system PATH.`);
-            console.log(`🔍 Current PATH: ${process.env.PATH}`);
-            console.log(`🔍 Resolved command: ${resolved.command}`);
-            console.log(`🔍 Platform: ${process.platform}`);
-        }
-        
-        if (err.code === 'ETIMEDOUT') {
-            console.log(`❌ Tool ${cmd} timed out after 3 minutes`);
-        }
-        
-        return null;
-    }
-}
 
 // -- Modular helpers for /lookup --
 async function queryPhoneInfoga(phone) {
