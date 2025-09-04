@@ -21,14 +21,18 @@ A powerful OSINT (Open Source Intelligence) tool that provides comprehensive inf
 - **Backend**: Node.js, Express.js
 - **Database**: PostgreSQL (Render) with SQLite fallback
 - **Frontend**: HTML, CSS, JavaScript
-- **OSINT Tools**: Sherlock, Maigret, PhoneInfoga, GHunt, Holehe
+- **OSINT Tools**: 
+  - 🐳 **Docker-based**: Sherlock, Maigret, Holehe, PhoneInfoga
+  - 🐍 **Python-based**: GHunt
 - **APIs**: CUFinder, IPInfo, Phone-Number-API
+- **Containerization**: Docker for OSINT tool execution
 
 ## 📋 Prerequisites
 
 - Node.js (v14 or higher)
 - npm or yarn
-- Python 3.7+ (for OSINT tools)
+- Python 3.7+ (for GHunt only)
+- Docker (for Sherlock, Maigret, Holehe, PhoneInfoga)
  
 
 ## 🔧 Installation
@@ -46,14 +50,14 @@ npm install
 
 ### 3. Install OSINT Tools
 ```bash
-# Install Python tools
-pip install sherlock-project holehe maigret ghunt
-
-# Or install individually
-pip install sherlock-project
-pip install holehe
-pip install maigret
+# Install Python tools (GHunt only)
 pip install ghunt
+
+# Docker-based tools are automatically handled:
+# - Sherlock: Uses python:3.11-slim container
+# - Maigret: Uses python:3.11-slim container  
+# - Holehe: Uses python:3.11-slim container
+# - PhoneInfoga: Uses sundowndev/phoneinfoga:latest container
 ```
 
 ### 4. Set Environment Variables
@@ -73,6 +77,28 @@ npm start
 ```
 
 The application will be available at `http://localhost:3000`
+
+## 🐳 Docker Integration
+
+This project uses Docker containers for most OSINT tools to ensure consistent execution across different environments:
+
+### Docker-based Tools
+- **Sherlock**: Username search across social media platforms
+- **Maigret**: Extended username search with additional sources
+- **Holehe**: Email breach checking
+- **PhoneInfoga**: Phone number intelligence gathering
+
+### How It Works
+1. When you submit a search query, the application automatically:
+   - Determines which tool to use based on input type
+   - Constructs the appropriate Docker command
+   - Replaces placeholders (`<username>`, `<email>`, `<phone_number>`) with your input
+   - Executes the command in a fresh container
+   - Returns the results
+
+2. **No manual Docker setup required** - the application handles everything automatically
+
+3. **Fresh containers for each execution** - ensures clean, isolated tool runs
 
 ## 📱 Usage
 
