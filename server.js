@@ -598,19 +598,6 @@ app.post('/api/email-lookup', async (req, res) => {
                 if (Array.isArray(holeheResult.leaks)) {
                     results.leaks = holeheResult.leaks;
                     console.log('✅ Found breaches:', results.leaks.length);
-                    try {
-                        // Also emit a CSV so /api/download-holehe-csv works even without -C flag
-                        const ts = Math.floor(Date.now() / 1000);
-                        const safeEmail = String(email).replace(/[^a-zA-Z0-9@._-]/g, '_');
-                        const csvName = `holehe_${ts}_${safeEmail}_results.csv`;
-                        const header = 'name,exists\n';
-                        const rows = results.leaks.map(l => `${(l.site || '').replace(/,/g,'')},${l.exists ? 'true' : 'false'}`).join('\n');
-                        fs.writeFileSync(csvName, header + rows, 'utf8');
-                        console.log('✅ Holehe CSV written:', csvName);
-                        scheduleFileCleanup(csvName);
-                    } catch (e) {
-                        console.log('⚠️ Holehe CSV write failed:', e.message);
-                    }
                 }
                 
                 // Extract social media registrations
@@ -741,13 +728,7 @@ app.post('/api/email-lookup', async (req, res) => {
             await dbManager.insertSearch(email, 'email', finalResult);
             console.log(`💾 Results stored in database with ID: ${searchId}`);
             
-            // Track any temporary files created during the search
-            const tempFiles = [
-                path.join(tempDir, `ghunt_${Date.now()}.json`),
-                path.join(tempDir, `holehe_${Date.now()}_results.csv`),
-                path.join(tempDir, `sherlock_${Date.now()}.json`),
-                path.join(tempDir, `maigret_${Date.now()}.json`)
-            ];
+            // No temp files created for tool outputs
             
             for (const tempFile of tempFiles) {
                 if (fs.existsSync(tempFile)) {
@@ -931,12 +912,7 @@ app.post('/api/phone-lookup', async (req, res) => {
             await dbManager.insertSearch(phone, 'phone', finalResult);
             console.log(`💾 Phone results stored in database with ID: ${searchId}`);
             
-            // Track any temporary files created during the search
-            const tempFiles = [
-                path.join(tempDir, `phoneinfoga_${Date.now()}.json`),
-                path.join(tempDir, `sherlock_${Date.now()}.json`),
-                path.join(tempDir, `maigret_${Date.now()}.json`)
-            ];
+            // No temp files created for tool outputs
             
             for (const tempFile of tempFiles) {
                 if (fs.existsSync(tempFile)) {
