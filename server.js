@@ -189,6 +189,17 @@ try {
             console.log('✅ Added Linux Python paths to PATH');
         }
         
+        // Debug: Check what's actually available
+        console.log('🔍 Current PATH:', process.env.PATH);
+        console.log('🔍 Checking for sherlock in PATH...');
+        try {
+            const { execSync } = require('child_process');
+            const whichSherlock = execSync('which sherlock', { encoding: 'utf8' }).trim();
+            console.log('✅ Sherlock found at:', whichSherlock);
+        } catch (e) {
+            console.log('❌ Sherlock not found in PATH');
+        }
+        
     // Set environment variables for Python tools and prevent shell issues
         process.env.PYTHONUNBUFFERED = '1';
         process.env.PYTHONIOENCODING = 'utf-8';
@@ -1323,16 +1334,14 @@ async function resolveToolCommand(cmd) {
         };
     }
 
-    // GHunt via python module
+    // GHunt via direct CLI (installed by pipx)
     if (cmd === 'ghunt') {
-        const py = await ensurePythonReady();
-        if (py) {
-        console.log(`🔍 Using Python module execution for ${cmd}: ${py} -m ${cmd}`);
-        return { command: py, viaPython: cmd };
-        } else {
-            console.log(`❌ Python not available for ${cmd}, trying direct command`);
-            return { command: 'python3', viaPython: cmd };
-        }
+        return { 
+            command: 'ghunt', 
+            viaTemplate: false, 
+            templateArgs: ['email', '<email>'],
+            placeholder: '<email>'
+        };
     }
 
     // Fallback to direct availability
