@@ -38,10 +38,16 @@ async function commandExists(cmd) {
 async function ensurePythonReady() {
     // Check for virtual environment first (preferred) - Linux path
     const venvPython = path.join(process.cwd(), 'venv', 'bin', 'python3');
+    const venvPythonAlt = path.join(process.cwd(), 'venv', 'bin', 'python');
     
     if (fs.existsSync(venvPython)) {
         console.log('✅ Using virtual environment Python:', venvPython);
         return venvPython;
+    }
+    
+    if (fs.existsSync(venvPythonAlt)) {
+        console.log('✅ Using virtual environment Python (alt):', venvPythonAlt);
+        return venvPythonAlt;
     }
     
     // Check for Windows virtual environment (for local development)
@@ -51,20 +57,36 @@ async function ensurePythonReady() {
         return venvPythonWin;
     }
     
+    // Check if we're in a virtual environment via environment variable
+    if (process.env.VIRTUAL_ENV) {
+        const venvPythonEnv = path.join(process.env.VIRTUAL_ENV, 'bin', 'python3');
+        const venvPythonEnvAlt = path.join(process.env.VIRTUAL_ENV, 'bin', 'python');
+        
+        if (fs.existsSync(venvPythonEnv)) {
+            console.log('✅ Using activated virtual environment Python:', venvPythonEnv);
+            return venvPythonEnv;
+        }
+        
+        if (fs.existsSync(venvPythonEnvAlt)) {
+            console.log('✅ Using activated virtual environment Python (alt):', venvPythonEnvAlt);
+            return venvPythonEnvAlt;
+        }
+    }
+    
     // Fallback to system Python
     if (await commandExists('python3')) {
         console.log('⚠️ Using system Python3 (virtual environment not found)');
-        console.log('💡 Run setup_python_env.sh to create virtual environment for proper tool execution');
+        console.log('💡 Virtual environment should be created during Render build process');
         return 'python3';
     }
     if (await commandExists('python')) {
         console.log('⚠️ Using system Python (virtual environment not found)');
-        console.log('💡 Run setup_python_env.sh to create virtual environment for proper tool execution');
+        console.log('💡 Virtual environment should be created during Render build process');
         return 'python';
     }
     
     console.log('❌ No Python found in system or virtual environment');
-    console.log('💡 Run setup_python_env.sh (Linux) or setup_python_env.bat (Windows) to create virtual environment');
+    console.log('💡 Virtual environment should be created during Render build process');
     return null;
 }
 
