@@ -223,7 +223,7 @@ dbManager.connect().then(async (connected) => {
 
 // Visitor tracking middleware - count only real page views with debounce per IP
 const recentVisitorByIp = new Map();
-const VISITOR_DEBOUNCE_MS = 10 * 60 * 1000; // 10 minutes
+const VISITOR_DEBOUNCE_MS = 1 * 60 * 1000; // 1 minute for testing
 app.use((req, res, next) => {
     try {
         // Count only GET requests to pages (exclude API & static assets)
@@ -245,11 +245,21 @@ app.use((req, res, next) => {
         recentVisitorByIp.set(ip, now);
 
         const userAgent = req.get('User-Agent') || 'Unknown';
-        dbManager.insertVisitor(ip, userAgent).then((success) => {
-            if (success) console.log('✅ Visitor tracked:', ips.join(', '));
-            else console.log('⚠️ Visitor tracking failed (database may not be connected)');
-        }).catch(() => {});
-    } catch {}
+        
+        // Only track visitors if database is connected
+        if (dbManager.isConnected && dbManager.db) {
+            dbManager.insertVisitor(ip, userAgent).then((success) => {
+                if (success) console.log('✅ Visitor tracked:', ips.join(', '));
+                else console.log('⚠️ Visitor tracking failed');
+            }).catch((error) => {
+                console.log('⚠️ Visitor tracking error:', error.message);
+            });
+        } else {
+            console.log('⚠️ Skipping visitor tracking - database not ready');
+        }
+    } catch (error) {
+        console.log('⚠️ Visitor tracking middleware error:', error.message);
+    }
     next();
 });
 
@@ -295,37 +305,7 @@ app.get('/lookup', async (req, res) => {
     }
 });
 
-// Unified OSINT lookup endpoint (modular, no unofficial scrapers)
-// GET /lookup?phone=+1234567890
-app.get('/lookup', async (req, res) => {
-    const phone = String(req.query.phone || '').trim();
-    if (!phone) return res.status(400).json({ error: 'Missing phone' });
 
-    try {
-        const [infoga, pna, leaks] = await Promise.all([
-            fetchFromPhoneInfoga(phone).catch(() => null),
-            fetchFromPhoneNumberApi(phone).catch(() => null),
-            fetchFromLeaksApis(phone).catch(() => null)
-        ]);
-
-        const response = {
-            phone,
-            carrier: infoga?.carrier || pna?.carrier || null,
-            country: infoga?.basic?.country || pna?.country || null,
-            line_type: infoga?.basic?.type || pna?.numberType || null,
-            formatted: pna?.formatInternational || pna?.formatE164 || null,
-            possible_name_sources: Array.isArray(infoga?.metadata?.names)
-                ? infoga.metadata.names
-                : [],
-            leak_sources: leaks?.sources || []
-        };
-
-        return res.json(response);
-    } catch (err) {
-        console.error('Lookup error:', err.message);
-        return res.status(500).json({ error: 'Lookup failed' });
-    }
-});
 
 // Aggregate OSINT endpoint
 app.post('/api/aggregate', async (req, res) => {
@@ -1053,8 +1033,12 @@ app.post('/api/ip-lookup', async (req, res) => {
 // Stats endpoint - FIXED FOR LINUX/RENDER
 app.get('/api/stats', async (req, res) => {
     try {
+        console.log('📊 Stats request received, database connected:', dbManager.isConnected);
         const visitorStats = await dbManager.getVisitorStats();
         const searchCount = await dbManager.getSearchCount();
+        
+        console.log('📊 Visitor stats:', visitorStats);
+        console.log('📊 Search count:', searchCount);
         
         res.json({
             visitors_today: visitorStats.visitors_today,
@@ -1067,6 +1051,38 @@ app.get('/api/stats', async (req, res) => {
     } catch (error) {
         console.log('❌ Stats error:', error.message);
         res.status(500).json({ error: 'Database error' });
+    }
+});
+
+// Test endpoint to manually increment visitor count
+app.post('/api/test-visitor', async (req, res) => {
+    try {
+        const testIp = 'test-' + Date.now();
+        const testUserAgent = 'Test-Bot/1.0';
+        
+        console.log('🧪 Testing visitor insertion with IP:', testIp);
+        const success = await dbManager.insertVisitor(testIp, testUserAgent);
+        
+        if (success) {
+            console.log('✅ Test visitor inserted successfully');
+            const stats = await dbManager.getVisitorStats();
+            res.json({
+                success: true,
+                message: 'Test visitor added',
+                new_stats: stats
+            });
+        } else {
+            res.status(500).json({
+                success: false,
+                message: 'Failed to insert test visitor'
+            });
+        }
+    } catch (error) {
+        console.log('❌ Test visitor error:', error.message);
+        res.status(500).json({
+            success: false,
+            error: error.message
+        });
     }
 });
 
