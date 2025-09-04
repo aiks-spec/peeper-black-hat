@@ -6,6 +6,7 @@ services:
       pip3 install --upgrade pip
       pip3 install -r requirements.txt
       npm install
+      echo "🐳 OSINT tools (Sherlock, Maigret, Holehe, PhoneInfoga) will use Docker containers"
     startCommand: chmod +x start.sh && ./start.sh
     envVars:
       - key: NODE_ENV
