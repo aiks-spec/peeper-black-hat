@@ -1324,10 +1324,24 @@ async function resolveToolCommand(cmd) {
             phoneinfoga: 'phoneinfoga',
         };
         const cliName = cliMap[cmd] || cmd;
-        const command = cliName;
+        const resolvedCli = resolveCliExecutable(cliName);
+        if (!resolvedCli) {
+            if (cmd === 'sherlock') {
+                throw new Error('Sherlock CLI not found. Ensure pipx installed it and PATH exposes ~/.local/bin');
+            }
+        }
+        const command = resolvedCli || cliName;
         const placeholder = toolTemplates[cmd].placeholder;
         // GHunt requires subcommand "email"
-        const baseArgs = cmd === 'ghunt' ? ['email', placeholder] : [placeholder];
+        let baseArgs = cmd === 'ghunt' ? ['email', placeholder] : [placeholder];
+        // Maigret defaults for Render stability
+        if (cmd === 'maigret') {
+            baseArgs = ['--timeout', '20', '--max-connections', '10', placeholder];
+        }
+        // PhoneInfoga preferred syntax
+        if (cmd === 'phoneinfoga') {
+            baseArgs = ['scan', '-n', placeholder];
+        }
         return {
             command,
             viaTemplate: true,
@@ -2525,6 +2539,37 @@ function cleanupGeneratedImages() {
         if (removed > 0) console.log(`🧹 Removed ${removed} generated image files`);
     } catch (e) {
         console.log('⚠️ Image cleanup error:', e.message);
+    }
+}
+
+// Resolve CLI executables installed via pipx (or system) robustly
+function resolveCliExecutable(cliName) {
+    try {
+        const candidates = [];
+        const envPath = process.env.PATH || '';
+        const pathSep = process.platform === 'win32' ? ';' : ':';
+        const envPaths = envPath.split(pathSep).filter(Boolean);
+        candidates.push(...envPaths);
+        const home = process.env.HOME || process.env.USERPROFILE || '';
+        const extraLinux = [
+            path.join(home, '.local', 'bin'),
+            '/usr/local/bin',
+            '/usr/bin',
+            '/bin'
+        ];
+        for (const p of extraLinux) {
+            if (!candidates.includes(p)) candidates.push(p);
+        }
+        // Check existence
+        for (const base of candidates) {
+            const full = path.join(base, cliName);
+            try {
+                if (fs.existsSync(full)) return full;
+            } catch {}
+        }
+        return null;
+    } catch {
+        return null;
     }
 }
 
