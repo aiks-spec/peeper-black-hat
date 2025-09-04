@@ -1,67 +1,43 @@
 services:
   - type: web
     name: osint-lookup-engine
-    env: docker
-    plan: starter
-    dockerfilePath: ./Dockerfile
-    startCommand: npm start
+    env: node
+    buildCommand: |
+      pip3 install --upgrade pip
+      pip3 install -r requirements.txt
+      npm install
+    startCommand: chmod +x start.sh && ./start.sh
     envVars:
       - key: NODE_ENV
         value: production
       - key: PORT
-        value: 3000
+        value: 10000
       - key: DB_TYPE
-        value: postgresql
+        value: postgres
       - key: DATABASE_URL
-        value: postgresql://peeper_aiks_database_user:kUs7g6cBDJTW6DPkaRebaMPa3E5Z6aGg@dpg-d2qnqep5pdvs738e09cg-a/peeper_aiks_database
-      - key: CUFINDER_API_KEY
-        sync: false
-      - key: IPINFO_TOKEN
-        sync: false
-      - key: DEHASHED_EMAIL
-        sync: false
-      - key: DEHASHED_API_KEY
-        sync: false
-      - key: PYTHON_PATH
-        value: python3
-      - key: PATH
-        value: /usr/local/bin:/usr/bin:/bin
-      - key: PYTHONPATH
-        value: /usr/local/lib/python3.11/dist-packages:/usr/lib/python3/dist-packages
-      - key: PYTHONUNBUFFERED
-        value: "1"
-      - key: PYTHONIOENCODING
-        value: utf-8
-      - key: PYTHONUTF8
-        value: "1"
-      - key: LC_ALL
-        value: C.UTF-8
-      - key: LANG
-        value: C.UTF-8
-      - key: LANGUAGE
-        value: C.UTF-8
-      - key: TERM
-        value: dumb
-      - key: NO_COLOR
-        value: "1"
-      - key: FORCE_COLOR
-        value: "0"
-      - key: ANSI_COLORS_DISABLED
-        value: "1"
-      - key: CLICOLOR
-        value: "0"
-      - key: CLICOLOR_FORCE
-        value: "0"
-      - key: BASH_ENV
-        value: ""
-      - key: ENV
-        value: ""
+        fromDatabase:
+          name: osint-db
+          property: connectionString
+      - key: DB_PATH
+        value: /tmp/osint.db
+      - key: CORS_ORIGIN
+        value: "*"
+      - key: TIMEOUT
+        value: 30000
+      - key: MAX_FILE_SIZE
+        value: 10485760
+      - key: DEBUG
+        value: "false"
+      - key: LOG_LEVEL
+        value: info
+      - key: CLEANUP_DELAY
+        value: 3600000
+      - key: GHUNT_TOKEN
+        value: oauth2_4/0AVMBsJihaCHpsqoEm3L-M7XKc_3kEWEVvqBP4Jzm14hCBOsHKqcI9mm-y0GA0iVO_6jtLw
+      - key: GHUNT_COOKIES_B64
+        value: eyJjb29raWVzIjp7IlNJRCI6ImcuYTAwMDB3anlHMXVCT0FKQWQtUGVIWlUwVFo4RkZGeFdZenZzRnphYTBON1NEZElRcHZGTjZsYlIyY010Z0VUTlpLXy1HSGpOTHdBQ2dZS0FYb1NBUkFTRlFIR1gyTWlkemlvN0gxU2pEazBpcm4tUEN3MzN4b1ZBVUY4eUtvbXZncmZKSWh0bVJRYTBwTlVjd3YyMDA3NiIsIl9fU2VjdXJlLTNQU0lEIjoiZy5hMDAwMHdqeUcxdUJPQUpBZC1QZUhaVTBUWjhGRkZ4V1l6dnNGemFhME43U0RkSVFwdkZOMTNYX2cxRDB3SXVSTi1lT3pRTnpjQUFDZ1lLQWNFU0FSQVNGUUhHWDJNaUdTY0lpMktxa3A1WVgzRVZBUU40TVJvVkFVRjh5S3BSWGxxY3huQlE2aGNQTmtCVjZFRngwMDc2IiwiTFNJRCI6Im8ubXlhY2NvdW50Lmdvb2dsZS5jb218cy5JTnxzLnlvdXR1YmU6Zy5hMDAwMHdqeUc2dmJ1LTRyWUJHSTZ1aE5hU1ZsekVIZjN4OGJHV2tTdmYwNWxtS2J5eEFSRGpCbVJlSmd2TUkybDlaQmVZdjAyd0FDZ1lLQWQwU0FSQVNGUUhHWDJNaUdTbU1yQ1dtMUhCcU5hVnVhQ3A5S1JvVkFVRjh5S3F5R0MxdHJDUmp3R204clFGcTJHTnYwMDc2IiwiSFNJRCI6IkFkYlQ4aXZxVzMwbjBMQkpwIiwiU1NJRCI6IkE0TkNnYkEzTVNYQWhCVV8tIiwiQVBJU0lEIjoiMU9oOEc1Rm5XV1FCY3ZrdC9BODBGVmVBbjltdUU5aUlZWCIsIlNBUElTSUQiOiItTExlWnNFNmJGTlFMY042L0FCMG1rTF9xNTJqQ0ZwTWUxIn0sIm9hdXRoX3Rva2VuIjoib2F1dGgyXzQvMEFWTUJzSmloYUNIcHNxb0VtM0wtTTdYS2NfM2tFV0VWdnFCUDRKem0xNGhDQk9zSEtxY0k5bW0teTBHQTBpVk9fNmp0THcifQ==
 
-      - key: RESET_COUNTS
-        value: "true"
-    healthCheckPath: /
-    healthCheckTimeout: 300
-    autoDeploy: true
-    branch: main
-    numInstances: 1
-    dockerContext: .
+databases:
+  - name: osint-db
+    databaseName: osint
+    user: osint
