@@ -695,6 +695,29 @@ app.post('/api/email-lookup', async (req, res) => {
             metadata: results.metadata,
             timestamp: new Date().toISOString()
         };
+        // Build combined clickable links from socialProfiles and any URL-like leaks
+        try {
+            const socialLinks = Array.isArray(finalResult.socialProfiles)
+                ? finalResult.socialProfiles.map(s => (typeof s === 'string' ? s : s.url)).filter(Boolean)
+                : [];
+            const leakLinks = Array.isArray(finalResult.breaches)
+                ? finalResult.breaches
+                    .map(b => {
+                        const site = typeof b === 'string' ? b : b.site;
+                        if (!site) return null;
+                        if (/^https?:\/\//i.test(site)) return site;
+                        // If it looks like a domain, make it clickable root link
+                        if (/^[a-z0-9.-]+\.[a-z]{2,}$/i.test(site)) return `https://${site}`;
+                        return null;
+                    })
+                    .filter(Boolean)
+                : [];
+            const all = Array.from(new Set([...
+                socialLinks,
+                ...leakLinks
+            ]));
+            finalResult.links = all;
+        } catch {}
         
         // Store final results in database
         try {
@@ -2156,6 +2179,26 @@ function mergeAggregatedResults(context, parts) {
         sources,
         confidence: sources.length >= 2 ? 'high' : 'medium'
     }));
+
+    // Build a flat list of clickable links from socialProfiles and any URL-like leaks
+    try {
+        const socialLinks = aggregated.socialProfiles.map(s => s.url).filter(Boolean);
+        const leakLinks = Array.isArray(aggregated.leaks)
+            ? aggregated.leaks
+                .map(item => {
+                    const site = typeof item === 'string' ? item : item.site;
+                    if (!site) return null;
+                    if (/^https?:\/\//i.test(site)) return site;
+                    if (/^[a-z0-9.-]+\.[a-z]{2,}$/i.test(site)) return `https://${site}`;
+                    return null;
+                })
+                .filter(Boolean)
+            : [];
+        aggregated.links = Array.from(new Set([...
+            socialLinks,
+            ...leakLinks
+        ]));
+    } catch {}
 
     // Build leaks with confidence
     aggregated.leaks = Array.from(leaksToSources.entries()).map(([key, sources]) => {
