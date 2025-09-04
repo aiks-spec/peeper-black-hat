@@ -1315,14 +1315,7 @@ async function resolveToolCommand(cmd) {
     
     // Template-driven tools (native Python execution)
     if (toolTemplates[cmd]) {
-        // Use CLI entrypoints installed in venv: sherlock, holehe, maigret, ghunt, phoneinfoga
-        const py = await ensurePythonReady();
-        let venvBin = '';
-        if (py) {
-            // venv/bin/python3 → venv/bin
-            const pyDir = path.dirname(py);
-            venvBin = pyDir;
-        }
+        // Use CLI entrypoints provided by pipx (~/.local/bin): sherlock, holehe, maigret, ghunt, phoneinfoga
         const cliMap = {
             sherlock: 'sherlock',
             holehe: 'holehe',
@@ -1331,7 +1324,7 @@ async function resolveToolCommand(cmd) {
             phoneinfoga: 'phoneinfoga',
         };
         const cliName = cliMap[cmd] || cmd;
-        const command = venvBin ? path.join(venvBin, cliName) : cliName;
+        const command = cliName;
         const placeholder = toolTemplates[cmd].placeholder;
         // GHunt requires subcommand "email"
         const baseArgs = cmd === 'ghunt' ? ['email', placeholder] : [placeholder];
