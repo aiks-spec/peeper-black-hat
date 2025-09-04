@@ -1301,7 +1301,7 @@ async function resolveToolCommand(cmd) {
         let baseArgs = cmd === 'ghunt' ? ['email', placeholder] : [placeholder];
         // Maigret defaults for Render stability with JSON output
         if (cmd === 'maigret') {
-            baseArgs = ['--timeout', '20', '-n', '10', placeholder];
+            baseArgs = ['--timeout', '30', '-n', '20', '--verbose', '--print-errors', placeholder];
         }
         // PhoneInfoga preferred syntax
         if (cmd === 'phoneinfoga') {
@@ -1375,8 +1375,8 @@ async function runToolIfAvailable(cmd, args, parseFn) {
         // Add JSON output file for tools that support it
         if (jsonOutputFile && ['maigret', 'holehe', 'sherlock'].includes(cmd)) {
             if (cmd === 'maigret') {
-                // Maigret uses --folderoutput for directory and -J for JSON format
-                allArgs = [...allArgs, '--folderoutput', path.dirname(jsonOutputFile), '-J', 'simple'];
+                // Try without JSON output first to see if that helps
+                console.log(`⚠️ Maigret: Skipping JSON output for now, using stdout only`);
             } else if (cmd === 'holehe') {
                 // Holehe doesn't support JSON output, just use stdout
                 console.log(`⚠️ Holehe doesn't support JSON output, using stdout parsing`);
@@ -1417,6 +1417,18 @@ async function runToolIfAvailable(cmd, args, parseFn) {
                 console.log(`✅ Tool ${cmd} parsed from stdout`);
             } else if (!result) {
                 result = stdout;
+            }
+            
+            // Debug output for Maigret
+            if (cmd === 'maigret') {
+                console.log(`🔍 Maigret stdout length: ${stdout.length}`);
+                console.log(`🔍 Maigret stderr length: ${stderr.length}`);
+                if (stdout.length > 0) {
+                    console.log(`🔍 Maigret stdout preview: ${stdout.substring(0, 500)}...`);
+                }
+                if (stderr.length > 0) {
+                    console.log(`🔍 Maigret stderr: ${stderr.substring(0, 500)}...`);
+                }
             }
             
             if (result && typeof result === 'object') result.__source = cmd;
