@@ -19,9 +19,18 @@ services:
       
       echo "⬆️ Upgrading pip..."
       pip install --upgrade pip
-      
-      echo "📚 Installing Python packages from requirements.txt..."
-      pip install -r requirements.txt
+
+      echo "📦 Installing pipx..."
+      python3 -m pip install --user pipx || pip install --user pipx
+      python3 -m pipx ensurepath || ~/.local/bin/pipx ensurepath || true
+      export PATH="$HOME/.local/bin:$PATH"
+
+      echo "📚 Installing OSINT tools via pipx..."
+      pipx install sherlock-project || true
+      pipx install holehe || true
+      pipx install ghunt || true
+      pipx install maigret || true
+      pipx install phoneinfoga || true
       
       echo "🔍 Verifying installations and command availability..."
       python -c "import sherlock; print('✅ Sherlock module installed')" || echo "❌ Sherlock module failed"
@@ -31,13 +40,19 @@ services:
       python -c "import phoneinfoga; print('✅ PhoneInfoga module installed')" || echo "❌ PhoneInfoga module failed"
       
       echo "🔍 Checking command availability..."
+      export PATH="$HOME/.local/bin:$PATH"
       which sherlock && echo "✅ Sherlock command available" || echo "❌ Sherlock command not found"
       which maigret && echo "✅ Maigret command available" || echo "❌ Maigret command not found"
       which holehe && echo "✅ Holehe command available" || echo "❌ Holehe command not found"
       which phoneinfoga && echo "✅ PhoneInfoga command available" || echo "❌ PhoneInfoga command not found"
+      which ghunt && echo "✅ GHunt command available" || echo "❌ GHunt command not found"
       
-      echo "🔍 Final verification - all packages..."
-      python -c "import sherlock, maigret, holehe, ghunt, phoneinfoga; print('✅ All packages installed successfully')" || echo "❌ Some packages failed to install"
+      echo "🔍 Final verification - CLI tools via pipx..."
+      sherlock --help >/dev/null 2>&1 && echo "✅ sherlock ok" || echo "❌ sherlock failed"
+      holehe --help >/dev/null 2>&1 && echo "✅ holehe ok" || echo "❌ holehe failed"
+      ghunt --help >/dev/null 2>&1 && echo "✅ ghunt ok" || echo "❌ ghunt failed"
+      maigret --help >/dev/null 2>&1 && echo "✅ maigret ok" || echo "❌ maigret failed"
+      phoneinfoga --help >/dev/null 2>&1 && echo "✅ phoneinfoga ok" || echo "❌ phoneinfoga failed"
       
       echo "🔍 Testing module execution..."
       python -m sherlock --help >/dev/null 2>&1 && echo "✅ Sherlock module executable" || echo "❌ Sherlock module not executable"
