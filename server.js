@@ -36,9 +36,32 @@ async function commandExists(cmd) {
 }
 
 async function ensurePythonReady() {
-    if (await commandExists('python3')) return 'python3';
-    if (await commandExists('python')) return 'python';
-    console.log('❌ No python found in system');
+    // Check for virtual environment first (preferred)
+    const venvPython = path.join(process.cwd(), 'venv', 'bin', 'python3');
+    const venvPythonWin = path.join(process.cwd(), 'venv', 'Scripts', 'python.exe');
+    
+    if (fs.existsSync(venvPython)) {
+        console.log('✅ Using virtual environment Python:', venvPython);
+        return venvPython;
+    }
+    
+    if (fs.existsSync(venvPythonWin)) {
+        console.log('✅ Using virtual environment Python (Windows):', venvPythonWin);
+        return venvPythonWin;
+    }
+    
+    // Fallback to system Python
+    if (await commandExists('python3')) {
+        console.log('✅ Using system Python3');
+        return 'python3';
+    }
+    if (await commandExists('python')) {
+        console.log('✅ Using system Python');
+        return 'python';
+    }
+    
+    console.log('❌ No Python found in system or virtual environment');
+    console.log('💡 Run setup_python_env.sh (Linux) or setup_python_env.bat (Windows) to create virtual environment');
     return null;
 }
 
@@ -375,8 +398,8 @@ app.post('/api/aggregate', async (req, res) => {
             // Sherlock and Maigret now require email input, skip for username queries
             // Consider treating username as email if it contains @ symbol
             if (trimmed.includes('@')) {
-                tasks.push(runToolIfAvailable('sherlock', [trimmed, '--print-found', '--no-color'], parseSherlock));
-                tasks.push(runToolIfAvailable('maigret', [trimmed, '--no-color'], parseMaigretSimple));
+            tasks.push(runToolIfAvailable('sherlock', [trimmed, '--print-found', '--no-color'], parseSherlock));
+                         tasks.push(runToolIfAvailable('maigret', [trimmed, '--no-color'], parseMaigretSimple));
             }
         }
 
@@ -1236,18 +1259,38 @@ const toolTemplates = {
 // Extend resolver to map to tool templates for these tools
 async function resolveToolCommand(cmd) {
     console.log(`🔍 Resolving tool command for: ${cmd}`);
-
+    
     // Template-driven tools (native Python execution)
     if (toolTemplates[cmd]) {
-        return { command: toolTemplates[cmd].command, viaTemplate: true, templateArgs: toolTemplates[cmd].args, placeholder: toolTemplates[cmd].placeholder };
+        const py = await ensurePythonReady();
+        if (py) {
+            // Use virtual environment Python if available
+            const templateArgs = toolTemplates[cmd].args.map(arg => 
+                arg === toolTemplates[cmd].command ? py : arg
+            );
+            return { 
+                command: py, 
+                viaTemplate: true, 
+                templateArgs: templateArgs, 
+                placeholder: toolTemplates[cmd].placeholder 
+            };
+        } else {
+            // Fallback to original template
+            return { 
+                command: toolTemplates[cmd].command, 
+                viaTemplate: true, 
+                templateArgs: toolTemplates[cmd].args, 
+                placeholder: toolTemplates[cmd].placeholder 
+            };
+        }
     }
 
     // GHunt via python module
     if (cmd === 'ghunt') {
         const py = await ensurePythonReady();
         if (py) {
-            console.log(`🔍 Using Python module execution for ${cmd}: ${py} -m ${cmd}`);
-            return { command: py, viaPython: cmd };
+        console.log(`🔍 Using Python module execution for ${cmd}: ${py} -m ${cmd}`);
+        return { command: py, viaPython: cmd };
         } else {
             console.log(`❌ Python not available for ${cmd}, trying direct command`);
             return { command: 'python3', viaPython: cmd };
@@ -1257,8 +1300,8 @@ async function resolveToolCommand(cmd) {
     // Fallback to direct availability
     const ok = await isCommandAvailable(cmd);
     console.log(`🔍 Direct command availability for ${cmd}: ${ok}`);
-    if (ok) return { command: cmd, viaPython: false };
-
+        if (ok) return { command: cmd, viaPython: false };
+        
     // Final fallback
     console.log(`🔍 Using final fallback for ${cmd}: python3 -m ${cmd}`);
     return { command: 'python3', viaPython: cmd };
@@ -1273,7 +1316,7 @@ async function runToolIfAvailable(cmd, args, parseFn) {
         console.log(`❌ Tool ${cmd} not available`);
         return null;
     }
-
+    
     // Template execution branch (native Python)
     if (resolved.viaTemplate) {
         const userInput = args[0] || '';
