@@ -23,14 +23,6 @@ services:
       echo "📚 Installing Python packages from requirements.txt..."
       pip install -r requirements.txt
       
-      # Ensure Sherlock is available as a script
-      if [ ! -d sherlock ]; then
-        echo "🔧 Cloning Sherlock repository..."
-        git clone https://github.com/sherlock-project/sherlock.git
-        echo "📚 Installing Sherlock requirements..."
-        source venv/bin/activate && pip install -r sherlock/requirements.txt || pip install -r sherlock/requirements.txt
-      fi
-      
       echo "🔍 Verifying installations and command availability..."
       python -c "import sherlock; print('✅ Sherlock module installed')" || echo "❌ Sherlock module failed"
       python -c "import maigret; print('✅ Maigret module installed')" || echo "❌ Maigret module failed"
@@ -48,7 +40,7 @@ services:
       python -c "import sherlock, maigret, holehe, ghunt, phoneinfoga; print('✅ All packages installed successfully')" || echo "❌ Some packages failed to install"
       
       echo "🔍 Testing module execution..."
-      python -m sherlock_project --help >/dev/null 2>&1 && echo "✅ Sherlock module executable" || echo "❌ Sherlock module not executable"
+      python -m sherlock --help >/dev/null 2>&1 && echo "✅ Sherlock module executable" || echo "❌ Sherlock module not executable"
       python -m maigret --help >/dev/null 2>&1 && echo "✅ Maigret module executable" || echo "❌ Maigret module not executable"
       python -m holehe --help >/dev/null 2>&1 && echo "✅ Holehe module executable" || echo "❌ Holehe module not executable"
       python -m phoneinfoga --help >/dev/null 2>&1 && echo "✅ PhoneInfoga module executable" || echo "❌ PhoneInfoga module not executable"
