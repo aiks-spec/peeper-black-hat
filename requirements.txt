@@ -1,4 +1,5 @@
-sherlock-project
-maigret
-holehe
+# OSINT tools now use Docker containers
+# sherlock-project - using Docker
+# maigret - using Docker  
+# holehe - using Docker
 ghunt
