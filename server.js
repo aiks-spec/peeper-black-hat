@@ -578,7 +578,7 @@ app.post('/api/email-lookup', async (req, res) => {
                 
                                  // Check if CSV file was created and schedule cleanup
                  const csvFiles = fs.readdirSync('.').filter(f => f.startsWith('holehe_') && f.endsWith('_results.csv'));
-                 console.log('🔍 Holehe CSV files found after execution:', csvFiles);
+                 console.log('🔍 CSV files found after execution:', csvFiles);
                  
                  // Schedule cleanup for all CSV files
                  csvFiles.forEach(csvFile => {
@@ -1681,13 +1681,20 @@ function parseHolehe(stdout) {
             }
             
             const out = [];
+            const isDomainLike = (s) => {
+                if (!s) return false;
+                const cleaned = s.trim();
+                if (/email used|not used|rate limit/i.test(cleaned)) return false;
+                if (/^https?:\/\//i.test(cleaned)) return true;
+                return /^[a-z0-9.-]+\.[a-z]{2,}$/i.test(cleaned);
+            };
             
             for (let i = 1; i < lines.length; i++) {
                 const cols = lines[i].split(',');
                 const site = (cols[nameIdx] || '').trim();
                 const existsVal = (cols[existsIdx] || '').trim().toLowerCase();
                 const exists = existsVal === 'true' || existsVal === '[+]' || existsVal === 'yes';
-                if (site && exists) out.push({ site, exists: true });
+                if (site && exists && isDomainLike(site)) out.push({ site, exists: true });
             }
             
             console.log('✅ Holehe found breaches from CSV:', out.length);
@@ -1706,11 +1713,18 @@ function parseHolehe(stdout) {
         try {
             const lines = String(stdout || '').split(/\r?\n/).filter(Boolean);
             const out = [];
+            const isDomainLike = (s) => {
+                if (!s) return false;
+                const cleaned = s.trim();
+                if (/email used|not used|rate limit/i.test(cleaned)) return false;
+                if (/^https?:\/\//i.test(cleaned)) return true;
+                return /^[a-z0-9.-]+\.[a-z]{2,}$/i.test(cleaned);
+            };
             lines.forEach(line => {
                 if (/\[\+\]/.test(line)) {
                     const m = line.match(/\[\+\]\s*([^:]+)\s*:?.*/);
                     const site = m ? m[1].trim() : null;
-                    if (site) out.push({ site, exists: true });
+                    if (site && isDomainLike(site)) out.push({ site, exists: true });
                 }
             });
             if (out.length) return { leaks: out };
