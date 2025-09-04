@@ -6,7 +6,16 @@ services:
       # Make setup scripts executable
       chmod +x setup_python_env.sh start_with_venv.sh
       # Create virtual environment and install Python dependencies
-      ./setup_python_env.sh
+      echo "🐍 Creating Python virtual environment..."
+      python3 -m venv venv
+      echo "🔧 Activating virtual environment..."
+      source venv/bin/activate
+      echo "⬆️ Upgrading pip..."
+      pip install --upgrade pip
+      echo "📚 Installing Python packages..."
+      pip install -r requirements.txt
+      echo "🔍 Verifying installations..."
+      python -c "import sherlock, maigret, holehe, ghunt, phoneinfoga" && echo "✅ All packages installed successfully"
       # Install Node.js dependencies
       npm install
     startCommand: ./start_with_venv.sh
