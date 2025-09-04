@@ -1315,22 +1315,30 @@ async function resolveToolCommand(cmd) {
     
     // Template-driven tools (native Python execution)
     if (toolTemplates[cmd]) {
-        // Use python -m <module> style to match Windows usage, inside venv
+        // Use CLI entrypoints installed in venv: sherlock, holehe, maigret, ghunt, phoneinfoga
         const py = await ensurePythonReady();
-        const command = py || 'python3';
-        const placeholder = toolTemplates[cmd].placeholder;
-        // Map template name to module invocation
-        const moduleMap = {
-            sherlock: ['-m', 'sherlock'],
-            holehe: ['-m', 'holehe'],
-            maigret: ['-m', 'maigret'],
-            phoneinfoga: ['-m', 'phoneinfoga']
+        let venvBin = '';
+        if (py) {
+            // venv/bin/python3 → venv/bin
+            const pyDir = path.dirname(py);
+            venvBin = pyDir;
+        }
+        const cliMap = {
+            sherlock: 'sherlock',
+            holehe: 'holehe',
+            maigret: 'maigret',
+            ghunt: 'ghunt',
+            phoneinfoga: 'phoneinfoga',
         };
-        const baseArgs = moduleMap[cmd] || [];
+        const cliName = cliMap[cmd] || cmd;
+        const command = venvBin ? path.join(venvBin, cliName) : cliName;
+        const placeholder = toolTemplates[cmd].placeholder;
+        // GHunt requires subcommand "email"
+        const baseArgs = cmd === 'ghunt' ? ['email', placeholder] : [placeholder];
         return {
             command,
             viaTemplate: true,
-            templateArgs: baseArgs.concat(placeholder),
+            templateArgs: baseArgs,
             placeholder
         };
     }
