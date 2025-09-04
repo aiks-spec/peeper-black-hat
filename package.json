@@ -6,7 +6,7 @@
   "scripts": {
     "start": "node server.js",
     "dev": "nodemon server.js",
-    "build": "echo 'Build completed - using Docker for tool installation'"
+    "build": "echo 'Build completed - using requirements.txt for Python tool installation'"
   },
   "engines": {
     "node": "20.16.0"
