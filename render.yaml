@@ -7,22 +7,29 @@ services:
       echo "🐍 Checking Python3 availability..."
       python3 --version || (echo "❌ Python3 not found" && exit 1)
 
-      echo "📦 Installing pipx..."
-      pip install pipx || python3 -m pip install --user pipx || pip install --user pipx
+      echo "🐍 Creating and activating Python virtual environment (.venv)..."
+      python3 -m venv .venv
+      . .venv/bin/activate
+      echo "⬆️ Upgrading pip inside venv..."
+      pip install --upgrade pip
+
+      echo "📚 Installing OSINT tools into .venv..."
+      pip install ghunt holehe sherlock-project maigret phoneinfoga || true
+
+      echo "📚 (Optional) Installing OSINT tools via pipx as fallback..."
+      pip install pipx || python3 -m pip install --user pipx || true
       python3 -m pipx ensurepath || ~/.local/bin/pipx ensurepath || true
       export PATH="$HOME/.local/bin:$PATH"
-      echo "🔍 PATH after pipx setup: $PATH"
+      pipx install sherlock-project --yes || true
+      pipx install holehe --yes || true
+      pipx install ghunt --yes || true
+      pipx install maigret --yes || true
+      pipx install phoneinfoga --yes || true
 
-      echo "📚 Installing OSINT tools via pipx..."
-      pipx install sherlock-project --yes || pipx install sherlock-project || true
-      pipx install holehe --yes || pipx install holehe || true
-      pipx install ghunt --yes || pipx install ghunt || true
-      pipx install maigret --yes || pipx install maigret || true
-      pipx install phoneinfoga --yes || pipx install phoneinfoga || true
-
-      echo "🔑 Fixing permissions on pipx shims..."
+      echo "🔑 Fixing permissions on venv and pipx shims..."
       chmod +x "$HOME/.local/bin"/* || true
       chmod +x "/root/.local/bin"/* || true
+      chmod +x ".venv/bin"/* || true
 
       echo "🔍 Checking command availability..."
       export PATH="$HOME/.local/bin:$PATH"
@@ -44,7 +51,7 @@ services:
       npm install
 
       echo "✅ Build process completed successfully"
-    startCommand: export PATH="/root/.local/bin:$HOME/.local/bin:/opt/render/project/src/.venv/bin:/usr/local/bin:/usr/bin:$PATH" && npm start
+    startCommand: export PATH="/opt/render/project/src/.venv/bin:/root/.local/bin:$HOME/.local/bin:/usr/local/bin:/usr/bin:$PATH" && npm start
     envVars:
       - key: NODE_ENV
         value: production
