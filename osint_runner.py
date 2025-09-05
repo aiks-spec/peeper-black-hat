@@ -1,19 +1,18 @@
 #!/usr/bin/env python3
 """
-OSINT Tools Runner
+OSINT Tools Runner for Render Production
 Creates a virtual environment, installs OSINT tools, and runs them on an email.
-Works on Linux without root permissions or Docker.
+Optimized for Linux environment without root permissions or Docker.
 """
 
 import os
 import sys
 import subprocess
 import venv
-import tempfile
-import shutil
+import json
 from pathlib import Path
 
-def run_command(cmd, cwd=None, timeout=300):
+def run_command(cmd, cwd=None, timeout=600):
     """Run a command and return stdout, stderr, and return code."""
     try:
         result = subprocess.run(
@@ -22,7 +21,8 @@ def run_command(cmd, cwd=None, timeout=300):
             cwd=cwd,
             capture_output=True, 
             text=True, 
-            timeout=timeout
+            timeout=timeout,
+            env={**os.environ, 'PYTHONUNBUFFERED': '1', 'NO_COLOR': '1'}
         )
         return result.stdout, result.stderr, result.returncode
     except subprocess.TimeoutExpired:
@@ -50,17 +50,9 @@ def get_python_executable(venv_path):
     else:  # Linux/Unix
         return venv_path / "bin" / "python"
 
-def get_pip_executable(venv_path):
-    """Get the pip executable path for the virtual environment."""
-    if os.name == 'nt':  # Windows
-        return venv_path / "Scripts" / "pip.exe"
-    else:  # Linux/Unix
-        return venv_path / "bin" / "pip"
-
 def install_packages(venv_path):
     """Install required packages in the virtual environment."""
     python_exe = get_python_executable(venv_path)
-    pip_exe = get_pip_executable(venv_path)
     
     packages = [
         "ghunt",
@@ -72,7 +64,7 @@ def install_packages(venv_path):
     print("📦 Installing packages...")
     for package in packages:
         print(f"Installing {package}...")
-        stdout, stderr, returncode = run_command(f'"{python_exe}" -m pip install {package}', timeout=300)
+        stdout, stderr, returncode = run_command(f'"{python_exe}" -m pip install {package} --quiet', timeout=600)
         if returncode == 0:
             print(f"✅ {package} installed successfully")
         else:
@@ -87,7 +79,7 @@ def extract_username_from_email(email):
     return email
 
 def run_osint_tools(venv_path, email):
-    """Run all OSINT tools on the provided email."""
+    """Run all OSINT tools on the provided email and return structured results."""
     python_exe = get_python_executable(venv_path)
     username = extract_username_from_email(email)
     
@@ -118,26 +110,45 @@ def run_osint_tools(venv_path, email):
     print(f"👤 Username extracted: {username}")
     print("=" * 60)
     
+    results = {}
+    
     for tool in tools:
         print(f"\n🔧 Running {tool['name']} ({tool['description']})")
         print("-" * 40)
         
-        stdout, stderr, returncode = run_command(tool['command'], timeout=300)
+        stdout, stderr, returncode = run_command(tool['command'], timeout=600)
         
         if returncode == 0:
             print("✅ Tool completed successfully")
             if stdout.strip():
                 print("📄 Output:")
                 print(stdout)
+                results[tool['name'].lower()] = {
+                    "success": True,
+                    "output": stdout.strip(),
+                    "error": None
+                }
             else:
                 print("ℹ️  No output generated")
+                results[tool['name'].lower()] = {
+                    "success": True,
+                    "output": "No results found",
+                    "error": None
+                }
         else:
             print(f"❌ Tool failed with return code {returncode}")
             if stderr.strip():
                 print("📄 Error output:")
                 print(stderr)
+            results[tool['name'].lower()] = {
+                "success": False,
+                "output": None,
+                "error": stderr.strip() if stderr.strip() else f"Tool failed with return code {returncode}"
+            }
         
         print("-" * 40)
+    
+    return results
 
 def main():
     """Main function."""
@@ -153,7 +164,7 @@ def main():
         print("❌ Invalid email format")
         sys.exit(1)
     
-    print("🚀 OSINT Tools Runner")
+    print("🚀 OSINT Tools Runner - Production Mode")
     print("=" * 60)
     
     try:
@@ -164,11 +175,23 @@ def main():
         install_packages(venv_path)
         
         # Run OSINT tools
-        run_osint_tools(venv_path, email)
+        results = run_osint_tools(venv_path, email)
         
         print("\n✅ OSINT analysis completed!")
         print(f"💡 Virtual environment saved at: {venv_path}")
-        print("💡 You can reuse it for future runs to avoid reinstalling packages")
+        
+        # Output results in JSON format for easy parsing
+        print("\n📊 RESULTS SUMMARY:")
+        print("=" * 60)
+        for tool_name, result in results.items():
+            status = "✅ SUCCESS" if result['success'] else "❌ FAILED"
+            print(f"{tool_name.upper()}: {status}")
+            if result['success'] and result['output']:
+                print(f"  Output: {result['output'][:100]}{'...' if len(result['output']) > 100 else ''}")
+            elif not result['success'] and result['error']:
+                print(f"  Error: {result['error'][:100]}{'...' if len(result['error']) > 100 else ''}")
+        
+        return results
         
     except KeyboardInterrupt:
         print("\n⚠️  Process interrupted by user")
