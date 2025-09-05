@@ -1297,7 +1297,7 @@ async function resolveToolCommand(cmd) {
         let baseArgs = cmd === 'ghunt' ? ['email', placeholder] : [placeholder];
         // Maigret defaults for Render stability with JSON output
         if (cmd === 'maigret') {
-            baseArgs = ['--timeout', '30', '-n', '20', '--verbose', '--print-errors', placeholder];
+            baseArgs = ['--timeout', '60', '-n', '50', '--print-errors', placeholder];
         }
         // PhoneInfoga preferred syntax
     if (cmd === 'phoneinfoga') {
