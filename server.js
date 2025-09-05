@@ -2603,6 +2603,9 @@ function resolveCliExecutable(cliName) {
                 if (fs.existsSync(full)) return full;
             } catch {}
         }
+        // Fallback to ~/.local/bin/<tool>
+        const shim = path.join(home, '.local', 'bin', cliName);
+        try { if (fs.existsSync(shim)) return shim; } catch {}
         // Debug: log what we checked
         console.log(`🔍 CLI resolver checked ${candidates.length} paths for ${cliName}:`, candidates.slice(0, 5).join(', '));
         return null;
