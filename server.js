@@ -169,6 +169,8 @@ try {
     
     // Add common CLI paths for Linux/Render (prepend unconditionally)
         const linuxPaths = [
+            path.join(process.cwd(), '.venv', 'bin'),
+            '/opt/render/project/src/.venv/bin',
             '/opt/render/.local/bin',
             path.join(process.env.HOME || '', '.local', 'bin'),
             '/usr/local/bin',
@@ -1291,8 +1293,11 @@ async function resolveToolCommand(cmd) {
             phoneinfoga: 'phoneinfoga',
         };
         const cliName = cliMap[cmd] || cmd;
-        // Try to resolve absolute path from pipx shims
-        const resolvedPath = resolveCliExecutable(cliName) ||
+        // Prefer .venv/bin tool if present
+        const venvBin = path.join(process.cwd(), '.venv', 'bin', cliName);
+        // Try to resolve absolute path from pipx shims / venv
+        const resolvedPath = (fs.existsSync(venvBin) ? venvBin : null) ||
+            resolveCliExecutable(cliName) ||
             path.join(process.env.HOME || '', '.local', 'bin', cliName) ||
             path.join('/root', '.local', 'bin', cliName);
         const placeholder = toolTemplates[cmd].placeholder;
