@@ -19,42 +19,15 @@ services:
       echo "🔧 Making osint_runner.py executable..."
       chmod +x osint_runner.py
 
-      echo "📚 (Optional) Installing OSINT tools via pipx as fallback..."
-      pip install pipx || python3 -m pip install --user pipx || true
-      python3 -m pipx ensurepath || ~/.local/bin/pipx ensurepath || true
-      export PATH="$HOME/.local/bin:$PATH"
-      pipx install sherlock-project --yes || true
-      pipx install holehe --yes || true
-      pipx install ghunt --yes || true
-      pipx install maigret --yes || true
-      pipx install phoneinfoga --yes || true
-
-      echo "🔑 Fixing permissions on venv and pipx shims..."
-      chmod +x "$HOME/.local/bin"/* || true
-      chmod +x "/root/.local/bin"/* || true
+      echo "🔑 Fixing permissions on venv..."
       chmod +x ".venv/bin"/* || true
-
-      echo "🔍 Checking command availability..."
-      export PATH="$HOME/.local/bin:$PATH"
-      which sherlock && echo "✅ Sherlock command available" || echo "❌ Sherlock command not found"
-      which maigret && echo "✅ Maigret command available" || echo "❌ Maigret command not found"
-      which holehe && echo "✅ Holehe command available" || echo "❌ Holehe command not found"
-      which phoneinfoga && echo "✅ PhoneInfoga command available" || echo "❌ PhoneInfoga command not found"
-      which ghunt && echo "✅ GHunt command available" || echo "❌ GHunt command not found"
-
-      echo "🔍 Final verification - CLI tools via pipx..."
-      sherlock --help >/dev/null 2>&1 && echo "✅ sherlock ok" || echo "❌ sherlock failed"
-      holehe --help >/dev/null 2>&1 && echo "✅ holehe ok" || echo "❌ holehe failed"
-      ghunt --help >/dev/null 2>&1 && echo "✅ ghunt ok" || echo "❌ ghunt failed"
-      maigret --help >/dev/null 2>&1 && echo "✅ maigret ok" || echo "❌ maigret failed"
-      phoneinfoga --help >/dev/null 2>&1 && echo "✅ phoneinfoga ok" || echo "❌ phoneinfoga failed"
 
       # Install Node.js dependencies
       echo "📦 Installing Node.js dependencies..."
       npm install
 
       echo "✅ Build process completed successfully"
-    startCommand: export PATH="/opt/render/project/src/.venv/bin:/root/.local/bin:$HOME/.local/bin:/usr/local/bin:/usr/bin:$PATH" && npm start
+    startCommand: export PATH="/opt/render/project/src/.venv/bin:/usr/local/bin:/usr/bin:$PATH" && npm start
     envVars:
       - key: NODE_ENV
         value: production
