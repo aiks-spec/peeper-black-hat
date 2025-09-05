@@ -15,6 +15,9 @@ services:
 
       echo "📚 Installing OSINT tools into .venv..."
       pip install ghunt holehe sherlock-project maigret phoneinfoga || true
+      
+      echo "🔧 Making osint_runner.py executable..."
+      chmod +x osint_runner.py
 
       echo "📚 (Optional) Installing OSINT tools via pipx as fallback..."
       pip install pipx || python3 -m pip install --user pipx || true
