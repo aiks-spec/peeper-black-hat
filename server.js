@@ -35,77 +35,9 @@ async function commandExists(cmd) {
     }
 }
 
-async function ensurePythonReady() {
-    // Check for virtual environment first (preferred) - Linux path
-    const venvPython = path.join(process.cwd(), 'venv', 'bin', 'python3');
-    const venvPythonAlt = path.join(process.cwd(), 'venv', 'bin', 'python');
-    
-    if (fs.existsSync(venvPython)) {
-        console.log('✅ Using virtual environment Python:', venvPython);
-        return venvPython;
-    }
-    
-    if (fs.existsSync(venvPythonAlt)) {
-        console.log('✅ Using virtual environment Python (alt):', venvPythonAlt);
-        return venvPythonAlt;
-    }
-    
-    // Check for Windows virtual environment (for local development)
-    const venvPythonWin = path.join(process.cwd(), 'venv', 'Scripts', 'python.exe');
-    if (fs.existsSync(venvPythonWin)) {
-        console.log('✅ Using virtual environment Python (Windows):', venvPythonWin);
-        return venvPythonWin;
-    }
-    
-    // Check if we're in a virtual environment via environment variable
-    if (process.env.VIRTUAL_ENV) {
-        const venvPythonEnv = path.join(process.env.VIRTUAL_ENV, 'bin', 'python3');
-        const venvPythonEnvAlt = path.join(process.env.VIRTUAL_ENV, 'bin', 'python');
-        
-        if (fs.existsSync(venvPythonEnv)) {
-            console.log('✅ Using activated virtual environment Python:', venvPythonEnv);
-            return venvPythonEnv;
-        }
-        
-        if (fs.existsSync(venvPythonEnvAlt)) {
-            console.log('✅ Using activated virtual environment Python (alt):', venvPythonEnvAlt);
-            return venvPythonEnvAlt;
-        }
-    }
-    
-    // Fallback to system Python
-    if (await commandExists('python3')) {
-        console.log('⚠️ Using system Python3 (virtual environment not found)');
-        console.log('💡 Virtual environment should be created during Render build process');
-        return 'python3';
-    }
-    if (await commandExists('python')) {
-        console.log('⚠️ Using system Python (virtual environment not found)');
-        console.log('💡 Virtual environment should be created during Render build process');
-        return 'python';
-    }
-    
-    console.log('❌ No Python found in system or virtual environment');
-    console.log('💡 Virtual environment should be created during Render build process');
-    return null;
-}
+// Removed legacy ensurePythonReady (not used)
 
-async function ensurePhoneInfogaInstalled() {
-    try {
-        // In Render environment, phoneinfoga should be pre-installed in /usr/local/bin
-        await execAsync('which phoneinfoga');
-        console.log('✅ PhoneInfoga found in system PATH');
-        return 'phoneinfoga';
-        } catch (error) {
-        console.log('❌ PhoneInfoga not found in PATH:', error.message);
-        // Try direct path
-        if (fs.existsSync('/usr/local/bin/phoneinfoga')) {
-            console.log('✅ PhoneInfoga found at /usr/local/bin/phoneinfoga');
-            return '/usr/local/bin/phoneinfoga';
-        }
-        return null;
-    }
-}
+// Removed legacy ensurePhoneInfogaInstalled (unused)
 
 // Removed external runtime installers; tools are preinstalled in system python via requirements.txt
 
@@ -2598,33 +2530,10 @@ function cleanupGeneratedImages() {
 }
 
 // Create JSON output file for tools that support it
-function createToolOutputFile(toolName, input) {
-    const timestamp = Date.now();
-    const safeInput = String(input).replace(/[^a-zA-Z0-9@._-]/g, '_');
-    const fileName = `${toolName}_${timestamp}_${safeInput}.json`;
-    const filePath = path.join(process.cwd(), 'reports', fileName);
-    
-    // Ensure reports directory exists
-    const reportsDir = path.join(process.cwd(), 'reports');
-    if (!fs.existsSync(reportsDir)) {
-        fs.mkdirSync(reportsDir, { recursive: true });
-    }
-    
-    return filePath;
-}
+// Removed legacy JSON output file creator (unused)
 
 // Read tool output from JSON file
-function readToolOutputFromFile(filePath) {
-    try {
-        if (fs.existsSync(filePath)) {
-            const content = fs.readFileSync(filePath, 'utf8');
-            return JSON.parse(content);
-        }
-    } catch (e) {
-        console.log(`⚠️ Failed to read tool output from ${filePath}:`, e.message);
-    }
-    return null;
-}
+// Removed legacy JSON output reader (unused)
 
 // Resolve CLI executables installed via pipx (or system) robustly
 function resolveCliExecutable(cliName) {
