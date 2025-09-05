@@ -20,6 +20,9 @@ services:
       pipx install maigret --yes || pipx install maigret || true
       pipx install phoneinfoga --yes || pipx install phoneinfoga || true
 
+      echo "🔑 Fixing permissions on pipx shims..."
+      chmod +x "$HOME/.local/bin"/* || true
+
       echo "🔍 Checking command availability..."
       export PATH="$HOME/.local/bin:$PATH"
       which sherlock && echo "✅ Sherlock command available" || echo "❌ Sherlock command not found"
