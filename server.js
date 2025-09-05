@@ -1291,6 +1291,10 @@ async function resolveToolCommand(cmd) {
             phoneinfoga: 'phoneinfoga',
         };
         const cliName = cliMap[cmd] || cmd;
+        // Try to resolve absolute path from pipx shims
+        const resolvedPath = resolveCliExecutable(cliName) ||
+            path.join(process.env.HOME || '', '.local', 'bin', cliName) ||
+            path.join('/root', '.local', 'bin', cliName);
         const placeholder = toolTemplates[cmd].placeholder;
         
         // GHunt requires subcommand "email"
@@ -1305,7 +1309,7 @@ async function resolveToolCommand(cmd) {
         }
         
         return {
-            command: cliName,
+            command: resolvedPath && fs.existsSync(resolvedPath) ? resolvedPath : cliName,
             viaTemplate: true,
             templateArgs: baseArgs,
             placeholder
@@ -1415,6 +1419,28 @@ async function runToolIfAvailable(cmd, args, parseFn) {
             return result;
         } catch (err) {
             console.log(`❌ Template tool ${cmd} failed:`, err.message);
+            // Handle EACCES by retrying via python3 interpreter on the shim file
+            if (/EACCES/i.test(err.message)) {
+                try {
+                    const shim = resolveCliExecutable(cmd) || path.join(process.env.HOME || '', '.local', 'bin', cmd) || path.join('/root', '.local', 'bin', cmd);
+                    if (shim && fs.existsSync(shim)) {
+                        console.log(`🔁 Retrying ${cmd} via python3 shim: ${shim}`);
+                        const { stdout, stderr } = await execFileAsync('python3', [shim, ...allArgs], {
+                            timeout: 300000,
+                            maxBuffer: 1024 * 1024 * 20,
+                            env: { ...process.env, PYTHONUNBUFFERED: '1', NO_COLOR: '1' },
+                            encoding: 'utf8'
+                        });
+                        let result = null;
+                        if (parseFn) result = parseFn(stdout, stderr);
+                        if (!result) result = stdout;
+                        if (result && typeof result === 'object') result.__source = cmd;
+                        return result;
+                    }
+                } catch (e2) {
+                    console.log(`❌ Retry via python3 failed for ${cmd}:`, e2.message);
+                }
+            }
             return null;
         }
     }
