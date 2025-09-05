@@ -1292,6 +1292,9 @@ async function runOsintScript(email) {
         return parseOsintScriptOutput(stdout, stderr);
     } catch (err) {
         console.log(`❌ OSINT script failed:`, err.message);
+        console.log(`❌ Full error:`, err);
+        if (err.stdout) console.log(`❌ STDOUT:`, err.stdout);
+        if (err.stderr) console.log(`❌ STDERR:`, err.stderr);
         return null;
     }
 }
@@ -1368,7 +1371,7 @@ async function runToolIfAvailable(cmd, args, parseFn) {
     
     // For non-email lookups, return null (disabled)
     console.log(`❌ Tool ${cmd} disabled - only email lookups via Python script are supported`);
-    return null;
+        return null;
 }
 
 // Use GHunt smart runner in email-lookup
