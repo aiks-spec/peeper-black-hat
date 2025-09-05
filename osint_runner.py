@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """
-OSINT Tools Runner for Render Production
-Creates a virtual environment, installs OSINT tools, and runs them on an email.
+OSINT Tools Runner for Render Free Plan
+Creates a virtual environment, installs OSINT tools from GitHub, and runs them on an email.
 Optimized for Linux environment without root permissions or Docker.
 """
 
@@ -10,9 +10,10 @@ import sys
 import subprocess
 import venv
 import json
+import base64
 from pathlib import Path
 
-def run_command(cmd, cwd=None, timeout=600):
+def run_command(cmd, cwd=None, timeout=300):
     """Run a command and return stdout, stderr, and return code."""
     try:
         result = subprocess.run(
@@ -50,27 +51,58 @@ def get_python_executable(venv_path):
     else:  # Linux/Unix
         return venv_path / "bin" / "python"
 
+def setup_ghunt_config(venv_path):
+    """Setup GHunt configuration from environment variables."""
+    ghunt_config_dir = venv_path / "lib" / "python3.11" / "site-packages" / "ghunt" / "config"
+    ghunt_config_dir.mkdir(parents=True, exist_ok=True)
+    
+    # Setup GHunt token
+    ghunt_token = os.environ.get('GHUNT_TOKEN')
+    if ghunt_token:
+        token_file = ghunt_config_dir / "tokens.json"
+        token_data = {"oauth_token": ghunt_token}
+        with open(token_file, 'w') as f:
+            json.dump(token_data, f)
+        print("✅ GHunt token configured")
+    
+    # Setup GHunt cookies
+    ghunt_cookies_b64 = os.environ.get('GHUNT_COOKIES_B64')
+    if ghunt_cookies_b64:
+        try:
+            cookies_data = base64.b64decode(ghunt_cookies_b64).decode('utf-8')
+            cookies_file = ghunt_config_dir / "cookies.json"
+            with open(cookies_file, 'w') as f:
+                f.write(cookies_data)
+            print("✅ GHunt cookies configured")
+        except Exception as e:
+            print(f"⚠️ Failed to decode GHunt cookies: {e}")
+
 def install_packages(venv_path):
-    """Install required packages in the virtual environment."""
+    """Install required packages from GitHub repositories."""
     python_exe = get_python_executable(venv_path)
     
+    # GitHub repository URLs for each tool
     packages = [
-        "ghunt",
-        "holehe", 
-        "sherlock-project",
-        "maigret"
+        "git+https://github.com/sherlock-project/sherlock.git",
+        "git+https://github.com/megadose/holehe.git", 
+        "git+https://github.com/soxoj/maigret.git",
+        "git+https://github.com/mxrch/GHunt.git"
     ]
     
-    print("📦 Installing packages...")
+    print("📦 Installing packages from GitHub repositories...")
     for package in packages:
-        print(f"Installing {package}...")
+        tool_name = package.split('/')[-1].replace('.git', '')
+        print(f"Installing {tool_name}...")
         stdout, stderr, returncode = run_command(f'"{python_exe}" -m pip install {package} --quiet', timeout=600)
         if returncode == 0:
-            print(f"✅ {package} installed successfully")
+            print(f"✅ {tool_name} installed successfully")
         else:
-            print(f"❌ Failed to install {package}: {stderr}")
+            print(f"❌ Failed to install {tool_name}: {stderr}")
     
     print("✅ Package installation completed")
+    
+    # Setup GHunt configuration after installation
+    setup_ghunt_config(venv_path)
 
 def extract_username_from_email(email):
     """Extract username from email address."""
@@ -83,42 +115,26 @@ def run_osint_tools(venv_path, email):
     python_exe = get_python_executable(venv_path)
     username = extract_username_from_email(email)
     
-    # Try different approaches for each tool
+    # Tool configurations with proper module names
     tools = [
         {
             "name": "Holehe",
-            "commands": [
-                f'"{python_exe}" -c "import holehe; holehe.main([\'{email}\'])"',
-                f'"{python_exe}" -m holehe {email}',
-                f'holehe {email}'
-            ],
+            "command": f'"{python_exe}" -m holehe {email}',
             "description": "Email breach checker"
         },
         {
             "name": "Sherlock", 
-            "commands": [
-                f'"{python_exe}" -c "import sherlock_project; sherlock_project.main([\'{username}\'])"',
-                f'"{python_exe}" -m sherlock_project {username}',
-                f'sherlock {username}'
-            ],
+            "command": f'"{python_exe}" -m sherlock {username}',
             "description": "Username search across social networks"
         },
         {
             "name": "Maigret",
-            "commands": [
-                f'"{python_exe}" -c "import maigret; maigret.main([\'{username}\'])"',
-                f'"{python_exe}" -m maigret {username}',
-                f'maigret {username}'
-            ],
+            "command": f'"{python_exe}" -m maigret {username}',
             "description": "Username search with advanced techniques"
         },
         {
             "name": "GHunt",
-            "commands": [
-                f'"{python_exe}" -c "import ghunt; ghunt.main([\'email\', \'{email}\'])"',
-                f'"{python_exe}" -m ghunt email {email}',
-                f'ghunt email {email}'
-            ],
+            "command": f'"{python_exe}" -m ghunt email {email}',
             "description": "Google account information gathering"
         }
     ]
@@ -132,14 +148,13 @@ def run_osint_tools(venv_path, email):
     for tool in tools:
         print(f"\n🔧 Running {tool['name']} ({tool['description']})")
         print("-" * 40)
+        print(f"Command: {tool['command']}")
         
-        success = False
-        for i, command in enumerate(tool['commands']):
-            print(f"🔄 Trying method {i+1}: {command}")
-            stdout, stderr, returncode = run_command(command, timeout=300)
-            
-            if returncode == 0 and stdout.strip():
-                print("✅ Tool completed successfully")
+        stdout, stderr, returncode = run_command(tool['command'], timeout=300)
+        
+        if returncode == 0:
+            print("✅ Tool completed successfully")
+            if stdout.strip():
                 print("📄 Output:")
                 print(stdout)
                 results[tool['name'].lower()] = {
@@ -147,17 +162,22 @@ def run_osint_tools(venv_path, email):
                     "output": stdout.strip(),
                     "error": None
                 }
-                success = True
-                break
             else:
-                print(f"❌ Method {i+1} failed: {stderr.strip() if stderr.strip() else 'No output'}")
-        
-        if not success:
-            print(f"❌ All methods failed for {tool['name']}")
+                print("ℹ️  No output generated")
+                results[tool['name'].lower()] = {
+                    "success": True,
+                    "output": "No results found",
+                    "error": None
+                }
+        else:
+            print(f"❌ Tool failed with return code {returncode}")
+            if stderr.strip():
+                print("📄 Error output:")
+                print(stderr)
             results[tool['name'].lower()] = {
                 "success": False,
                 "output": None,
-                "error": f"All execution methods failed for {tool['name']}"
+                "error": stderr.strip() if stderr.strip() else f"Tool failed with return code {returncode}"
             }
         
         print("-" * 40)
@@ -178,14 +198,14 @@ def main():
         print("❌ Invalid email format")
         sys.exit(1)
     
-    print("🚀 OSINT Tools Runner - Production Mode")
+    print("🚀 OSINT Tools Runner - Render Free Plan Mode")
     print("=" * 60)
     
     try:
         # Create virtual environment
         venv_path = create_venv()
         
-        # Install packages
+        # Install packages from GitHub
         install_packages(venv_path)
         
         # Run OSINT tools
@@ -204,6 +224,11 @@ def main():
                 print(f"  Output: {result['output'][:100]}{'...' if len(result['output']) > 100 else ''}")
             elif not result['success'] and result['error']:
                 print(f"  Error: {result['error'][:100]}{'...' if len(result['error']) > 100 else ''}")
+        
+        # Also output structured JSON for programmatic access
+        print("\n🔧 JSON OUTPUT:")
+        print("=" * 60)
+        print(json.dumps(results, indent=2))
         
         return results
         
