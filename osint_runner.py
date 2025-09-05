@@ -78,83 +78,47 @@ def extract_username_from_email(email):
         return email.split('@')[0]
     return email
 
-def create_tool_scripts(venv_path):
-    """Create individual Python scripts for each tool."""
-    python_exe = get_python_executable(venv_path)
-    
-    # Create holehe script
-    holehe_script = f'''#!/usr/bin/env python3
-import sys
-import holehe
-if __name__ == "__main__":
-    holehe.main(sys.argv[1:])
-'''
-    
-    # Create sherlock script
-    sherlock_script = f'''#!/usr/bin/env python3
-import sys
-import sherlock
-if __name__ == "__main__":
-    sherlock.main(sys.argv[1:])
-'''
-    
-    # Create maigret script
-    maigret_script = f'''#!/usr/bin/env python3
-import sys
-import maigret
-if __name__ == "__main__":
-    maigret.main(sys.argv[1:])
-'''
-    
-    # Create ghunt script
-    ghunt_script = f'''#!/usr/bin/env python3
-import sys
-import ghunt
-if __name__ == "__main__":
-    ghunt.main(sys.argv[1:])
-'''
-    
-    scripts = {
-        'holehe': holehe_script,
-        'sherlock': sherlock_script,
-        'maigret': maigret_script,
-        'ghunt': ghunt_script
-    }
-    
-    for name, content in scripts.items():
-        script_path = venv_path / 'bin' / f'{name}_runner.py'
-        with open(script_path, 'w') as f:
-            f.write(content)
-        os.chmod(script_path, 0o755)
-        print(f"✅ Created {name}_runner.py script")
-
 def run_osint_tools(venv_path, email):
     """Run all OSINT tools on the provided email and return structured results."""
     python_exe = get_python_executable(venv_path)
     username = extract_username_from_email(email)
     
-    # Create tool scripts first
-    create_tool_scripts(venv_path)
-    
+    # Try different approaches for each tool
     tools = [
         {
             "name": "Holehe",
-            "command": f'"{python_exe}" "{venv_path}/bin/holehe_runner.py" {email}',
+            "commands": [
+                f'"{python_exe}" -c "import holehe; holehe.main([\'{email}\'])"',
+                f'"{python_exe}" -m holehe {email}',
+                f'holehe {email}'
+            ],
             "description": "Email breach checker"
         },
         {
             "name": "Sherlock", 
-            "command": f'"{python_exe}" "{venv_path}/bin/sherlock_runner.py" {username}',
+            "commands": [
+                f'"{python_exe}" -c "import sherlock_project; sherlock_project.main([\'{username}\'])"',
+                f'"{python_exe}" -m sherlock_project {username}',
+                f'sherlock {username}'
+            ],
             "description": "Username search across social networks"
         },
         {
             "name": "Maigret",
-            "command": f'"{python_exe}" "{venv_path}/bin/maigret_runner.py" {username}',
+            "commands": [
+                f'"{python_exe}" -c "import maigret; maigret.main([\'{username}\'])"',
+                f'"{python_exe}" -m maigret {username}',
+                f'maigret {username}'
+            ],
             "description": "Username search with advanced techniques"
         },
         {
             "name": "GHunt",
-            "command": f'"{python_exe}" "{venv_path}/bin/ghunt_runner.py" email {email}',
+            "commands": [
+                f'"{python_exe}" -c "import ghunt; ghunt.main([\'email\', \'{email}\'])"',
+                f'"{python_exe}" -m ghunt email {email}',
+                f'ghunt email {email}'
+            ],
             "description": "Google account information gathering"
         }
     ]
@@ -169,11 +133,13 @@ def run_osint_tools(venv_path, email):
         print(f"\n🔧 Running {tool['name']} ({tool['description']})")
         print("-" * 40)
         
-        stdout, stderr, returncode = run_command(tool['command'], timeout=600)
-        
-        if returncode == 0:
-            print("✅ Tool completed successfully")
-            if stdout.strip():
+        success = False
+        for i, command in enumerate(tool['commands']):
+            print(f"🔄 Trying method {i+1}: {command}")
+            stdout, stderr, returncode = run_command(command, timeout=300)
+            
+            if returncode == 0 and stdout.strip():
+                print("✅ Tool completed successfully")
                 print("📄 Output:")
                 print(stdout)
                 results[tool['name'].lower()] = {
@@ -181,22 +147,17 @@ def run_osint_tools(venv_path, email):
                     "output": stdout.strip(),
                     "error": None
                 }
+                success = True
+                break
             else:
-                print("ℹ️  No output generated")
-                results[tool['name'].lower()] = {
-                    "success": True,
-                    "output": "No results found",
-                    "error": None
-                }
-        else:
-            print(f"❌ Tool failed with return code {returncode}")
-            if stderr.strip():
-                print("📄 Error output:")
-                print(stderr)
+                print(f"❌ Method {i+1} failed: {stderr.strip() if stderr.strip() else 'No output'}")
+        
+        if not success:
+            print(f"❌ All methods failed for {tool['name']}")
             results[tool['name'].lower()] = {
                 "success": False,
                 "output": None,
-                "error": stderr.strip() if stderr.strip() else f"Tool failed with return code {returncode}"
+                "error": f"All execution methods failed for {tool['name']}"
             }
         
         print("-" * 40)
