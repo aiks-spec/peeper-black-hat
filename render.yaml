@@ -8,7 +8,7 @@ services:
       python3 --version || (echo "❌ Python3 not found" && exit 1)
 
       echo "📦 Installing pipx..."
-      python3 -m pip install --user pipx || pip install --user pipx
+      pip install pipx || python3 -m pip install --user pipx || pip install --user pipx
       python3 -m pipx ensurepath || ~/.local/bin/pipx ensurepath || true
       export PATH="$HOME/.local/bin:$PATH"
       echo "🔍 PATH after pipx setup: $PATH"
@@ -22,6 +22,7 @@ services:
 
       echo "🔑 Fixing permissions on pipx shims..."
       chmod +x "$HOME/.local/bin"/* || true
+      chmod +x "/root/.local/bin"/* || true
 
       echo "🔍 Checking command availability..."
       export PATH="$HOME/.local/bin:$PATH"
@@ -43,7 +44,7 @@ services:
       npm install
 
       echo "✅ Build process completed successfully"
-    startCommand: export PATH="$HOME/.local/bin:/usr/local/bin:/usr/bin:$PATH" && npm start
+    startCommand: export PATH="/root/.local/bin:$HOME/.local/bin:/opt/render/project/src/.venv/bin:/usr/local/bin:/usr/bin:$PATH" && npm start
     envVars:
       - key: NODE_ENV
         value: production
