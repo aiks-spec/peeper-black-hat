@@ -1424,11 +1424,34 @@ async function runToolIfAvailable(cmd, args, parseFn) {
             return result;
         } catch (err) {
             console.log(`❌ Template tool ${cmd} failed:`, err.message);
-            // Handle EACCES by retrying via python3 interpreter on the shim file
+            // Handle EACCES by fixing permissions and retrying
             if (/EACCES/i.test(err.message)) {
                 try {
                     const shim = resolveCliExecutable(cmd) || path.join(process.env.HOME || '', '.local', 'bin', cmd) || path.join('/root', '.local', 'bin', cmd);
                     if (shim && fs.existsSync(shim)) {
+                        try {
+                            console.log(`🔧 Fixing execute permissions on ${shim}`);
+                            fs.chmodSync(shim, 0o755);
+                        } catch (chmodErr) {
+                            console.log(`⚠️ chmod failed on ${shim}: ${chmodErr.message}`);
+                        }
+                        // Retry executing the shim directly first
+                        try {
+                            console.log(`🔁 Retrying ${cmd} executing shim directly`);
+                            const { stdout, stderr } = await execFileAsync(shim, allArgs, {
+                                timeout: 300000,
+                                maxBuffer: 1024 * 1024 * 20,
+                                env: { ...process.env, PYTHONUNBUFFERED: '1', NO_COLOR: '1' },
+                                encoding: 'utf8'
+                            });
+                            let result = null;
+                            if (parseFn) result = parseFn(stdout, stderr);
+                            if (!result) result = stdout;
+                            if (result && typeof result === 'object') result.__source = cmd;
+                            return result;
+                        } catch (shimExecErr) {
+                            console.log(`⚠️ Direct shim exec failed for ${cmd}: ${shimExecErr.message}`);
+                        }
                         console.log(`🔁 Retrying ${cmd} via python3 shim: ${shim}`);
                         const { stdout, stderr } = await execFileAsync('python3', [shim, ...allArgs], {
                             timeout: 300000,
