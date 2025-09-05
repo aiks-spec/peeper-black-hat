@@ -53,8 +53,18 @@ def get_python_executable(venv_path):
 
 def setup_ghunt_config(venv_path):
     """Setup GHunt configuration from environment variables."""
-    ghunt_config_dir = venv_path / "lib" / "python3.11" / "site-packages" / "ghunt" / "config"
+    # Find the correct Python version directory dynamically
+    lib_dir = venv_path / "lib"
+    python_dirs = [d for d in lib_dir.iterdir() if d.is_dir() and d.name.startswith('python')]
+    
+    if not python_dirs:
+        print("⚠️ No Python version directory found in venv")
+        return
+    
+    python_version_dir = python_dirs[0]  # Use the first (and likely only) Python version
+    ghunt_config_dir = python_version_dir / "site-packages" / "ghunt" / "config"
     ghunt_config_dir.mkdir(parents=True, exist_ok=True)
+    print(f"🔧 GHunt config directory: {ghunt_config_dir}")
     
     # Setup GHunt token
     ghunt_token = os.environ.get('GHUNT_TOKEN')
@@ -186,22 +196,27 @@ def run_osint_tools(venv_path, email):
 
 def main():
     """Main function."""
-    if len(sys.argv) != 2:
-        print("Usage: python osint_runner.py <email>")
-        print("Example: python osint_runner.py test@example.com")
-        sys.exit(1)
-    
-    email = sys.argv[1]
-    
-    # Validate email format
-    if '@' not in email or '.' not in email.split('@')[1]:
-        print("❌ Invalid email format")
-        sys.exit(1)
-    
-    print("🚀 OSINT Tools Runner - Render Free Plan Mode")
-    print("=" * 60)
-    
     try:
+        print("🔧 Starting OSINT runner script...")
+        print(f"🔧 Python version: {sys.version}")
+        print(f"🔧 Script arguments: {sys.argv}")
+        
+        if len(sys.argv) != 2:
+            print("Usage: python osint_runner.py <email>")
+            print("Example: python osint_runner.py test@example.com")
+            sys.exit(1)
+        
+        email = sys.argv[1]
+        print(f"🔧 Email received: {email}")
+        
+        # Validate email format
+        if '@' not in email or '.' not in email.split('@')[1]:
+            print("❌ Invalid email format")
+            sys.exit(1)
+        
+        print("🚀 OSINT Tools Runner - Render Free Plan Mode")
+        print("=" * 60)
+        
         # Create virtual environment
         venv_path = create_venv()
         
@@ -236,7 +251,9 @@ def main():
         print("\n⚠️  Process interrupted by user")
         sys.exit(1)
     except Exception as e:
-        print(f"\n❌ An error occurred: {e}")
+        print(f"\n❌ An error occurred in main: {e}")
+        import traceback
+        traceback.print_exc()
         sys.exit(1)
 
 if __name__ == "__main__":
