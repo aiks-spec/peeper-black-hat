@@ -78,30 +78,83 @@ def extract_username_from_email(email):
         return email.split('@')[0]
     return email
 
+def create_tool_scripts(venv_path):
+    """Create individual Python scripts for each tool."""
+    python_exe = get_python_executable(venv_path)
+    
+    # Create holehe script
+    holehe_script = f'''#!/usr/bin/env python3
+import sys
+import holehe
+if __name__ == "__main__":
+    holehe.main(sys.argv[1:])
+'''
+    
+    # Create sherlock script
+    sherlock_script = f'''#!/usr/bin/env python3
+import sys
+import sherlock
+if __name__ == "__main__":
+    sherlock.main(sys.argv[1:])
+'''
+    
+    # Create maigret script
+    maigret_script = f'''#!/usr/bin/env python3
+import sys
+import maigret
+if __name__ == "__main__":
+    maigret.main(sys.argv[1:])
+'''
+    
+    # Create ghunt script
+    ghunt_script = f'''#!/usr/bin/env python3
+import sys
+import ghunt
+if __name__ == "__main__":
+    ghunt.main(sys.argv[1:])
+'''
+    
+    scripts = {
+        'holehe': holehe_script,
+        'sherlock': sherlock_script,
+        'maigret': maigret_script,
+        'ghunt': ghunt_script
+    }
+    
+    for name, content in scripts.items():
+        script_path = venv_path / 'bin' / f'{name}_runner.py'
+        with open(script_path, 'w') as f:
+            f.write(content)
+        os.chmod(script_path, 0o755)
+        print(f"✅ Created {name}_runner.py script")
+
 def run_osint_tools(venv_path, email):
     """Run all OSINT tools on the provided email and return structured results."""
     python_exe = get_python_executable(venv_path)
     username = extract_username_from_email(email)
     
+    # Create tool scripts first
+    create_tool_scripts(venv_path)
+    
     tools = [
         {
             "name": "Holehe",
-            "command": f'"{python_exe}" -m holehe {email}',
+            "command": f'"{python_exe}" "{venv_path}/bin/holehe_runner.py" {email}',
             "description": "Email breach checker"
         },
         {
             "name": "Sherlock", 
-            "command": f'"{python_exe}" -m sherlock {username}',
+            "command": f'"{python_exe}" "{venv_path}/bin/sherlock_runner.py" {username}',
             "description": "Username search across social networks"
         },
         {
             "name": "Maigret",
-            "command": f'"{python_exe}" -m maigret {username}',
+            "command": f'"{python_exe}" "{venv_path}/bin/maigret_runner.py" {username}',
             "description": "Username search with advanced techniques"
         },
         {
             "name": "GHunt",
-            "command": f'"{python_exe}" -m ghunt email {email}',
+            "command": f'"{python_exe}" "{venv_path}/bin/ghunt_runner.py" email {email}',
             "description": "Google account information gathering"
         }
     ]
