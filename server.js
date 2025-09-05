@@ -121,7 +121,7 @@ try {
         
         // Debug: Check what's actually available
         console.log('🔍 Current PATH:', process.env.PATH);
-        console.log('🔍 Checking for sherlock in PATH...');
+        console.log('🔍 Checking for sherlock in PATH...'); 
         try {
             const { execSync } = require('child_process');
             const whichSherlock = execSync('which sherlock', { encoding: 'utf8' }).trim();
@@ -1273,9 +1273,95 @@ async function resolveToolCommand(cmd) {
     return { command: cmd };
 }
 
+// Run OSINT tools using the Python script
+async function runOsintScript(email) {
+    try {
+        console.log(`🐍 Running OSINT script for email: ${email}`);
+        const { stdout, stderr } = await execFileAsync('python3', ['osint_runner.py', email], {
+            timeout: 600000, // 10 minutes timeout
+            maxBuffer: 1024 * 1024 * 50, // 50MB buffer
+            env: { ...process.env, PYTHONUNBUFFERED: '1' },
+            encoding: 'utf8'
+        });
+        
+        console.log(`✅ OSINT script completed`);
+        console.log(`📄 Output length: ${stdout.length} characters`);
+        
+        // Parse the output to extract individual tool results
+        return parseOsintScriptOutput(stdout, stderr);
+    } catch (err) {
+        console.log(`❌ OSINT script failed:`, err.message);
+        return null;
+    }
+}
+
+// Parse the output from osint_runner.py to extract individual tool results
+function parseOsintScriptOutput(stdout, stderr) {
+    const results = {
+        holehe: null,
+        sherlock: null,
+        maigret: null,
+        ghunt: null
+    };
+    
+    const lines = stdout.split('\n');
+    let currentTool = null;
+    let toolOutput = [];
+    
+    for (const line of lines) {
+        if (line.includes('Running Holehe')) {
+            if (currentTool && toolOutput.length > 0) {
+                results[currentTool] = toolOutput.join('\n');
+            }
+            currentTool = 'holehe';
+            toolOutput = [];
+        } else if (line.includes('Running Sherlock')) {
+            if (currentTool && toolOutput.length > 0) {
+                results[currentTool] = toolOutput.join('\n');
+            }
+            currentTool = 'sherlock';
+            toolOutput = [];
+        } else if (line.includes('Running Maigret')) {
+            if (currentTool && toolOutput.length > 0) {
+                results[currentTool] = toolOutput.join('\n');
+            }
+            currentTool = 'maigret';
+            toolOutput = [];
+        } else if (line.includes('Running GHunt')) {
+            if (currentTool && toolOutput.length > 0) {
+                results[currentTool] = toolOutput.join('\n');
+            }
+            currentTool = 'ghunt';
+            toolOutput = [];
+        } else if (currentTool && !line.startsWith('🔧') && !line.startsWith('📄') && !line.startsWith('✅') && !line.startsWith('❌') && !line.startsWith('ℹ️') && !line.startsWith('-') && !line.startsWith('=')) {
+            toolOutput.push(line);
+        }
+    }
+    
+    // Handle the last tool
+    if (currentTool && toolOutput.length > 0) {
+        results[currentTool] = toolOutput.join('\n');
+    }
+    
+    return results;
+}
+
 // Update runToolIfAvailable to handle docker inputs
 async function runToolIfAvailable(cmd, args, parseFn) {
     console.log(`🔧 Running tool: ${cmd} with args:`, args);
+    
+    // For email lookups, use the Python script instead of individual tools
+    if (args.length > 0 && args[0].includes('@')) {
+        const email = args[0];
+        console.log(`📧 Email detected, using OSINT script for comprehensive analysis`);
+        const scriptResults = await runOsintScript(email);
+        
+        if (scriptResults && scriptResults[cmd]) {
+            console.log(`✅ Tool ${cmd} data from script:`, scriptResults[cmd].substring(0, 200) + '...');
+            return parseFn ? parseFn(scriptResults[cmd], '') : scriptResults[cmd];
+        }
+    }
+    
     const resolved = await resolveToolCommand(cmd);
     console.log(`🔍 Tool resolution result:`, resolved);
     if (!resolved.command) {
