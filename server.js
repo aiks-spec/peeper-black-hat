@@ -1273,168 +1273,102 @@ async function resolveToolCommand(cmd) {
     return { command: cmd };
 }
 
-// Update runToolIfAvailable to handle docker inputs
+// Run OSINT tools using the Python script ONLY
+async function runOsintScript(email) {
+    try {
+        console.log(`🐍 Running OSINT script for email: ${email}`);
+        
+        const { stdout, stderr } = await execFileAsync('python3', ['osint_runner.py', email], {
+            timeout: 600000, // 10 minutes timeout
+            maxBuffer: 1024 * 1024 * 50, // 50MB buffer
+            env: { ...process.env, PYTHONUNBUFFERED: '1' },
+            encoding: 'utf8'
+        });
+        
+        console.log(`✅ OSINT script completed`);
+        console.log(`📄 Output length: ${stdout.length} characters`);
+        
+        // Parse the output to extract individual tool results
+        return parseOsintScriptOutput(stdout, stderr);
+    } catch (err) {
+        console.log(`❌ OSINT script failed:`, err.message);
+        return null;
+    }
+}
+
+// Parse the output from osint_runner.py to extract individual tool results
+function parseOsintScriptOutput(stdout, stderr) {
+    const results = {
+        holehe: null,
+        sherlock: null,
+        maigret: null,
+        ghunt: null
+    };
+    
+    const lines = stdout.split('\n');
+    let currentTool = null;
+    let toolOutput = [];
+    
+    for (const line of lines) {
+        if (line.includes('Running Holehe')) {
+            if (currentTool && toolOutput.length > 0) {
+                results[currentTool] = toolOutput.join('\n');
+            }
+            currentTool = 'holehe';
+            toolOutput = [];
+        } else if (line.includes('Running Sherlock')) {
+            if (currentTool && toolOutput.length > 0) {
+                results[currentTool] = toolOutput.join('\n');
+            }
+            currentTool = 'sherlock';
+            toolOutput = [];
+        } else if (line.includes('Running Maigret')) {
+            if (currentTool && toolOutput.length > 0) {
+                results[currentTool] = toolOutput.join('\n');
+            }
+            currentTool = 'maigret';
+            toolOutput = [];
+        } else if (line.includes('Running GHunt')) {
+            if (currentTool && toolOutput.length > 0) {
+                results[currentTool] = toolOutput.join('\n');
+            }
+            currentTool = 'ghunt';
+            toolOutput = [];
+        } else if (currentTool && !line.startsWith('🔧') && !line.startsWith('📄') && !line.startsWith('✅') && !line.startsWith('❌') && !line.startsWith('ℹ️') && !line.startsWith('-') && !line.startsWith('=')) {
+            toolOutput.push(line);
+        }
+    }
+    
+    // Handle the last tool
+    if (currentTool && toolOutput.length > 0) {
+        results[currentTool] = toolOutput.join('\n');
+    }
+    
+    return results;
+}
+
+// Update runToolIfAvailable to ONLY use Python script for email lookups
 async function runToolIfAvailable(cmd, args, parseFn) {
     console.log(`🔧 Running tool: ${cmd} with args:`, args);
-    const resolved = await resolveToolCommand(cmd);
-    console.log(`🔍 Tool resolution result:`, resolved);
-    if (!resolved.command) {
-        console.log(`❌ Tool ${cmd} not available`);
+    
+    // For email lookups, ONLY use the Python script
+    if (args.length > 0 && args[0].includes('@')) {
+        const email = args[0];
+        console.log(`📧 Email detected, using OSINT script for comprehensive analysis`);
+        const scriptResults = await runOsintScript(email);
+        
+        if (scriptResults && scriptResults[cmd]) {
+            console.log(`✅ Tool ${cmd} data from script:`, scriptResults[cmd].substring(0, 200) + '...');
+            return parseFn ? parseFn(scriptResults[cmd], '') : scriptResults[cmd];
+        }
+        
+        // If script didn't return data for this specific tool, return empty result
         return null;
     }
     
-    // Template execution branch (native Python)
-    if (resolved.viaTemplate) {
-        const userInput = args[0] || '';
-        if (!userInput) {
-            console.log(`❌ No user input provided for ${cmd}`);
-            return null;
-        }
-        // Replace placeholder with user input, then add remaining arguments
-        let processedInput = userInput;
-        
-        // Extract username from email if the tool requires it
-        if (toolTemplates[cmd] && toolTemplates[cmd].extractUsername) {
-            processedInput = extractUsernameFromEmail(userInput);
-            console.log(`🔧 Extracted username from email: ${userInput} -> ${processedInput}`);
-        }
-        
-        // JSON output creation disabled for all tools per user request
-        let jsonOutputFile = null;
-        
-        const templateArgs = resolved.templateArgs.map((a) => typeof a === 'string' && resolved.placeholder ? a.replace(resolved.placeholder, processedInput) : a);
-        let allArgs = [...templateArgs, ...args.slice(1)]; // Add all additional arguments after the first one
-        
-        // Skip all JSON output flags; use stdout-only
-        
-        console.log(`🔧 Executing: ${resolved.command} ${allArgs.join(' ')}`);
-        try {
-            const { stdout, stderr } = await execFileAsync(resolved.command, allArgs, {
-                timeout: 300000,
-                maxBuffer: 1024 * 1024 * 20,
-                env: { ...process.env, PYTHONUNBUFFERED: '1', NO_COLOR: '1' },
-                encoding: 'utf8'
-            });
-            
-            // Try to read from JSON file first, then fallback to stdout parsing
-            let result = null;
-            if (jsonOutputFile && fs.existsSync(jsonOutputFile)) {
-                console.log(`📁 Reading tool output from JSON file: ${jsonOutputFile}`);
-                result = readToolOutputFromFile(jsonOutputFile);
-                if (result) {
-                    console.log(`✅ Tool ${cmd} data loaded from JSON file`);
-                    // Clean up the JSON file after reading
-                    try {
-                        fs.unlinkSync(jsonOutputFile);
-                    } catch (e) {
-                        console.log(`⚠️ Failed to clean up JSON file: ${e.message}`);
-                    }
-                }
-            }
-            
-            // Fallback to stdout parsing if JSON file didn't work
-            if (!result && parseFn) {
-                result = parseFn(stdout, stderr);
-                console.log(`✅ Tool ${cmd} parsed from stdout`);
-            } else if (!result) {
-                result = stdout;
-            }
-            
-            // Debug output for Maigret
-            if (cmd === 'maigret') {
-                console.log(`🔍 Maigret stdout length: ${stdout.length}`);
-                console.log(`🔍 Maigret stderr length: ${stderr.length}`);
-                if (stdout.length > 0) {
-                    console.log(`🔍 Maigret stdout preview: ${stdout.substring(0, 500)}...`);
-                }
-                if (stderr.length > 0) {
-                    console.log(`🔍 Maigret stderr: ${stderr.substring(0, 500)}...`);
-                }
-            }
-            
-            if (result && typeof result === 'object') result.__source = cmd;
-            return result;
-        } catch (err) {
-            console.log(`❌ Template tool ${cmd} failed:`, err.message);
-            // Handle EACCES by fixing permissions and retrying
-            if (/EACCES/i.test(err.message)) {
-                try {
-                    const shim = resolveCliExecutable(cmd) || path.join(process.env.HOME || '', '.local', 'bin', cmd) || path.join('/root', '.local', 'bin', cmd);
-                    if (shim && fs.existsSync(shim)) {
-                        try {
-                            console.log(`🔧 Fixing execute permissions on ${shim}`);
-                            fs.chmodSync(shim, 0o755);
-                        } catch (chmodErr) {
-                            console.log(`⚠️ chmod failed on ${shim}: ${chmodErr.message}`);
-                        }
-                        // Retry executing the shim directly first
-                        try {
-                            console.log(`🔁 Retrying ${cmd} executing shim directly`);
-                            const { stdout, stderr } = await execFileAsync(shim, allArgs, {
-                                timeout: 300000,
-                                maxBuffer: 1024 * 1024 * 20,
-                                env: { ...process.env, PYTHONUNBUFFERED: '1', NO_COLOR: '1' },
-                                encoding: 'utf8'
-                            });
-                            let result = null;
-                            if (parseFn) result = parseFn(stdout, stderr);
-                            if (!result) result = stdout;
-                            if (result && typeof result === 'object') result.__source = cmd;
-                            return result;
-                        } catch (shimExecErr) {
-                            console.log(`⚠️ Direct shim exec failed for ${cmd}: ${shimExecErr.message}`);
-                        }
-                        console.log(`🔁 Retrying ${cmd} via python3 shim: ${shim}`);
-                        const { stdout, stderr } = await execFileAsync('python3', [shim, ...allArgs], {
-                            timeout: 300000,
-                            maxBuffer: 1024 * 1024 * 20,
-                            env: { ...process.env, PYTHONUNBUFFERED: '1', NO_COLOR: '1' },
-                            encoding: 'utf8'
-                        });
-                        let result = null;
-                        if (parseFn) result = parseFn(stdout, stderr);
-                        if (!result) result = stdout;
-                        if (result && typeof result === 'object') result.__source = cmd;
-                        return result;
-                    }
-                } catch (e2) {
-                    console.log(`❌ Retry via python3 failed for ${cmd}:`, e2.message);
-                }
-            }
-            return null;
-        }
-    }
-
-    // Python module/direct execution (existing logic)
-    const spawnCmd = resolved.command;
-    let spawnArgs;
-    if (resolved.viaPython) {
-        if (resolved.viaPython.startsWith('-m ')) {
-            const moduleName = resolved.viaPython.replace('-m ', '');
-            spawnArgs = ['-m', moduleName, ...args];
-        } else if (resolved.viaPython.startsWith('-m')) {
-            const moduleName = resolved.viaPython.replace('-m', '');
-            spawnArgs = ['-m', moduleName, ...args];
-        } else {
-            spawnArgs = ['-m', resolved.viaPython, ...args];
-        }
-    } else {
-        spawnArgs = args;
-    }
-    try {
-        const { stdout, stderr } = await execFileAsync(spawnCmd, spawnArgs, {
-            timeout: 180000,
-            maxBuffer: 1024 * 1024 * 20,
-            env: { ...process.env, PYTHONUNBUFFERED: '1', NO_COLOR: '1' },
-            encoding: 'utf8'
-        });
-        const parsed = parseFn(stdout, stderr);
-        if (parsed && typeof parsed === 'object') parsed.__source = cmd;
-        return parsed;
-    } catch (err) {
-        console.log(`❌ Tool ${cmd} failed:`, err.message);
-        return null;
-    }
+    // For non-email lookups, return null (disabled)
+    console.log(`❌ Tool ${cmd} disabled - only email lookups via Python script are supported`);
+    return null;
 }
 
 // Use GHunt smart runner in email-lookup
@@ -2299,8 +2233,8 @@ app.post('/api/run-osint-script', async (req, res) => {
         });
         
         console.log(`✅ OSINT script completed`);
-        
-        res.json({
+    
+    res.json({
             success: true,
             email: email,
             output: stdout,
