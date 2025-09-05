@@ -112,13 +112,14 @@ async function ensurePhoneInfogaInstalled() {
 // GHunt auto-login at startup (non-interactive: selects option 1)
 async function runGhuntAutoLogin() {
     try {
-        const py = await ensurePythonReady();
-        if (!py) {
-            console.log('❌ Python not available, skipping GHunt auto-login');
+        // Use ghunt CLI installed via pipx
+        const ghuntAvailable = await commandExists('ghunt');
+        if (!ghuntAvailable) {
+            console.log('❌ GHunt CLI not found in PATH; skipping auto-login');
             return;
         }
         console.log('🔐 GHunt auto-login: starting');
-        const child = spawn(py, ['-m', 'ghunt', 'login'], {
+        const child = spawn('ghunt', ['login'], {
             stdio: ['pipe', 'pipe', 'pipe'],
             env: { ...process.env, PYTHONUNBUFFERED: '1', PYTHONIOENCODING: 'utf-8' }
         });
@@ -1304,7 +1305,7 @@ async function resolveToolCommand(cmd) {
             baseArgs = ['--timeout', '30', '-n', '20', '--verbose', '--print-errors', placeholder];
         }
         // PhoneInfoga preferred syntax
-        if (cmd === 'phoneinfoga') {
+    if (cmd === 'phoneinfoga') {
             baseArgs = ['scan', '-n', placeholder];
         }
         
@@ -1331,9 +1332,9 @@ async function resolveToolCommand(cmd) {
     console.log(`🔍 Direct command availability for ${cmd}: ${ok}`);
         if (ok) return { command: cmd, viaPython: false };
         
-    // Final fallback
-    console.log(`🔍 Using final fallback for ${cmd}: python3 -m ${cmd}`);
-    return { command: 'python3', viaPython: cmd };
+    // Final fallback: try direct CLI name only (no python -m)
+    console.log(`🔍 Using final fallback for ${cmd}: direct CLI name`);
+    return { command: cmd };
 }
 
 // Update runToolIfAvailable to handle docker inputs
