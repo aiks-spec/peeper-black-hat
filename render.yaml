@@ -3,22 +3,9 @@ services:
     name: osint-lookup-engine
     env: node
     buildCommand: |
-      # Make setup scripts executable
-      chmod +x setup_python_env.sh start_with_venv.sh
-      
       # Ensure Python3 is available
       echo "🐍 Checking Python3 availability..."
       python3 --version || (echo "❌ Python3 not found" && exit 1)
-      
-      # Create virtual environment and install Python dependencies
-      echo "🐍 Creating Python virtual environment..."
-      python3 -m venv venv
-      
-      echo "🔧 Activating virtual environment..."
-      source venv/bin/activate
-      
-      echo "⬆️ Upgrading pip..."
-      pip install --upgrade pip
 
       echo "📦 Installing pipx..."
       python3 -m pip install --user pipx || pip install --user pipx
@@ -27,23 +14,12 @@ services:
       echo "🔍 PATH after pipx setup: $PATH"
 
       echo "📚 Installing OSINT tools via pipx..."
-      pipx install sherlock-project || true
-      pipx install holehe || true
-      pipx install ghunt || true
-      pipx install maigret || true
-      pipx install phoneinfoga || true
-      
-      # Fallback: install sherlock via pip if pipx fails
-      echo "🔧 Installing sherlock as fallback..."
-      pip install sherlock-project || true
-      
-      echo "🔍 Verifying installations and command availability..."
-      python -c "import sherlock; print('✅ Sherlock module installed')" || echo "❌ Sherlock module failed"
-      python -c "import maigret; print('✅ Maigret module installed')" || echo "❌ Maigret module failed"
-      python -c "import holehe; print('✅ Holehe module installed')" || echo "❌ Holehe module failed"
-      python -c "import ghunt; print('✅ GHunt module installed')" || echo "❌ GHunt module failed"
-      python -c "import phoneinfoga; print('✅ PhoneInfoga module installed')" || echo "❌ PhoneInfoga module failed"
-      
+      pipx install sherlock-project --yes || pipx install sherlock-project || true
+      pipx install holehe --yes || pipx install holehe || true
+      pipx install ghunt --yes || pipx install ghunt || true
+      pipx install maigret --yes || pipx install maigret || true
+      pipx install phoneinfoga --yes || pipx install phoneinfoga || true
+
       echo "🔍 Checking command availability..."
       export PATH="$HOME/.local/bin:$PATH"
       which sherlock && echo "✅ Sherlock command available" || echo "❌ Sherlock command not found"
@@ -51,26 +27,20 @@ services:
       which holehe && echo "✅ Holehe command available" || echo "❌ Holehe command not found"
       which phoneinfoga && echo "✅ PhoneInfoga command available" || echo "❌ PhoneInfoga command not found"
       which ghunt && echo "✅ GHunt command available" || echo "❌ GHunt command not found"
-      
+
       echo "🔍 Final verification - CLI tools via pipx..."
       sherlock --help >/dev/null 2>&1 && echo "✅ sherlock ok" || echo "❌ sherlock failed"
       holehe --help >/dev/null 2>&1 && echo "✅ holehe ok" || echo "❌ holehe failed"
       ghunt --help >/dev/null 2>&1 && echo "✅ ghunt ok" || echo "❌ ghunt failed"
       maigret --help >/dev/null 2>&1 && echo "✅ maigret ok" || echo "❌ maigret failed"
       phoneinfoga --help >/dev/null 2>&1 && echo "✅ phoneinfoga ok" || echo "❌ phoneinfoga failed"
-      
-      echo "🔍 Testing module execution..."
-      python -m sherlock --help >/dev/null 2>&1 && echo "✅ Sherlock module executable" || echo "❌ Sherlock module not executable"
-      python -m maigret --help >/dev/null 2>&1 && echo "✅ Maigret module executable" || echo "❌ Maigret module not executable"
-      python -m holehe --help >/dev/null 2>&1 && echo "✅ Holehe module executable" || echo "❌ Holehe module not executable"
-      python -m phoneinfoga --help >/dev/null 2>&1 && echo "✅ PhoneInfoga module executable" || echo "❌ PhoneInfoga module not executable"
-      
+
       # Install Node.js dependencies
       echo "📦 Installing Node.js dependencies..."
       npm install
-      
+
       echo "✅ Build process completed successfully"
-    startCommand: ./start_with_venv.sh
+    startCommand: npm start
     envVars:
       - key: NODE_ENV
         value: production
