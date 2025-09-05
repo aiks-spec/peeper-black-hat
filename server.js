@@ -2251,50 +2251,29 @@ async function getPhoneApiData(phone) {
 // Daily cleanup disabled per user request
 // cron.schedule('0 0 * * *', async () => {});
 
-// Test endpoint for tool availability
-app.get('/api/test-tools', async (req, res) => {
-    const tools = ['sherlock', 'holehe', 'maigret', 'ghunt'];
-    const results = {};
-    
-    for (const tool of tools) {
-        try {
-            const resolved = await resolveToolCommand(tool);
-            results[tool] = {
-                available: !!resolved.command,
-                command: resolved.command,
-                viaPython: resolved.viaPython,
-                platform: process.platform
-            };
-            
-            // Test actual execution on Linux/Render
-            if (resolved.command && resolved.viaPython) {
-                try {
-                    await execFileAsync(resolved.command, ['-m', resolved.viaPython, '--help'], { 
-                        timeout: 10000, 
-                        maxBuffer: 1024 * 1024,
-                        env: { ...process.env, PYTHONUNBUFFERED: '1', NO_COLOR: '1' }
-                    });
-                    results[tool].executionTest = 'passed';
-                } catch (execError) {
-                    results[tool].executionTest = 'failed';
-                    results[tool].executionError = execError.message;
-                }
-            }
-        } catch (error) {
-            results[tool] = {
-                available: false,
-                error: error.message,
-                platform: process.platform
-            };
-        }
-    }
-    
+
+
+// Global error handler
+process.on('uncaughtException', (error) => {
+    console.error('❌ Uncaught Exception:', error.message);
+    console.error('Stack:', error.stack);
+    // Don't exit, just log the error
+});
+
+process.on('unhandledRejection', (reason, promise) => {
+    console.error('❌ Unhandled Rejection at:', promise, 'reason:', reason);
+    // Don't exit, just log the error
+});
+
+// Health check endpoint
+app.get('/api/health', (req, res) => {
     res.json({
+        status: 'OK',
+        timestamp: new Date().toISOString(),
+        uptime: process.uptime(),
+        memory: process.memoryUsage(),
         platform: process.platform,
-        pythonPath: process.env.PYTHON_PATH,
-        environment: process.env.NODE_ENV,
-        databaseType: 'postgresql',
-        results
+        nodeVersion: process.version
     });
 });
 
