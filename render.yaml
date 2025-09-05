@@ -40,7 +40,7 @@ services:
       npm install
 
       echo "✅ Build process completed successfully"
-    startCommand: npm start
+    startCommand: export PATH="$HOME/.local/bin:/usr/local/bin:/usr/bin:$PATH" && npm start
     envVars:
       - key: NODE_ENV
         value: production
