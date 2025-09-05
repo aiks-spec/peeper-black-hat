@@ -167,28 +167,23 @@ process.on('SIGINT', async () => {
 try {
     console.log('🌐 Running on Linux/Render platform');
     
-    // Add common Python paths for Linux/Render
+    // Add common CLI paths for Linux/Render (prepend unconditionally)
         const linuxPaths = [
+            '/opt/render/.local/bin',
+            path.join(process.env.HOME || '', '.local', 'bin'),
             '/usr/local/bin',
             '/usr/bin',
             '/bin',
             '/opt/python/bin',
-            // Dynamic home-local bin for pipx shims
-            path.join(process.env.HOME || '', '.local', 'bin'),
             '/home/render/.local/bin',
             '/root/.local/bin',
             '/usr/local/lib/python3.11/bin',
             '/usr/local/lib/python3.10/bin',
             '/usr/local/lib/python3.9/bin'
         ];
-        
         const existingPath = process.env.PATH || '';
-        const newPaths = linuxPaths.filter(p => fs.existsSync(p));
-        
-        if (newPaths.length > 0) {
-        process.env.PATH = `${newPaths.join(':')}:${existingPath}`;
-            console.log('✅ Added Linux Python paths to PATH');
-        }
+        process.env.PATH = `${linuxPaths.join(':')}:${existingPath}`;
+        console.log('✅ Preprended Linux CLI paths to PATH');
         
         // Debug: Check what's actually available
         console.log('🔍 Current PATH:', process.env.PATH);
@@ -1363,29 +1358,13 @@ async function runToolIfAvailable(cmd, args, parseFn) {
             console.log(`🔧 Extracted username from email: ${userInput} -> ${processedInput}`);
         }
         
-        // Create JSON output file for tools that support it
+        // JSON output creation disabled for all tools per user request
         let jsonOutputFile = null;
-        if (['maigret', 'holehe', 'sherlock'].includes(cmd)) {
-            jsonOutputFile = createToolOutputFile(cmd, processedInput);
-            console.log(`📁 Created JSON output file: ${jsonOutputFile}`);
-        }
         
         const templateArgs = resolved.templateArgs.map((a) => typeof a === 'string' && resolved.placeholder ? a.replace(resolved.placeholder, processedInput) : a);
         let allArgs = [...templateArgs, ...args.slice(1)]; // Add all additional arguments after the first one
         
-        // Add JSON output file for tools that support it
-        if (jsonOutputFile && ['maigret', 'holehe', 'sherlock'].includes(cmd)) {
-            if (cmd === 'maigret') {
-                // Try without JSON output first to see if that helps
-                console.log(`⚠️ Maigret: Skipping JSON output for now, using stdout only`);
-            } else if (cmd === 'holehe') {
-                // Holehe doesn't support JSON output, just use stdout
-                console.log(`⚠️ Holehe doesn't support JSON output, using stdout parsing`);
-            } else if (cmd === 'sherlock') {
-                // Sherlock uses --output for file
-                allArgs = [...allArgs, '--output', jsonOutputFile];
-            }
-        }
+        // Skip all JSON output flags; use stdout-only
         
         console.log(`🔧 Executing: ${resolved.command} ${allArgs.join(' ')}`);
         try {
