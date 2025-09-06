@@ -11,10 +11,10 @@ class OSINTLookupEngine {
         this.updateStatus('ONLINE');
         this.startStatusBlink();
         
-        // Refresh stats every 30 seconds to keep visitor count updated
+        // Refresh stats every 10 seconds to keep visitor count updated
         setInterval(() => {
             this.loadStats();
-        }, 30000);
+        }, 10000);
     }
 
     setupEventListeners() {
@@ -632,7 +632,15 @@ class OSINTLookupEngine {
     // Stats Management
     async loadStats() {
         try {
-            const response = await fetch('/api/stats');
+            // Add cache-busting parameter to ensure fresh data
+            const timestamp = new Date().getTime();
+            const response = await fetch(`/api/stats?t=${timestamp}`, {
+                cache: 'no-cache',
+                headers: {
+                    'Cache-Control': 'no-cache',
+                    'Pragma': 'no-cache'
+                }
+            });
             const data = await response.json();
 
             // Prefer total_hits if available so the number changes on refresh
@@ -640,6 +648,7 @@ class OSINTLookupEngine {
                 ? data.total_hits
                 : (data.visitors_today || 0);
 
+            console.log('📊 Stats loaded:', data);
             document.getElementById('visitor-count').textContent = visitorsDisplay;
             document.getElementById('search-count').textContent = data.searches || 0;
         } catch (error) {
