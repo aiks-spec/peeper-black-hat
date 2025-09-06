@@ -220,6 +220,12 @@ app.use((req, res, next) => {
         const isPage = req.method === 'GET' && !req.path.startsWith('/api/');
         if (!isPage) return next();
 
+        // Only track if database is connected
+        if (!dbManager.isConnected) {
+            console.log('⚠️ Database not connected, skipping visitor tracking');
+            return next();
+        }
+
         // Get real client IP
         const ips = [
             req.headers['x-forwarded-for']?.split(',')[0]?.trim(),
@@ -232,10 +238,12 @@ app.use((req, res, next) => {
 
         const userAgent = req.get('User-Agent') || 'Unknown';
         
+        console.log('🔍 Page visit detected:', req.path, 'from IP:', ip);
+        
         // Always track visitor (no debounce)
         dbManager.insertVisitor(ip, userAgent).then((success) => {
             if (success) {
-                console.log('✅ Visitor tracked:', ip, '- User Agent:', userAgent.substring(0, 50));
+                console.log('✅ Visitor tracked successfully:', ip);
             } else {
                 console.log('⚠️ Visitor tracking failed (database may not be connected)');
             }
@@ -954,7 +962,6 @@ app.get('/api/stats', async (req, res) => {
             timestamp: new Date().toISOString()
         };
         
-        console.log('📊 Stats requested:', stats);
         res.json(stats);
     } catch (error) {
         console.log('❌ Stats error:', error.message);
@@ -1320,7 +1327,7 @@ function parseOsintScriptOutput(stdout, stderr) {
         ghunt: null
     };
     
-    const lines = stdout.split('\n');
+    const lines = stdout.split('\n'); 
     let currentTool = null;
     let toolOutput = [];
     
