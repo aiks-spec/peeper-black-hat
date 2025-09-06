@@ -4,6 +4,7 @@ class OSINTLookupEngine {
         this.initialize();
         this.loadStats();
         this.setupEventListeners();
+        this.statsLoading = false; // Prevent multiple simultaneous requests
     }
 
     initialize() {
@@ -11,10 +12,10 @@ class OSINTLookupEngine {
         this.updateStatus('ONLINE');
         this.startStatusBlink();
         
-        // Refresh stats every 10 seconds to keep visitor count updated
+        // Refresh stats every 30 seconds to keep visitor count updated
         setInterval(() => {
             this.loadStats();
-        }, 10000);
+        }, 30000);
     }
 
     setupEventListeners() {
@@ -631,6 +632,13 @@ class OSINTLookupEngine {
 
     // Stats Management
     async loadStats() {
+        // Prevent multiple simultaneous requests
+        if (this.statsLoading) {
+            return;
+        }
+        
+        this.statsLoading = true;
+        
         try {
             // Add cache-busting parameter to ensure fresh data
             const timestamp = new Date().getTime();
@@ -648,7 +656,6 @@ class OSINTLookupEngine {
                 ? data.total_hits
                 : (data.visitors_today || 0);
 
-            console.log('📊 Stats loaded:', data);
             document.getElementById('visitor-count').textContent = visitorsDisplay;
             document.getElementById('search-count').textContent = data.searches || 0;
         } catch (error) {
@@ -656,6 +663,8 @@ class OSINTLookupEngine {
             // Set default values on error
             document.getElementById('visitor-count').textContent = '0';
             document.getElementById('search-count').textContent = '0';
+        } finally {
+            this.statsLoading = false;
         }
     }
 
