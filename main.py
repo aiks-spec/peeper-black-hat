@@ -1,21 +1,16 @@
 #!/usr/bin/env python3
 """
 Unified OSINT Runner Script
-Runs Sherlock, Holehe, GHunt, and Maigret from local repositories
+Runs Sherlock, Holehe, GHunt, and Maigret from local repositories using subprocess
 """
 
 import sys
 import json
 import os
 import time
+import subprocess
 from datetime import datetime
 from typing import Dict, List, Any, Optional
-
-# Add local tool directories to Python path
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), 'sherlock'))
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), 'holehe'))
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), 'ghunt'))
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), 'maigret'))
 
 class OSINTRunner:
     def __init__(self):
@@ -35,39 +30,103 @@ class OSINTRunner:
         """Extract username from email (part before @)"""
         return email.split('@')[0] if '@' in email else email
     
-    def run_holehe(self, email: str) -> Dict[str, Any]:
-        """Run Holehe on email"""
-        print(f"🔍 Running Holehe on: {email}")
+    def run_subprocess_tool(self, cmd: List[str], tool_name: str) -> Dict[str, Any]:
+        """Generic subprocess runner for OSINT tools"""
         try:
-            # Import Holehe from local repository
-            from holehe import holehe
+            print(f"🔧 Executing: {' '.join(cmd)}")
+            result = subprocess.run(
+                cmd,
+                capture_output=True,
+                text=True,
+                timeout=300,  # 5 minute timeout
+                cwd=os.path.dirname(os.path.abspath(__file__))  # Run from project root
+            )
             
-            # Run Holehe
-            results = holehe(email)
-            
-            # Parse results
-            parsed_results = []
-            if results:
-                for result in results:
-                    parsed_results.append({
-                        'site': result.get('name', 'Unknown'),
-                        'exists': result.get('exists', False),
-                        'confidence': result.get('confidence', 'Unknown'),
-                        'url': result.get('url', ''),
-                        'error': result.get('error', '')
-                    })
-            
-            self.results['tools']['holehe'] = {
-                'success': True,
-                'data': parsed_results,
-                'error': None
+            if result.returncode == 0:
+                print(f"✅ {tool_name} completed successfully")
+                return {
+                    'success': True,
+                    'stdout': result.stdout,
+                    'stderr': result.stderr,
+                    'returncode': result.returncode
+                }
+            else:
+                print(f"❌ {tool_name} failed with return code {result.returncode}")
+                return {
+                    'success': False,
+                    'stdout': result.stdout,
+                    'stderr': result.stderr,
+                    'returncode': result.returncode
+                }
+                
+        except subprocess.TimeoutExpired:
+            error_msg = f"{tool_name} timed out after 5 minutes"
+            print(f"⏰ {error_msg}")
+            return {
+                'success': False,
+                'stdout': '',
+                'stderr': error_msg,
+                'returncode': -1
             }
-            
-            print(f"✅ Holehe completed: {len(parsed_results)} results")
-            return {'success': True, 'data': parsed_results}
-            
         except Exception as e:
-            error_msg = f"Holehe error: {str(e)}"
+            error_msg = f"{tool_name} subprocess error: {str(e)}"
+            print(f"❌ {error_msg}")
+            return {
+                'success': False,
+                'stdout': '',
+                'stderr': error_msg,
+                'returncode': -1
+            }
+    
+    def run_holehe(self, email: str) -> Dict[str, Any]:
+        """Run Holehe on email using subprocess"""
+        print(f"🔍 Running Holehe on: {email}")
+        
+        # Run holehe via subprocess as a module
+        cmd = ['python3', '-m', 'holehe', email, '--json']
+        result = self.run_subprocess_tool(cmd, 'Holehe')
+        
+        if result['success']:
+            try:
+                # Parse JSON output
+                if result['stdout'].strip():
+                    parsed_data = json.loads(result['stdout'])
+                    if isinstance(parsed_data, list):
+                        parsed_results = []
+                        for item in parsed_data:
+                            parsed_results.append({
+                                'site': item.get('name', 'Unknown'),
+                                'exists': item.get('exists', False),
+                                'confidence': item.get('confidence', 'Unknown'),
+                                'url': item.get('url', ''),
+                                'error': item.get('error', '')
+                            })
+                    else:
+                        parsed_results = [parsed_data] if parsed_data else []
+                else:
+                    parsed_results = []
+                
+                self.results['tools']['holehe'] = {
+                    'success': True,
+                    'data': parsed_results,
+                    'error': None
+                }
+                
+                print(f"✅ Holehe completed: {len(parsed_results)} results")
+                return {'success': True, 'data': parsed_results}
+                
+            except json.JSONDecodeError as e:
+                error_msg = f"Holehe JSON parse error: {str(e)}"
+                print(f"❌ {error_msg}")
+                print(f"Raw output: {result['stdout'][:200]}...")
+                self.results['tools']['holehe'] = {
+                    'success': False,
+                    'data': [],
+                    'error': error_msg
+                }
+                return {'success': False, 'error': error_msg}
+        else:
+            error_msg = f"Holehe execution failed: {result['stderr']}"
             print(f"❌ {error_msg}")
             self.results['tools']['holehe'] = {
                 'success': False,
@@ -77,44 +136,56 @@ class OSINTRunner:
             return {'success': False, 'error': error_msg}
     
     def run_ghunt(self, email: str) -> Dict[str, Any]:
-        """Run GHunt on email"""
+        """Run GHunt on email using subprocess"""
         print(f"🔍 Running GHunt on: {email}")
-        try:
-            # Import GHunt from local repository
-            from ghunt import ghunt
-            
-            # Run GHunt
-            results = ghunt.email(email)
-            
-            # Parse results
-            parsed_results = {}
-            if results:
-                parsed_results = {
-                    'name': results.get('name', ''),
-                    'profile_picture': results.get('profile_picture', ''),
-                    'cover_photo': results.get('cover_photo', ''),
-                    'emails': results.get('emails', []),
-                    'phone_numbers': results.get('phone_numbers', []),
-                    'social_profiles': results.get('social_profiles', []),
-                    'locations': results.get('locations', []),
-                    'workplaces': results.get('workplaces', []),
-                    'education': results.get('education', []),
-                    'birthday': results.get('birthday', ''),
-                    'gender': results.get('gender', ''),
-                    'profile_url': results.get('profile_url', '')
+        
+        # Run ghunt via subprocess as a module
+        cmd = ['python3', '-m', 'ghunt', 'email', email, '--json']
+        result = self.run_subprocess_tool(cmd, 'GHunt')
+        
+        if result['success']:
+            try:
+                # Parse JSON output
+                if result['stdout'].strip():
+                    parsed_data = json.loads(result['stdout'])
+                    parsed_results = {
+                        'name': parsed_data.get('name', ''),
+                        'profile_picture': parsed_data.get('profile_picture', ''),
+                        'cover_photo': parsed_data.get('cover_photo', ''),
+                        'emails': parsed_data.get('emails', []),
+                        'phone_numbers': parsed_data.get('phone_numbers', []),
+                        'social_profiles': parsed_data.get('social_profiles', []),
+                        'locations': parsed_data.get('locations', []),
+                        'workplaces': parsed_data.get('workplaces', []),
+                        'education': parsed_data.get('education', []),
+                        'birthday': parsed_data.get('birthday', ''),
+                        'gender': parsed_data.get('gender', ''),
+                        'profile_url': parsed_data.get('profile_url', '')
+                    }
+                else:
+                    parsed_results = {}
+                
+                self.results['tools']['ghunt'] = {
+                    'success': True,
+                    'data': parsed_results,
+                    'error': None
                 }
-            
-            self.results['tools']['ghunt'] = {
-                'success': True,
-                'data': parsed_results,
-                'error': None
-            }
-            
-            print(f"✅ GHunt completed: {len(parsed_results)} data points")
-            return {'success': True, 'data': parsed_results}
-            
-        except Exception as e:
-            error_msg = f"GHunt error: {str(e)}"
+                
+                print(f"✅ GHunt completed: {len(parsed_results)} data points")
+                return {'success': True, 'data': parsed_results}
+                
+            except json.JSONDecodeError as e:
+                error_msg = f"GHunt JSON parse error: {str(e)}"
+                print(f"❌ {error_msg}")
+                print(f"Raw output: {result['stdout'][:200]}...")
+                self.results['tools']['ghunt'] = {
+                    'success': False,
+                    'data': {},
+                    'error': error_msg
+                }
+                return {'success': False, 'error': error_msg}
+        else:
+            error_msg = f"GHunt execution failed: {result['stderr']}"
             print(f"❌ {error_msg}")
             self.results['tools']['ghunt'] = {
                 'success': False,
@@ -124,37 +195,53 @@ class OSINTRunner:
             return {'success': False, 'error': error_msg}
     
     def run_sherlock(self, username: str) -> Dict[str, Any]:
-        """Run Sherlock on username"""
+        """Run Sherlock on username using subprocess"""
         print(f"🔍 Running Sherlock on: {username}")
-        try:
-            # Import Sherlock from local repository
-            from sherlock import sherlock
-            
-            # Run Sherlock
-            results = sherlock(username)
-            
-            # Parse results
-            parsed_results = []
-            if results:
-                for result in results:
-                    parsed_results.append({
-                        'site': result.get('name', 'Unknown'),
-                        'url': result.get('url', ''),
-                        'status': result.get('status', 'Unknown'),
-                        'response_time': result.get('response_time', 0)
-                    })
-            
-            self.results['tools']['sherlock'] = {
-                'success': True,
-                'data': parsed_results,
-                'error': None
-            }
-            
-            print(f"✅ Sherlock completed: {len(parsed_results)} results")
-            return {'success': True, 'data': parsed_results}
-            
-        except Exception as e:
-            error_msg = f"Sherlock error: {str(e)}"
+        
+        # Run sherlock via subprocess as a module
+        cmd = ['python3', '-m', 'sherlock', username, '--json']
+        result = self.run_subprocess_tool(cmd, 'Sherlock')
+        
+        if result['success']:
+            try:
+                # Parse JSON output
+                if result['stdout'].strip():
+                    parsed_data = json.loads(result['stdout'])
+                    if isinstance(parsed_data, list):
+                        parsed_results = []
+                        for item in parsed_data:
+                            parsed_results.append({
+                                'site': item.get('name', 'Unknown'),
+                                'url': item.get('url', ''),
+                                'status': item.get('status', 'Unknown'),
+                                'response_time': item.get('response_time', 0)
+                            })
+                    else:
+                        parsed_results = [parsed_data] if parsed_data else []
+                else:
+                    parsed_results = []
+                
+                self.results['tools']['sherlock'] = {
+                    'success': True,
+                    'data': parsed_results,
+                    'error': None
+                }
+                
+                print(f"✅ Sherlock completed: {len(parsed_results)} results")
+                return {'success': True, 'data': parsed_results}
+                
+            except json.JSONDecodeError as e:
+                error_msg = f"Sherlock JSON parse error: {str(e)}"
+                print(f"❌ {error_msg}")
+                print(f"Raw output: {result['stdout'][:200]}...")
+                self.results['tools']['sherlock'] = {
+                    'success': False,
+                    'data': [],
+                    'error': error_msg
+                }
+                return {'success': False, 'error': error_msg}
+        else:
+            error_msg = f"Sherlock execution failed: {result['stderr']}"
             print(f"❌ {error_msg}")
             self.results['tools']['sherlock'] = {
                 'success': False,
@@ -164,37 +251,53 @@ class OSINTRunner:
             return {'success': False, 'error': error_msg}
     
     def run_maigret(self, username: str) -> Dict[str, Any]:
-        """Run Maigret on username"""
+        """Run Maigret on username using subprocess"""
         print(f"🔍 Running Maigret on: {username}")
-        try:
-            # Import Maigret from local repository
-            from maigret import maigret
-            
-            # Run Maigret
-            results = maigret(username)
-            
-            # Parse results
-            parsed_results = []
-            if results:
-                for result in results:
-                    parsed_results.append({
-                        'site': result.get('name', 'Unknown'),
-                        'url': result.get('url', ''),
-                        'status': result.get('status', 'Unknown'),
-                        'response_time': result.get('response_time', 0)
-                    })
-            
-            self.results['tools']['maigret'] = {
-                'success': True,
-                'data': parsed_results,
-                'error': None
-            }
-            
-            print(f"✅ Maigret completed: {len(parsed_results)} results")
-            return {'success': True, 'data': parsed_results}
-            
-        except Exception as e:
-            error_msg = f"Maigret error: {str(e)}"
+        
+        # Run maigret via subprocess as a module
+        cmd = ['python3', '-m', 'maigret', username, '--json']
+        result = self.run_subprocess_tool(cmd, 'Maigret')
+        
+        if result['success']:
+            try:
+                # Parse JSON output
+                if result['stdout'].strip():
+                    parsed_data = json.loads(result['stdout'])
+                    if isinstance(parsed_data, list):
+                        parsed_results = []
+                        for item in parsed_data:
+                            parsed_results.append({
+                                'site': item.get('name', 'Unknown'),
+                                'url': item.get('url', ''),
+                                'status': item.get('status', 'Unknown'),
+                                'response_time': item.get('response_time', 0)
+                            })
+                    else:
+                        parsed_results = [parsed_data] if parsed_data else []
+                else:
+                    parsed_results = []
+                
+                self.results['tools']['maigret'] = {
+                    'success': True,
+                    'data': parsed_results,
+                    'error': None
+                }
+                
+                print(f"✅ Maigret completed: {len(parsed_results)} results")
+                return {'success': True, 'data': parsed_results}
+                
+            except json.JSONDecodeError as e:
+                error_msg = f"Maigret JSON parse error: {str(e)}"
+                print(f"❌ {error_msg}")
+                print(f"Raw output: {result['stdout'][:200]}...")
+                self.results['tools']['maigret'] = {
+                    'success': False,
+                    'data': [],
+                    'error': error_msg
+                }
+                return {'success': False, 'error': error_msg}
+        else:
+            error_msg = f"Maigret execution failed: {result['stderr']}"
             print(f"❌ {error_msg}")
             self.results['tools']['maigret'] = {
                 'success': False,
