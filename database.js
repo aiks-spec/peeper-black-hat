@@ -169,10 +169,6 @@ class DatabaseManager {
     }
 
     async insertVisitor(ip, userAgent) {
-        console.log('🔍 insertVisitor called with:', { ip, userAgent: userAgent?.substring(0, 50) });
-        console.log('🔍 Database connected:', this.isConnected);
-        console.log('🔍 Database object exists:', !!this.db);
-        
         if (!this.isConnected || !this.db) {
             console.log('⚠️ Database not connected, skipping visitor insert');
             return false;
@@ -181,29 +177,19 @@ class DatabaseManager {
         // Clean and truncate IP address if it's too long
         const cleanIp = String(ip || '').trim().substring(0, 255); // Limit to 255 chars
         const cleanUserAgent = String(userAgent || '').trim().substring(0, 1000); // Limit user agent
-        
-        console.log(`🔍 Inserting visitor: ${cleanIp} with user agent: ${cleanUserAgent?.substring(0, 50)}...`);
 
         try {
-            console.log('🔍 Getting database client...');
             const client = await this.db.connect();
-            console.log('🔍 Database client obtained, executing query...');
             
             const result = await client.query(
                 'INSERT INTO visitors (ip, user_agent) VALUES ($1, $2)',
                 [cleanIp, cleanUserAgent]
             );
             
-            console.log('🔍 Query executed successfully:', result);
             client.release();
-            console.log('🔍 Client released, returning true');
             return true;
         } catch (error) {
             console.error('❌ Visitor insertion failed:', error.message);
-            console.error('❌ Visitor insertion error details:', error);
-            console.error('❌ IP length:', cleanIp.length, 'User Agent length:', cleanUserAgent.length);
-            console.error('❌ Error code:', error.code);
-            console.error('❌ Error stack:', error.stack);
             return false;
         }
     }
@@ -252,53 +238,39 @@ class DatabaseManager {
     }
 
     async getVisitorStats() {
-        console.log('🔍 getVisitorStats called');
-        console.log('🔍 Database connected:', this.isConnected);
-        console.log('🔍 Database object exists:', !!this.db);
-        
         if (!this.isConnected || !this.db) {
             console.log('⚠️ Database not connected, returning default visitor stats');
             return { visitors_today: 0, total_visitors: 0, hits_today: 0, total_hits: 0 };
         }
 
         try {
-            console.log('🔍 Getting database client for stats...');
             const client = await this.db.connect();
-            console.log('🔍 Database client obtained for stats');
             
             // Unique visitors today
-            console.log('🔍 Querying unique visitors today...');
             const todayUniqueResult = await client.query(`
                     SELECT COUNT(DISTINCT ip) as visitors 
                     FROM visitors 
                     WHERE timestamp > NOW() - INTERVAL '24 hours'
                 `);
-            console.log('🔍 Today unique visitors result:', todayUniqueResult.rows[0]);
                 
             // Total unique visitors overall
-            console.log('🔍 Querying total unique visitors...');
             const totalUniqueResult = await client.query(`
                     SELECT COUNT(DISTINCT ip) as total_visitors 
                     FROM visitors
                 `);
-            console.log('🔍 Total unique visitors result:', totalUniqueResult.rows[0]);
 
             // Total hits today
-            console.log('🔍 Querying hits today...');
             const todayHitsResult = await client.query(`
                 SELECT COUNT(*) as hits_today 
                 FROM visitors 
                 WHERE timestamp > NOW() - INTERVAL '24 hours'
             `);
-            console.log('🔍 Today hits result:', todayHitsResult.rows[0]);
 
             // Total hits overall
-            console.log('🔍 Querying total hits...');
             const totalHitsResult = await client.query(`
                 SELECT COUNT(*) as total_hits 
                 FROM visitors
             `);
-            console.log('🔍 Total hits result:', totalHitsResult.rows[0]);
                 
             client.release();
             
@@ -309,12 +281,9 @@ class DatabaseManager {
                 total_hits: parseInt(totalHitsResult.rows[0].total_hits) || 0
             };
             
-            console.log('🔍 Final stats object:', stats);
             return stats;
         } catch (error) {
             console.error('❌ Visitor stats failed:', error.message);
-            console.error('❌ Visitor stats error details:', error);
-            console.error('❌ Error stack:', error.stack);
             return { visitors_today: 0, total_visitors: 0, hits_today: 0, total_hits: 0 };
         }
     }
