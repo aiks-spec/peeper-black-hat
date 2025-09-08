@@ -29,6 +29,22 @@ class OSINTRunner:
     def _tool_script(self, folder: str, script: str) -> str:
         return os.path.join(os.path.dirname(__file__), folder, script)
 
+    def _find_tool_script(self, folder: str, candidates: List[str]) -> Optional[str]:
+        base = os.path.join(os.path.dirname(__file__), folder)
+        for name in candidates:
+            path = os.path.join(base, name)
+            if os.path.exists(path):
+                return path
+        return None
+
+    def _find_any_script(self, candidates: List[List[str]]) -> Optional[str]:
+        base = os.path.dirname(__file__)
+        for parts in candidates:
+            path = os.path.join(base, *parts)
+            if os.path.exists(path):
+                return path
+        return None
+
     def extract_username(self, email: str) -> str:
         """Extract username from email (part before @)"""
         return email.split('@')[0] if '@' in email else email
@@ -121,9 +137,14 @@ class OSINTRunner:
         print(f"🔍 Running Holehe on: {email}")
         
         # Run Holehe from local cloned repo (no --json; capture raw output)
-        script_path = self._tool_script('holehe', 'holehe.py')
-        if not os.path.exists(script_path):
-            msg = f"Holehe script missing at: {script_path}"
+        script_path = self._find_any_script([
+            ['holehe', 'holehe', 'core.py'],
+            ['holehe', 'cli.py'],
+            ['holehe', 'holehe.py']
+        ])
+        if not script_path:
+            tried = 'holehe/holehe/core.py, holehe/cli.py, holehe/holehe.py'
+            msg = f"Holehe script missing (tried: {tried})"
             print(f"❌ {msg}")
             self.results['tools']['holehe'] = {
                 'success': False,
@@ -155,9 +176,15 @@ class OSINTRunner:
         print(f"🔍 Running GHunt on: {email}")
         
         # Run GHunt from local cloned repo (no --json; capture raw output)
-        script_path = self._tool_script('ghunt', 'ghunt.py')
-        if not os.path.exists(script_path):
-            msg = f"GHunt script missing at: {script_path}"
+        script_path = self._find_any_script([
+            ['Ghunt', 'main.py'],
+            ['Ghunt', 'ghunt', 'ghunt.py'],
+            ['ghunt', 'ghunt.py'],
+            ['ghunt', '__main__.py']
+        ])
+        if not script_path:
+            tried = 'Ghunt/main.py, Ghunt/ghunt/ghunt.py, ghunt/ghunt.py, ghunt/__main__.py'
+            msg = f"GHunt script missing (tried: {tried})"
             print(f"❌ {msg}")
             self.results['tools']['ghunt'] = {
                 'success': False,
@@ -189,9 +216,14 @@ class OSINTRunner:
         print(f"🔍 Running Sherlock on: {username}")
         
         # Run Sherlock from local cloned repo (no --json; capture raw output)
-        script_path = self._tool_script('sherlock', 'sherlock.py')
-        if not os.path.exists(script_path):
-            msg = f"Sherlock script missing at: {script_path}"
+        script_path = self._find_any_script([
+            ['sherlock', 'sherlock_project', 'sherlock.py'],
+            ['sherlock', '__main__.py'],
+            ['sherlock', 'sherlock.py']
+        ])
+        if not script_path:
+            tried = 'sherlock/sherlock_project/sherlock.py, sherlock/__main__.py, sherlock/sherlock.py'
+            msg = f"Sherlock script missing (tried: {tried})"
             print(f"❌ {msg}")
             self.results['tools']['sherlock'] = {
                 'success': False,
@@ -223,9 +255,14 @@ class OSINTRunner:
         print(f"🔍 Running Maigret on: {username}")
         
         # Run Maigret from local cloned repo (no --json; capture raw output)
-        script_path = self._tool_script('maigret', 'maigret.py')
-        if not os.path.exists(script_path):
-            msg = f"Maigret script missing at: {script_path}"
+        script_path = self._find_any_script([
+            ['maigret', 'maigret', 'maigret.py'],
+            ['maigret', 'maigret.py'],
+            ['maigret', '__main__.py']
+        ])
+        if not script_path:
+            tried = 'maigret/maigret/maigret.py, maigret/maigret.py, maigret/__main__.py'
+            msg = f"Maigret script missing (tried: {tried})"
             print(f"❌ {msg}")
             self.results['tools']['maigret'] = {
                 'success': False,
