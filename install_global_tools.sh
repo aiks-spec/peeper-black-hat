@@ -12,25 +12,29 @@ python3 --version || true
 pip --version || true
 pip3 --version || true
 
+echo "[+] Adjusting environment (avoid virtualenv user-site issues)"
+unset PIP_USER || true
+export PIPX_HOME="$HOME/.local/pipx"
+export PIPX_BIN_DIR="$HOME/.local/bin"
+mkdir -p "$PIPX_HOME" "$PIPX_BIN_DIR"
+export PATH="$PIPX_BIN_DIR:/usr/local/bin:/usr/bin:/bin:$PATH"
+
 echo "[+] Install/upgrade pipx and ensure PATH"
-python -m pip install --user --upgrade pip pipx || python3 -m pip install --user --upgrade pip pipx || pip3 install --user --upgrade pip pipx
+python -m pip install --upgrade pip pipx || python3 -m pip install --upgrade pip pipx || pip3 install --upgrade pip pipx
 python -m pipx ensurepath || python3 -m pipx ensurepath || pipx ensurepath || true
-export PATH="$HOME/.local/bin:/usr/local/bin:/usr/bin:/bin:$PATH"
+export PATH="$PIPX_BIN_DIR:/usr/local/bin:/usr/bin:/bin:$PATH"
 
 echo "[+] Install sherlock via pipx"
-python -m pipx install sherlock-project || python3 -m pipx install sherlock-project || pipx install sherlock-project || true
+python -m pipx install --pip-args="--no-input" sherlock-project || python3 -m pipx install --pip-args="--no-input" sherlock-project || pipx install sherlock-project || true
 
 echo "[+] Install Maigret"
-python -m pip install --user --upgrade maigret || python3 -m pip install --user --upgrade maigret || pip3 install --user --upgrade maigret
+python -m pipx install --pip-args="--no-input" maigret || python3 -m pipx install --pip-args="--no-input" maigret || pipx install maigret || true
 
-echo "[+] Install Holehe from GitHub"
-git clone --depth=1 https://github.com/megadose/holehe.git /tmp/holehe || true
-cd /tmp/holehe
-python setup.py install || python3 setup.py install || pip3 install . || python -m pip install . || true
-cd -
+echo "[+] Install Holehe via pipx from GitHub"
+python -m pipx install 'git+https://github.com/megadose/holehe.git' || python3 -m pipx install 'git+https://github.com/megadose/holehe.git' || pipx install 'git+https://github.com/megadose/holehe.git' || true
 
 echo "[+] Install GHunt via pipx"
-python -m pipx install ghunt || python3 -m pipx install ghunt || pipx install ghunt || true
+python -m pipx install --pip-args="--no-input" ghunt || python3 -m pipx install --pip-args="--no-input" ghunt || pipx install ghunt || true
 
 echo "[+] Configure GHunt (non-interactive) if creds provided"
 if command -v ghunt >/dev/null 2>&1; then
