@@ -52,6 +52,12 @@ class OSINTRunner:
                 }
             else:
                 print(f"❌ {tool_name} failed with return code {result.returncode}")
+                if result.stdout:
+                    preview = result.stdout[:400]
+                    print(f"↪ stdout: {preview}")
+                if result.stderr:
+                    preview = result.stderr[:400]
+                    print(f"↪ stderr: {preview}")
                 return {
                     'success': False,
                     'stdout': result.stdout,
@@ -78,13 +84,26 @@ class OSINTRunner:
                 'returncode': -1
             }
     
+    def run_with_module_fallback(self, module_cmd: List[str], script_cmd: List[str], tool_name: str) -> Dict[str, Any]:
+        """Try python -m first; if it fails or gives no JSON, run the local script path."""
+        first = self.run_subprocess_tool(module_cmd, f"{tool_name} (-m)")
+        if first['success'] and (first.get('stdout') or '').strip():
+            return first
+        # Decide whether to fallback based on common module errors or empty output
+        stderr = (first.get('stderr') or '').lower()
+        if ('no module named' in stderr) or ('__main__' in stderr) or ('enoent' in stderr) or ('eacces' in stderr) or not (first.get('stdout') or '').strip():
+            print(f"🔁 Falling back to script for {tool_name}…")
+            return self.run_subprocess_tool(script_cmd, f"{tool_name} (script)")
+        return first
+    
     def run_holehe(self, email: str) -> Dict[str, Any]:
         """Run Holehe on email using subprocess"""
         print(f"🔍 Running Holehe on: {email}")
         
-        # Run holehe via subprocess as a module
-        cmd = ['python3', '-m', 'holehe', email, '--json']
-        result = self.run_subprocess_tool(cmd, 'Holehe')
+        # Try module first, then local script as fallback
+        module_cmd = ['python3', '-m', 'holehe', email, '--json']
+        script_cmd = ['python3', os.path.join(os.path.dirname(__file__), 'holehe', 'holehe.py'), email, '--json']
+        result = self.run_with_module_fallback(module_cmd, script_cmd, 'Holehe')
         
         if result['success']:
             try:
@@ -139,9 +158,10 @@ class OSINTRunner:
         """Run GHunt on email using subprocess"""
         print(f"🔍 Running GHunt on: {email}")
         
-        # Run ghunt via subprocess as a module
-        cmd = ['python3', '-m', 'ghunt', 'email', email, '--json']
-        result = self.run_subprocess_tool(cmd, 'GHunt')
+        # Try module first, then local script as fallback
+        module_cmd = ['python3', '-m', 'ghunt', 'email', email, '--json']
+        script_cmd = ['python3', os.path.join(os.path.dirname(__file__), 'ghunt', 'ghunt.py'), 'email', email, '--json']
+        result = self.run_with_module_fallback(module_cmd, script_cmd, 'GHunt')
         
         if result['success']:
             try:
@@ -198,9 +218,10 @@ class OSINTRunner:
         """Run Sherlock on username using subprocess"""
         print(f"🔍 Running Sherlock on: {username}")
         
-        # Run sherlock via subprocess as a module
-        cmd = ['python3', '-m', 'sherlock', username, '--json']
-        result = self.run_subprocess_tool(cmd, 'Sherlock')
+        # Try module first, then local script as fallback
+        module_cmd = ['python3', '-m', 'sherlock', username, '--json']
+        script_cmd = ['python3', os.path.join(os.path.dirname(__file__), 'sherlock', 'sherlock.py'), username, '--json']
+        result = self.run_with_module_fallback(module_cmd, script_cmd, 'Sherlock')
         
         if result['success']:
             try:
@@ -254,9 +275,10 @@ class OSINTRunner:
         """Run Maigret on username using subprocess"""
         print(f"🔍 Running Maigret on: {username}")
         
-        # Run maigret via subprocess as a module
-        cmd = ['python3', '-m', 'maigret', username, '--json']
-        result = self.run_subprocess_tool(cmd, 'Maigret')
+        # Try module first, then local script as fallback
+        module_cmd = ['python3', '-m', 'maigret', username, '--json']
+        script_cmd = ['python3', os.path.join(os.path.dirname(__file__), 'maigret', 'maigret.py'), username, '--json']
+        result = self.run_with_module_fallback(module_cmd, script_cmd, 'Maigret')
         
         if result['success']:
             try:
