@@ -41,6 +41,10 @@ echo "[+] Configure GHunt (non-interactive) if creds provided"
 if command -v ghunt >/dev/null 2>&1; then
   mkdir -p "$HOME/.config/ghunt" "/opt/render/.config/ghunt"
   export XDG_CONFIG_HOME="$HOME/.config"
+  # Fallback: embed cookies if not provided via env (requested by user)
+  if [ -z "${GHUNT_COOKIES_B64:-}" ]; then
+    export GHUNT_COOKIES_B64="eyJjb29raWVzIjp7IlNJRCI6ImcuYTAwMDFBanlHNi10Sm5mYzBjTFZNR3VTTVNlX1ZyekJwYUpsenlsQnYtZ0hVYVdDemppTTVOWVZ0anI1dWtXSUt6MWh1ZHN3WUFBQ2dZS0Fkb1NBUkFTRlFIR1gyTWk3Nng5Vklsb29EUjdWbkFkUUdJMmdCb1ZBVUY4eUtwcnZXVXIzd2FoQkhxU0tLWXZYdUF3MDA3NiIsIl9fU2VjdXJlLTNQU0lEIjoiZy5hMDAwMUFqeUc2LXRKbmZjMGNMVk1HdVNNU2VfVnJ6QnBhSmx6eWxCdi1nSFVhV0N6amlNZVVWc05VYWZPQjJRbDNIQ2VCM21mQUFDZ1lLQVFzU0FSQVNGUUhHWDJNaWdTQVZqMzRXSGdyZGNyYk1IMk8ycWhvVkFVRjh5S29iOUNxSUFEYkdxRHMyamY0X3B3LVIwMDc2IiwiTFNJRCI6Im8ubXlhY2NvdW50Lmdvb2dsZS5jb218cy5JTnxzLnlvdXR1YmU6Zy5hMDAwMUFqeUd3T01vUGJNU0VmSS1wdUZmM0cxTWFIT2k3YVNtdjRnUHUwQXF4UUJUZzFCOTNIZkQwbTZVaWEzeFJvM0FtVGtpd0FDZ1lLQVp3U0FSQVNGUUhHWDJNaVVNeFhNdjRUTEpBWG5rWGNCU1RPMEJvVkFVRjh5S3BONVZlNDc4WnVlVUU4R1pfNWJ4Zk0wMDc2IiwiSFNJRCI6IkFTUGMwaWZxZTY2ME1fYTJ6IiwiU1NJRCI6IkFMYWstbWs5bktqTWd3LThCIiwiQVBJU0lEIjoiRVl3TVA0cGZ5bGMxZjIwMy9BTDFLNTkyVnBkeHktNkxkQSIsIlNBUElTSUQiOiJtM2Y4WVlzd0FrdEF3NHpvL0FnbFltdTYyZGUtS0RwaEtYIn0sIm9hdXRoX3Rva2VuIjoib2F1dGgyXzQvMEFWTUJzSmdIRi1MR2N6NUVxUHZ3dld4TzlteHJzX25CdDZCaUljTlA1Mmw1TjJqYjhRN0ZaeldoOG1rdHBpa1FsWTlDOEEifQ=="
+  fi
   if [ -n "${GHUNT_TOKEN:-}" ]; then
     echo -n "$GHUNT_TOKEN" > "$HOME/.config/ghunt/token.txt"
     echo -n "$GHUNT_TOKEN" > "$HOME/.config/ghunt/token"
@@ -67,8 +71,7 @@ ${GHUNT_TOKEN}
 
 EOF
   fi
-  # Post-login status (non-fatal)
-  ghunt login status || true
+  # No status check requested
 fi
 
 echo "[+] Make CLIs executable (best effort)"
