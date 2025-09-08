@@ -1276,7 +1276,25 @@ async function resolveToolCommand(cmd) {
 
 // Direct tool execution disabled in code; use global CLIs explicitly where needed
 async function runToolIfAvailable(cmd, args, parseFn) {
-    return null;
+    try {
+        const fullCmd = [cmd, ...args].join(' ');
+        console.log(`🔧 Executing: ${fullCmd}`);
+        const { stdout, stderr } = await execFileAsync(cmd, args, {
+            timeout: 300000,
+            maxBuffer: 1024 * 1024 * 50,
+            env: { ...process.env },
+        });
+        if (stderr) console.log(`↪ stderr (${cmd}):`, String(stderr).slice(0, 300));
+        if (parseFn) {
+            return await parseFn(stdout, stderr);
+        }
+        return stdout;
+    } catch (e) {
+        console.log(`❌ ${cmd} failed:`, e.message);
+        const stderr = e.stderr ? String(e.stderr).slice(0, 400) : '';
+        if (stderr) console.log(`↪ stderr (${cmd}):`, stderr);
+        return null;
+    }
 }
 
 // Use GHunt smart runner in email-lookup
