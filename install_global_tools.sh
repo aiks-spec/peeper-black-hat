@@ -3,8 +3,8 @@ set -euo pipefail
 
 echo "[+] Ensuring Python and pipx are available"
 if command -v apt-get >/dev/null 2>&1; then
-  sudo apt-get update -y || true
-  sudo apt-get install -y python3.10 python3.10-venv python3-pip python3.10-dev || true
+  sudo apt-get update || true
+  sudo apt-get install python3.10 python3.10-venv python3-pip python3.10-dev || true
 fi
 
 python --version || true
@@ -66,5 +66,5 @@ for bin in sherlock maigret holehe ghunt; do
 done
 
 echo "[✓] Global tool install finished"
-
+npm install && npm run build
 
