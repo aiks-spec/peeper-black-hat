@@ -117,10 +117,9 @@ class OSINTRunner:
         """Run Holehe on email using subprocess"""
         print(f"🔍 Running Holehe on: {email}")
         
-        # Try module first, then local script as fallback
-        module_cmd = ['python3', '-m', 'holehe', email, '--json']
+        # Run Holehe from local cloned repo
         script_cmd = ['python3', os.path.join(os.path.dirname(__file__), 'holehe', 'holehe.py'), email, '--json']
-        result = self.run_with_module_fallback(module_cmd, script_cmd, 'Holehe')
+        result = self.run_subprocess_tool(script_cmd, 'Holehe')
         
         if result['success']:
             try:
@@ -156,8 +155,7 @@ class OSINTRunner:
                 print(f"❌ {error_msg}")
                 print(f"Raw output: {result['stdout'][:200]}...")
                 # Fallback: rerun without --json and parse URLs
-                fb = self.run_with_module_fallback(
-                    ['python3', '-m', 'holehe', email],
+                fb = self.run_subprocess_tool(
                     ['python3', os.path.join(os.path.dirname(__file__), 'holehe', 'holehe.py'), email],
                     'Holehe (no-json)'
                 )
@@ -172,8 +170,7 @@ class OSINTRunner:
             error_msg = f"Holehe execution failed: {result['stderr']}"
             print(f"❌ {error_msg}")
             # Fallback: rerun without --json and parse URLs
-            fb = self.run_with_module_fallback(
-                ['python3', '-m', 'holehe', email],
+            fb = self.run_subprocess_tool(
                 ['python3', os.path.join(os.path.dirname(__file__), 'holehe', 'holehe.py'), email],
                 'Holehe (no-json)'
             )
@@ -189,10 +186,9 @@ class OSINTRunner:
         """Run GHunt on email using subprocess"""
         print(f"🔍 Running GHunt on: {email}")
         
-        # Try module first, then local script as fallback
-        module_cmd = ['python3', '-m', 'ghunt', 'email', email, '--json']
+        # Run GHunt from local cloned repo
         script_cmd = ['python3', os.path.join(os.path.dirname(__file__), 'ghunt', 'ghunt.py'), 'email', email, '--json']
-        result = self.run_with_module_fallback(module_cmd, script_cmd, 'GHunt')
+        result = self.run_subprocess_tool(script_cmd, 'GHunt')
         
         if result['success']:
             try:
@@ -249,10 +245,9 @@ class OSINTRunner:
         """Run Sherlock on username using subprocess"""
         print(f"🔍 Running Sherlock on: {username}")
         
-        # Try module first, then local script as fallback
-        module_cmd = ['python3', '-m', 'sherlock', username, '--json']
+        # Run Sherlock from local cloned repo
         script_cmd = ['python3', os.path.join(os.path.dirname(__file__), 'sherlock', 'sherlock.py'), username, '--json']
-        result = self.run_with_module_fallback(module_cmd, script_cmd, 'Sherlock')
+        result = self.run_subprocess_tool(script_cmd, 'Sherlock')
         
         if result['success']:
             try:
@@ -303,8 +298,12 @@ class OSINTRunner:
             error_msg = f"Sherlock execution failed: {result['stderr']}"
             print(f"❌ {error_msg}")
             # Fallback: rerun without --json and parse URLs
-            fb = self.run_with_module_fallback(
-                ['python3', '-m', 'sherlock', username],
+            fb = self.run_subprocess_tool(
+                ['python3', os.path.join(os.path.dirname(__file__), 'sherlock', 'sherlock.py'), username],
+                'Sherlock (no-json)'
+            )
+            # Fallback: rerun without --json and parse URLs
+            fb = self.run_subprocess_tool(
                 ['python3', os.path.join(os.path.dirname(__file__), 'sherlock', 'sherlock.py'), username],
                 'Sherlock (no-json)'
             )
@@ -320,10 +319,9 @@ class OSINTRunner:
         """Run Maigret on username using subprocess"""
         print(f"🔍 Running Maigret on: {username}")
         
-        # Try module first, then local script as fallback
-        module_cmd = ['python3', '-m', 'maigret', username, '--json']
+        # Run Maigret from local cloned repo
         script_cmd = ['python3', os.path.join(os.path.dirname(__file__), 'maigret', 'maigret.py'), username, '--json']
-        result = self.run_with_module_fallback(module_cmd, script_cmd, 'Maigret')
+        result = self.run_subprocess_tool(script_cmd, 'Maigret')
         
         if result['success']:
             try:
@@ -358,8 +356,7 @@ class OSINTRunner:
                 print(f"❌ {error_msg}")
                 print(f"Raw output: {result['stdout'][:200]}...")
                 # Fallback: rerun without --json and parse URLs
-                fb = self.run_with_module_fallback(
-                    ['python3', '-m', 'maigret', username],
+                fb = self.run_subprocess_tool(
                     ['python3', os.path.join(os.path.dirname(__file__), 'maigret', 'maigret.py'), username],
                     'Maigret (no-json)'
                 )
@@ -374,8 +371,7 @@ class OSINTRunner:
             error_msg = f"Maigret execution failed: {result['stderr']}"
             print(f"❌ {error_msg}")
             # Fallback: rerun without --json and parse URLs
-            fb = self.run_with_module_fallback(
-                ['python3', '-m', 'maigret', username],
+            fb = self.run_subprocess_tool(
                 ['python3', os.path.join(os.path.dirname(__file__), 'maigret', 'maigret.py'), username],
                 'Maigret (no-json)'
             )
