@@ -238,23 +238,29 @@ class OSINTRunner:
         
         # Add execution summary
         self.results['execution_time'] = round(execution_time, 2)
-        self.results['summary'] = {
-            'total_tools': 4,
-            'successful_tools': sum(1 for tool in self.results['tools'].values() if tool['success']),
-            'failed_tools': sum(1 for tool in self.results['tools'].values() if not tool['success']),
-            'notes': {
-                'holehe': 'see raw output',
-                'ghunt': 'see raw output',
-                'sherlock': 'see raw output',
-                'maigret': 'see raw output'
-            }
+        # Ensure summary defaults exist
+        s = self.results.get('summary', {})
+        s.setdefault('total_results', 0)
+        s.setdefault('social_profiles', 0)
+        s.setdefault('breaches', 0)
+        s.setdefault('google_data', 'No')
+        s['total_tools'] = 4
+        s['successful_tools'] = sum(1 for tool in self.results['tools'].values() if tool.get('success'))
+        s['failed_tools'] = sum(1 for tool in self.results['tools'].values() if not tool.get('success'))
+        s['total_results'] = s.get('social_profiles', 0) + s.get('breaches', 0)
+        s['notes'] = {
+            'holehe': 'see raw output',
+            'ghunt': 'see raw output',
+            'sherlock': 'see raw output',
+            'maigret': 'see raw output'
         }
+        self.results['summary'] = s
         
         print("-" * 50)
         print(f"⏱️  Total execution time: {execution_time:.2f} seconds")
-        print(f"✅ Successful tools: {self.results['summary']['successful_tools']}/4")
-        print(f"❌ Failed tools: {self.results['summary']['failed_tools']}/4")
-        print(f"📊 Results: see raw output for each tool")
+        print(f"✅ Successful tools: {self.results['summary'].get('successful_tools', 0)}/4")
+        print(f"❌ Failed tools: {self.results['summary'].get('failed_tools', 0)}/4")
+        print(f"📊 Total results: {self.results['summary'].get('total_results', 0)}")
         
         return self.results
     
@@ -297,9 +303,9 @@ def main():
     print("="*60)
     print(f"📧 Target: {email}")
     print(f"👤 Username: {results['username']}")
-    print(f"⏱️  Execution time: {results['execution_time']}s")
-    print(f"✅ Successful: {results['summary']['successful_tools']}/4 tools")
-    print(f"📊 Total results: {results['summary']['total_results']}")
+    print(f"⏱️  Execution time: {results.get('execution_time', 0)}s")
+    print(f"✅ Successful: {results.get('summary', {}).get('successful_tools', 0)}/4 tools")
+    print(f"📊 Total results: {results.get('summary', {}).get('total_results', 0)}")
     print(f"💾 Output file: {output_file}")
     print("="*60)
     
