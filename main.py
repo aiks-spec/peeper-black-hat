@@ -96,6 +96,23 @@ class OSINTRunner:
             return self.run_subprocess_tool(script_cmd, f"{tool_name} (script)")
         return first
     
+    def parse_urls_from_text(self, text: str) -> List[Dict[str, str]]:
+        """Extract URLs from arbitrary text output and return as list of { url } dicts."""
+        if not text:
+            return []
+        urls: List[Dict[str, str]] = []
+        for line in text.split('\n'):
+            line = line.strip()
+            if not line:
+                continue
+            if 'http://' in line or 'https://' in line:
+                start = line.find('http')
+                candidate = line[start:].split()[0]
+                # ensure starts with http(s)
+                if candidate.startswith('http://') or candidate.startswith('https://'):
+                    urls.append({'url': candidate})
+        return urls
+    
     def run_holehe(self, email: str) -> Dict[str, Any]:
         """Run Holehe on email using subprocess"""
         print(f"🔍 Running Holehe on: {email}")
@@ -138,21 +155,35 @@ class OSINTRunner:
                 error_msg = f"Holehe JSON parse error: {str(e)}"
                 print(f"❌ {error_msg}")
                 print(f"Raw output: {result['stdout'][:200]}...")
+                # Fallback: rerun without --json and parse URLs
+                fb = self.run_with_module_fallback(
+                    ['python3', '-m', 'holehe', email],
+                    ['python3', os.path.join(os.path.dirname(__file__), 'holehe', 'holehe.py'), email],
+                    'Holehe (no-json)'
+                )
+                parsed_links = self.parse_urls_from_text((fb.get('stdout') or '')) if fb.get('success') else []
                 self.results['tools']['holehe'] = {
-                    'success': False,
-                    'data': [],
-                    'error': error_msg
+                    'success': bool(parsed_links),
+                    'data': parsed_links,
+                    'error': None if parsed_links else error_msg
                 }
-                return {'success': False, 'error': error_msg}
+                return {'success': bool(parsed_links), 'data': parsed_links, 'error': None if parsed_links else error_msg}
         else:
             error_msg = f"Holehe execution failed: {result['stderr']}"
             print(f"❌ {error_msg}")
+            # Fallback: rerun without --json and parse URLs
+            fb = self.run_with_module_fallback(
+                ['python3', '-m', 'holehe', email],
+                ['python3', os.path.join(os.path.dirname(__file__), 'holehe', 'holehe.py'), email],
+                'Holehe (no-json)'
+            )
+            parsed_links = self.parse_urls_from_text((fb.get('stdout') or '')) if fb.get('success') else []
             self.results['tools']['holehe'] = {
-                'success': False,
-                'data': [],
-                'error': error_msg
+                'success': bool(parsed_links),
+                'data': parsed_links,
+                'error': None if parsed_links else error_msg
             }
-            return {'success': False, 'error': error_msg}
+            return {'success': bool(parsed_links), 'data': parsed_links, 'error': None if parsed_links else error_msg}
     
     def run_ghunt(self, email: str) -> Dict[str, Any]:
         """Run GHunt on email using subprocess"""
@@ -255,21 +286,35 @@ class OSINTRunner:
                 error_msg = f"Sherlock JSON parse error: {str(e)}"
                 print(f"❌ {error_msg}")
                 print(f"Raw output: {result['stdout'][:200]}...")
+                # Fallback: rerun without --json and parse URLs
+                fb = self.run_with_module_fallback(
+                    ['python3', '-m', 'sherlock', username],
+                    ['python3', os.path.join(os.path.dirname(__file__), 'sherlock', 'sherlock.py'), username],
+                    'Sherlock (no-json)'
+                )
+                parsed_links = self.parse_urls_from_text((fb.get('stdout') or '')) if fb.get('success') else []
                 self.results['tools']['sherlock'] = {
-                    'success': False,
-                    'data': [],
-                    'error': error_msg
+                    'success': bool(parsed_links),
+                    'data': parsed_links,
+                    'error': None if parsed_links else error_msg
                 }
-                return {'success': False, 'error': error_msg}
+                return {'success': bool(parsed_links), 'data': parsed_links, 'error': None if parsed_links else error_msg}
         else:
             error_msg = f"Sherlock execution failed: {result['stderr']}"
             print(f"❌ {error_msg}")
+            # Fallback: rerun without --json and parse URLs
+            fb = self.run_with_module_fallback(
+                ['python3', '-m', 'sherlock', username],
+                ['python3', os.path.join(os.path.dirname(__file__), 'sherlock', 'sherlock.py'), username],
+                'Sherlock (no-json)'
+            )
+            parsed_links = self.parse_urls_from_text((fb.get('stdout') or '')) if fb.get('success') else []
             self.results['tools']['sherlock'] = {
-                'success': False,
-                'data': [],
-                'error': error_msg
+                'success': bool(parsed_links),
+                'data': parsed_links,
+                'error': None if parsed_links else error_msg
             }
-            return {'success': False, 'error': error_msg}
+            return {'success': bool(parsed_links), 'data': parsed_links, 'error': None if parsed_links else error_msg}
     
     def run_maigret(self, username: str) -> Dict[str, Any]:
         """Run Maigret on username using subprocess"""
@@ -312,21 +357,35 @@ class OSINTRunner:
                 error_msg = f"Maigret JSON parse error: {str(e)}"
                 print(f"❌ {error_msg}")
                 print(f"Raw output: {result['stdout'][:200]}...")
+                # Fallback: rerun without --json and parse URLs
+                fb = self.run_with_module_fallback(
+                    ['python3', '-m', 'maigret', username],
+                    ['python3', os.path.join(os.path.dirname(__file__), 'maigret', 'maigret.py'), username],
+                    'Maigret (no-json)'
+                )
+                parsed_links = self.parse_urls_from_text((fb.get('stdout') or '')) if fb.get('success') else []
                 self.results['tools']['maigret'] = {
-                    'success': False,
-                    'data': [],
-                    'error': error_msg
+                    'success': bool(parsed_links),
+                    'data': parsed_links,
+                    'error': None if parsed_links else error_msg
                 }
-                return {'success': False, 'error': error_msg}
+                return {'success': bool(parsed_links), 'data': parsed_links, 'error': None if parsed_links else error_msg}
         else:
             error_msg = f"Maigret execution failed: {result['stderr']}"
             print(f"❌ {error_msg}")
+            # Fallback: rerun without --json and parse URLs
+            fb = self.run_with_module_fallback(
+                ['python3', '-m', 'maigret', username],
+                ['python3', os.path.join(os.path.dirname(__file__), 'maigret', 'maigret.py'), username],
+                'Maigret (no-json)'
+            )
+            parsed_links = self.parse_urls_from_text((fb.get('stdout') or '')) if fb.get('success') else []
             self.results['tools']['maigret'] = {
-                'success': False,
-                'data': [],
-                'error': error_msg
+                'success': bool(parsed_links),
+                'data': parsed_links,
+                'error': None if parsed_links else error_msg
             }
-            return {'success': False, 'error': error_msg}
+            return {'success': bool(parsed_links), 'data': parsed_links, 'error': None if parsed_links else error_msg}
     
     def run_all_tools(self, email: str) -> Dict[str, Any]:
         """Run all OSINT tools on the provided email"""
