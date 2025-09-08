@@ -99,25 +99,20 @@ process.on('SIGINT', async () => {
 try {
     console.log('🌐 Running on Linux/Render platform');
     
-    // Add common CLI paths for Linux/Render (prepend unconditionally)
-        const linuxPaths = [
+    // Simplify PATH: include only venv/bin and system paths, deduping entries
+    const basePaths = [
         path.join(process.cwd(), '.venv', 'bin'),
-        '/opt/render/project/src/.venv/bin',
-        '/opt/render/.local/bin',
-        path.join(process.env.HOME || '', '.local', 'bin'),
-            '/usr/local/bin',
-            '/usr/bin',
-            '/bin',
-            '/opt/python/bin',
-            '/home/render/.local/bin',
-            '/root/.local/bin',
-            '/usr/local/lib/python3.11/bin',
-            '/usr/local/lib/python3.10/bin',
-            '/usr/local/lib/python3.9/bin'
-        ];
-        const existingPath = process.env.PATH || '';
-    process.env.PATH = `${linuxPaths.join(':')}:${existingPath}`;
-    console.log('✅ Preprended Linux CLI paths to PATH');
+        '/usr/local/bin',
+        '/usr/bin',
+        '/bin'
+    ];
+    const existingPath = process.env.PATH || '';
+    const sep = process.platform === 'win32' ? ';' : ':';
+    const current = existingPath.split(sep).filter(Boolean);
+    const seen = new Set(current);
+    const toPrepend = basePaths.filter(p => !seen.has(p));
+    process.env.PATH = `${toPrepend.join(sep)}${toPrepend.length ? sep : ''}${current.join(sep)}`;
+    console.log('✅ Simplified PATH for Render');
 
     // Debug: Check what's actually available
     console.log('🔍 Current PATH:', process.env.PATH);
@@ -1408,7 +1403,7 @@ async function resolveToolCommand(cmd) {
 // Disable all direct tool execution - tools are now handled by main.py
 async function runToolIfAvailable(cmd, args, parseFn) {
     // Intentionally silent; unified runner handles tools.
-    return null;
+        return null;
 }
 
 // Use GHunt smart runner in email-lookup
