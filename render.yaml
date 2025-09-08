@@ -16,8 +16,8 @@ services:
       echo "📚 Installing OSINT tools into .venv..."
       pip install ghunt holehe sherlock-project maigret phoneinfoga || true
       
-      echo "🔧 Making osint_runner.py executable..."
-      chmod +x osint_runner.py
+      echo "🔧 Making main.py executable..."
+      chmod +x main.py
 
       echo "🔑 Fixing permissions on venv..."
       chmod +x ".venv/bin"/* || true
