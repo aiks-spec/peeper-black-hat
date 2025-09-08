@@ -17,32 +17,32 @@ class DatabaseManager {
                 throw new Error('DATABASE_URL environment variable is required for PostgreSQL connection');
             }
             
-            console.log('🐘 Connecting to PostgreSQL database...');
-            this.db = new Pool({
-                connectionString: this.databaseUrl,
-                ssl: {
-                    rejectUnauthorized: false
-                },
-                // Add connection pool settings for production
-                max: 20,
-                idleTimeoutMillis: 30000,
-                connectionTimeoutMillis: 2000,
-            });
-            
-            // Test connection with timeout
-            const client = await Promise.race([
-                this.db.connect(),
-                new Promise((_, reject) => 
-                    setTimeout(() => reject(new Error('Connection timeout')), 10000)
-                )
-            ]);
-            
-            console.log('✅ PostgreSQL connection established');
-            this.isConnected = true;
-            
-            // Test a simple query
-            const testResult = await client.query('SELECT NOW()');
-            console.log('✅ Database query test successful:', testResult.rows[0]);
+                console.log('🐘 Connecting to PostgreSQL database...');
+                this.db = new Pool({
+                    connectionString: this.databaseUrl,
+                    ssl: {
+                        rejectUnauthorized: false
+                    },
+                    // Add connection pool settings for production
+                    max: 20,
+                    idleTimeoutMillis: 30000,
+                    connectionTimeoutMillis: 2000,
+                });
+                
+                // Test connection with timeout
+                const client = await Promise.race([
+                    this.db.connect(),
+                    new Promise((_, reject) => 
+                        setTimeout(() => reject(new Error('Connection timeout')), 10000)
+                    )
+                ]);
+                
+                console.log('✅ PostgreSQL connection established');
+                this.isConnected = true;
+                
+                // Test a simple query
+                const testResult = await client.query('SELECT NOW()');
+                console.log('✅ Database query test successful:', testResult.rows[0]);
             client.release();
             
             await this.initializeTables();
@@ -59,7 +59,7 @@ class DatabaseManager {
 
     async initializeTables() {
         try {
-            await this.initializePostgreSQLTables();
+                await this.initializePostgreSQLTables();
         } catch (error) {
             console.error('❌ Table initialization failed:', error.message);
             throw error;
@@ -169,6 +169,10 @@ class DatabaseManager {
     }
 
     async insertVisitor(ip, userAgent) {
+        console.log('🔍 insertVisitor called with:', { ip, userAgent: userAgent?.substring(0, 50) });
+        console.log('🔍 Database connected:', this.isConnected);
+        console.log('🔍 Database object exists:', !!this.db);
+        
         if (!this.isConnected || !this.db) {
             console.log('⚠️ Database not connected, skipping visitor insert');
             return false;
@@ -181,17 +185,25 @@ class DatabaseManager {
         console.log(`🔍 Inserting visitor: ${cleanIp} with user agent: ${cleanUserAgent?.substring(0, 50)}...`);
 
         try {
+            console.log('🔍 Getting database client...');
             const client = await this.db.connect();
-            await client.query(
+            console.log('🔍 Database client obtained, executing query...');
+            
+            const result = await client.query(
                 'INSERT INTO visitors (ip, user_agent) VALUES ($1, $2)',
                 [cleanIp, cleanUserAgent]
             );
+            
+            console.log('🔍 Query executed successfully:', result);
             client.release();
+            console.log('🔍 Client released, returning true');
             return true;
         } catch (error) {
             console.error('❌ Visitor insertion failed:', error.message);
             console.error('❌ Visitor insertion error details:', error);
             console.error('❌ IP length:', cleanIp.length, 'User Agent length:', cleanUserAgent.length);
+            console.error('❌ Error code:', error.code);
+            console.error('❌ Error stack:', error.stack);
             return false;
         }
     }
@@ -205,13 +217,13 @@ class DatabaseManager {
         console.log(`🔍 Inserting search: ${query} (${queryType}) with results: ${results ? 'Yes' : 'No'}`);
 
         try {
-            const client = await this.db.connect();
-            const result = await client.query(
-                'INSERT INTO searches (query, query_type, results) VALUES ($1, $2, $3) RETURNING id',
-                [query, queryType, JSON.stringify(results)]
-            );
-            client.release();
-            return result.rows[0].id;
+                const client = await this.db.connect();
+                const result = await client.query(
+                    'INSERT INTO searches (query, query_type, results) VALUES ($1, $2, $3) RETURNING id',
+                    [query, queryType, JSON.stringify(results)]
+                );
+                client.release();
+                return result.rows[0].id;
         } catch (error) {
             console.error('❌ Search insertion failed:', error.message);
             console.error('❌ Search insertion error details:', error);
@@ -240,50 +252,69 @@ class DatabaseManager {
     }
 
     async getVisitorStats() {
+        console.log('🔍 getVisitorStats called');
+        console.log('🔍 Database connected:', this.isConnected);
+        console.log('🔍 Database object exists:', !!this.db);
+        
         if (!this.isConnected || !this.db) {
             console.log('⚠️ Database not connected, returning default visitor stats');
             return { visitors_today: 0, total_visitors: 0, hits_today: 0, total_hits: 0 };
         }
 
         try {
+            console.log('🔍 Getting database client for stats...');
             const client = await this.db.connect();
+            console.log('🔍 Database client obtained for stats');
             
             // Unique visitors today
+            console.log('🔍 Querying unique visitors today...');
             const todayUniqueResult = await client.query(`
-                SELECT COUNT(DISTINCT ip) as visitors 
-                FROM visitors 
-                WHERE timestamp > NOW() - INTERVAL '24 hours'
-            `);
-            
+                    SELECT COUNT(DISTINCT ip) as visitors 
+                    FROM visitors 
+                    WHERE timestamp > NOW() - INTERVAL '24 hours'
+                `);
+            console.log('🔍 Today unique visitors result:', todayUniqueResult.rows[0]);
+                
             // Total unique visitors overall
+            console.log('🔍 Querying total unique visitors...');
             const totalUniqueResult = await client.query(`
-                SELECT COUNT(DISTINCT ip) as total_visitors 
-                FROM visitors
-            `);
+                    SELECT COUNT(DISTINCT ip) as total_visitors 
+                    FROM visitors
+                `);
+            console.log('🔍 Total unique visitors result:', totalUniqueResult.rows[0]);
 
             // Total hits today
+            console.log('🔍 Querying hits today...');
             const todayHitsResult = await client.query(`
                 SELECT COUNT(*) as hits_today 
                 FROM visitors 
                 WHERE timestamp > NOW() - INTERVAL '24 hours'
             `);
+            console.log('🔍 Today hits result:', todayHitsResult.rows[0]);
 
             // Total hits overall
+            console.log('🔍 Querying total hits...');
             const totalHitsResult = await client.query(`
                 SELECT COUNT(*) as total_hits 
                 FROM visitors
             `);
-            
+            console.log('🔍 Total hits result:', totalHitsResult.rows[0]);
+                
             client.release();
             
-            return {
+            const stats = {
                 visitors_today: parseInt(todayUniqueResult.rows[0].visitors) || 0,
                 total_visitors: parseInt(totalUniqueResult.rows[0].total_visitors) || 0,
                 hits_today: parseInt(todayHitsResult.rows[0].hits_today) || 0,
                 total_hits: parseInt(totalHitsResult.rows[0].total_hits) || 0
             };
+            
+            console.log('🔍 Final stats object:', stats);
+            return stats;
         } catch (error) {
             console.error('❌ Visitor stats failed:', error.message);
+            console.error('❌ Visitor stats error details:', error);
+            console.error('❌ Error stack:', error.stack);
             return { visitors_today: 0, total_visitors: 0, hits_today: 0, total_hits: 0 };
         }
     }
@@ -295,9 +326,9 @@ class DatabaseManager {
         }
 
         try {
-            const client = await this.db.connect();
+                const client = await this.db.connect();
             const result = await client.query('SELECT COUNT(*) as count FROM searches');
-            client.release();
+                client.release();
             return parseInt(result.rows[0].count);
         } catch (error) {
             console.error('❌ Search count failed:', error.message);
@@ -312,14 +343,14 @@ class DatabaseManager {
         }
 
         try {
-            const client = await this.db.connect();
-            const result = await client.query(`
+                const client = await this.db.connect();
+                const result = await client.query(`
                 SELECT id, query, query_type, timestamp, results
-                FROM searches 
-                ORDER BY timestamp DESC 
-                LIMIT $1
-            `, [limit]);
-            client.release();
+                    FROM searches 
+                    ORDER BY timestamp DESC 
+                    LIMIT $1
+                `, [limit]);
+                client.release();
             return result.rows;
         } catch (error) {
             console.error('❌ Search history failed:', error.message);
@@ -334,21 +365,21 @@ class DatabaseManager {
         }
 
         try {
-            const client = await this.db.connect();
+                const client = await this.db.connect();
             
             // Reset visitor counts
-            await client.query('DELETE FROM visitors');
+                await client.query('DELETE FROM visitors');
             console.log('✅ Visitor counts reset');
             
             // Reset search counts
-            await client.query('DELETE FROM searches');
+                await client.query('DELETE FROM searches');
             console.log('✅ Search counts reset');
             
             // Reset temp files
-            await client.query('DELETE FROM temp_files');
+                await client.query('DELETE FROM temp_files');
             console.log('✅ Temp files reset');
             
-            client.release();
+                client.release();
             return true;
         } catch (error) {
             console.error('❌ Reset counts failed:', error.message);
