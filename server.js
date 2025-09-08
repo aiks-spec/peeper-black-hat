@@ -1324,10 +1324,12 @@ async function runToolIfAvailable(cmd, args, parseFn) {
         if (stderr) console.log(`↪ stderr (${cmd}):`, stderr);
         // Fallback: try via shell so PATH and shebangs resolve like in interactive shells
         try {
-            const shellCmd = [cmd, ...args.map(a => `'${String(a).replace(/'/g, "'\\''")}'`)].join(' ');
-            const exportPath = `${process.env.HOME || '/opt/render'}/.local/bin:/usr/local/bin:/usr/bin:/bin`;
+            const resolvedBin = resolveCli(cmd);
+            const shellCmd = [resolvedBin, ...args].join(' ');
+            const exportPathHome = `${process.env.HOME || '/home/render'}/.local/bin`;
+            const exportPath = `${exportPathHome}:/opt/render/.local/bin:/usr/local/bin:/usr/bin:/bin`;
             const wrapped = `export PATH="${exportPath}:$PATH"; ${shellCmd}`;
-            console.log(`🔁 Retrying via shell: ${shellCmd}`);
+            console.log(`🔁 Retrying via shell: ${[cmd, ...args].join(' ')}`);
             const { stdout: sOut, stderr: sErr } = await execAsync(wrapped, {
                 timeout: 300000,
                 maxBuffer: 1024 * 1024 * 50,
