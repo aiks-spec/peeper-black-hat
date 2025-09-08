@@ -305,13 +305,16 @@ class OSINTRunner:
         # Run tools
         start_time = time.time()
         
-        # Run email-based tools
-        self.run_holehe(email)
-        self.run_ghunt(email)
-        
-        # Run username-based tools
-        self.run_sherlock(username)
-        self.run_maigret(username)
+        if os.environ.get('SKIP_TOOLS') == '1':
+            print("⚠️  SKIP_TOOLS=1 set — skipping external tool execution")
+        else:
+            # Run email-based tools
+            self.run_holehe(email)
+            self.run_ghunt(email)
+            
+            # Run username-based tools
+            self.run_sherlock(username)
+            self.run_maigret(username)
         
         end_time = time.time()
         execution_time = end_time - start_time
