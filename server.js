@@ -664,6 +664,54 @@ app.post('/api/email-lookup', async (req, res) => {
             console.log('❌ Maigret failed:', error.message);
         }
         
+        // Unified fallback: run main.py to collect tool outputs when direct tools are disabled
+        try {
+            console.log('🐍 Fallback: running unified OSINT runner main.py...');
+            const { stdout, stderr } = await execFileAsync('python3', ['main.py', email], {
+                timeout: 600000,
+                maxBuffer: 1024 * 1024 * 50,
+                cwd: process.cwd()
+            });
+            if (stderr) {
+                console.log('⚠️ main.py stderr:', String(stderr).slice(0, 400));
+            }
+            const out = String(stdout || '');
+            const match = out.match(/Results saved to:\s*(.+)/);
+            if (match && match[1]) {
+                const savedPath = match[1].trim();
+                console.log('💾 Reading unified results from:', savedPath);
+                try {
+                    const raw = fs.readFileSync(savedPath, 'utf8');
+                    const data = JSON.parse(raw);
+                    // Merge social URLs from tools
+                    const urls = new Set();
+                    const t = (data && data.tools) || {};
+                    for (const key of ['holehe', 'sherlock', 'maigret']) {
+                        const tool = t[key];
+                        if (tool && Array.isArray(tool.data)) {
+                            tool.data.forEach(item => { if (item && item.url) urls.add(item.url); });
+                        }
+                    }
+                    const socialArr = Array.from(urls).map(url => ({ url }));
+                    if (socialArr.length) {
+                        results.social = [...new Set([...results.social, ...socialArr])];
+                        console.log('✅ Added social profiles from main.py:', socialArr.length);
+                    }
+                    // Attach runner metadata
+                    results.metadata.unified = {
+                        execution_time: data.execution_time,
+                        summary: data.summary
+                    };
+                } catch (e) {
+                    console.log('❌ Failed to parse main.py JSON:', e.message);
+                }
+            } else {
+                console.log('❌ main.py did not report output file path');
+            }
+        } catch (e) {
+            console.log('❌ main.py fallback failed:', e.message);
+        }
+
         // Clean and structure final result
         const finalResult = {
             email: email,
@@ -1326,7 +1374,7 @@ async function resolveToolCommand(cmd) {
 // Disable all direct tool execution - tools are now handled by main.py
 async function runToolIfAvailable(cmd, args, parseFn) {
     console.log(`🔧 Tool ${cmd} disabled - use main.py for OSINT analysis`);
-    return null;
+        return null;
 }
 
 // Use GHunt smart runner in email-lookup
@@ -2192,7 +2240,7 @@ app.post('/api/run-osint-script', async (req, res) => {
 
         console.log(`✅ OSINT script completed`);
     
-        res.json({
+    res.json({
             success: true,
             email: email,
             output: stdout,
