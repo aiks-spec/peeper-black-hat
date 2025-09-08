@@ -8,7 +8,11 @@ services:
       echo "📦 Installing Node.js dependencies..."
       npm ci || npm install
       echo "✅ Build process completed"
-    startCommand: export PATH="$HOME/.local/bin:/usr/local/bin:/usr/bin:/bin:$PATH" && npm start
+    startCommand: |
+      export PATH="$HOME/.local/bin:/usr/local/bin:/usr/bin:/bin:$PATH"
+      echo "🔧 Ensuring global OSINT tools are installed at runtime..."
+      bash scripts/install_global_tools.sh || true
+      npm start
     envVars:
       - key: NODE_ENV
         value: production
