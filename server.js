@@ -1275,11 +1275,40 @@ async function resolveToolCommand(cmd) {
 
 
 // Direct tool execution disabled in code; use global CLIs explicitly where needed
+function resolveCli(cmd) {
+    try {
+        const candidates = [];
+        const home = process.env.HOME || '/opt/render';
+        candidates.push(`${home}/.local/bin/${cmd}`);
+        candidates.push(`/opt/render/.local/bin/${cmd}`);
+        candidates.push(`/usr/local/bin/${cmd}`);
+        candidates.push(`/usr/bin/${cmd}`);
+        candidates.push(cmd);
+        for (const c of candidates) {
+            try {
+                if (fs.existsSync(c)) {
+                    return c;
+                }
+            } catch {}
+        }
+        // Fallback to `which`
+        try {
+            const { execSync } = require('child_process');
+            const found = execSync(`which ${cmd}`, { encoding: 'utf8' }).trim();
+            if (found) return found;
+        } catch {}
+        return cmd;
+    } catch {
+        return cmd;
+    }
+}
+
 async function runToolIfAvailable(cmd, args, parseFn) {
     try {
-        const fullCmd = [cmd, ...args].join(' ');
+        const bin = resolveCli(cmd);
+        const fullCmd = [bin, ...args].join(' ');
         console.log(`🔧 Executing: ${fullCmd}`);
-        const { stdout, stderr } = await execFileAsync(cmd, args, {
+        const { stdout, stderr } = await execFileAsync(bin, args, {
             timeout: 300000,
             maxBuffer: 1024 * 1024 * 50,
             env: { ...process.env },
