@@ -57,7 +57,8 @@ if command -v ghunt >/dev/null 2>&1; then
   # Robust non-interactive GHunt login: always choose option 2 and paste cookies
   if [ -n "${GHUNT_COOKIES_B64:-}" ]; then
     echo "[+] Performing GHunt login via option 2 (cookies) with pexpect"
-    (python3 - <<'PY' 2>/dev/null || python - <<'PY' 2>/dev/null) || true
+    PYBIN="$(command -v python3 || command -v python || echo python3)"
+    "$PYBIN" - <<'PY' || true
 import os
 import pexpect
 
@@ -76,8 +77,6 @@ try:
 except Exception:
     pass
 PY
-PY
-    )
   fi
   # No status check requested
 fi
