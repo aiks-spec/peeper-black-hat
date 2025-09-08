@@ -216,7 +216,7 @@ dbManager.connect().then(async (connected) => {
 // Visitor tracking middleware - count only real page views
 app.use((req, res, next) => {
     try {
-        console.log('🔍 Middleware triggered:', req.method, req.path);
+        console.log('🔍 VISITOR MIDDLEWARE TRIGGERED:', req.method, req.path, 'at', new Date().toISOString());
         
         // Count only GET requests to pages (exclude API & static assets)
         const isPage = req.method === 'GET' && !req.path.startsWith('/api/');
