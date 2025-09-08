@@ -22,16 +22,16 @@ const cleanupQueue = new Map(); // Track files to cleanup
 const tempDir = path.join(process.cwd(), 'temp');
 const localBinDir = path.join(process.cwd(), 'bin');
 if (!fs.existsSync(localBinDir)) {
-    try { fs.mkdirSync(localBinDir, { recursive: true }); } catch {}
+    try { fs.mkdirSync(localBinDir, { recursive: true }); } catch { }
 }
 
 // Simple Python tool availability check for Render environment
 async function commandExists(cmd) {
-    try { 
-        await execAsync(`which ${cmd}`); 
-        return true; 
-    } catch { 
-        return false; 
+    try {
+        await execAsync(`which ${cmd}`);
+        return true;
+    } catch {
+        return false;
     }
 }
 
@@ -58,7 +58,7 @@ async function runGhuntAutoLogin() {
         let out = '';
         let err = '';
         const writeChoice = () => {
-            try { child.stdin.write('1\n'); child.stdin.end(); } catch {}
+            try { child.stdin.write('1\n'); child.stdin.end(); } catch { }
         };
         // Write selection after short delay in case prompt not captured
         const t = setTimeout(writeChoice, 1200);
@@ -98,41 +98,41 @@ process.on('SIGINT', async () => {
 // Linux/Render PATH handling
 try {
     console.log('🌐 Running on Linux/Render platform');
-    
+
     // Add common CLI paths for Linux/Render (prepend unconditionally)
-        const linuxPaths = [
-            path.join(process.cwd(), '.venv', 'bin'),
-            '/opt/render/project/src/.venv/bin',
-            '/opt/render/.local/bin',
-            path.join(process.env.HOME || '', '.local', 'bin'),
-            '/usr/local/bin',
-            '/usr/bin',
-            '/bin',
-            '/opt/python/bin',
-            '/home/render/.local/bin',
-            '/root/.local/bin',
-            '/usr/local/lib/python3.11/bin',
-            '/usr/local/lib/python3.10/bin',
-            '/usr/local/lib/python3.9/bin'
-        ];
-        const existingPath = process.env.PATH || '';
-        process.env.PATH = `${linuxPaths.join(':')}:${existingPath}`;
-        console.log('✅ Preprended Linux CLI paths to PATH');
-        
-        // Debug: Check what's actually available
-        console.log('🔍 Current PATH:', process.env.PATH);
-        console.log('🔍 Checking for sherlock in PATH...'); 
-        try {
-            const { execSync } = require('child_process');
-            const whichSherlock = execSync('which sherlock', { encoding: 'utf8' }).trim();
-            console.log('✅ Sherlock found at:', whichSherlock);
-        } catch (e) {
-            console.log('❌ Sherlock not found in PATH');
-        }
-        
+    const linuxPaths = [
+        path.join(process.cwd(), '.venv', 'bin'),
+        '/opt/render/project/src/.venv/bin',
+        '/opt/render/.local/bin',
+        path.join(process.env.HOME || '', '.local', 'bin'),
+        '/usr/local/bin',
+        '/usr/bin',
+        '/bin',
+        '/opt/python/bin',
+        '/home/render/.local/bin',
+        '/root/.local/bin',
+        '/usr/local/lib/python3.11/bin',
+        '/usr/local/lib/python3.10/bin',
+        '/usr/local/lib/python3.9/bin'
+    ];
+    const existingPath = process.env.PATH || '';
+    process.env.PATH = `${linuxPaths.join(':')}:${existingPath}`;
+    console.log('✅ Preprended Linux CLI paths to PATH');
+
+    // Debug: Check what's actually available
+    console.log('🔍 Current PATH:', process.env.PATH);
+    console.log('🔍 Checking for sherlock in PATH...');
+    try {
+        const { execSync } = require('child_process');
+        const whichSherlock = execSync('which sherlock', { encoding: 'utf8' }).trim();
+        console.log('✅ Sherlock found at:', whichSherlock);
+    } catch (e) {
+        console.log('❌ Sherlock not found in PATH');
+    }
+
     // Set environment variables for Python tools and prevent shell issues
-        process.env.PYTHONUNBUFFERED = '1';
-        process.env.PYTHONIOENCODING = 'utf-8';
+    process.env.PYTHONUNBUFFERED = '1';
+    process.env.PYTHONIOENCODING = 'utf-8';
     process.env.PYTHONUTF8 = '1';
     process.env.LC_ALL = 'C.UTF-8';
     process.env.LANG = 'C.UTF-8';
@@ -172,21 +172,19 @@ app.use(cors());
 app.use(express.json());
 
 // Visitor tracking middleware - MUST be before static files
+const recentVisitors = new Map(); // Track recent visitors to prevent duplicate counts
+const VISITOR_DEBOUNCE_MS = 5000; // 5 seconds debounce per IP
+
 app.use((req, res, next) => {
     try {
-        console.log('🔍 VISITOR MIDDLEWARE TRIGGERED:', req.method, req.path, 'at', new Date().toISOString());
-        
         // Count only GET requests to pages (exclude API & static assets)
         const isPage = req.method === 'GET' && !req.path.startsWith('/api/');
-        console.log('🔍 Is page request:', isPage);
         
         if (!isPage) {
-            console.log('🔍 Not a page request, skipping visitor tracking');
             return next();
         }
 
         // Only track if database is connected
-        console.log('🔍 Database connected:', dbManager.isConnected);
         if (!dbManager.isConnected) {
             console.log('⚠️ Database not connected, skipping visitor tracking');
             return next();
@@ -204,21 +202,37 @@ app.use((req, res, next) => {
 
         const userAgent = req.get('User-Agent') || 'Unknown';
         
-        console.log('🔍 Page visit detected:', req.path, 'from IP:', ip);
-        console.log('🔍 User Agent:', userAgent.substring(0, 50));
+        // Check if we've already tracked this IP recently
+        const now = Date.now();
+        const lastVisit = recentVisitors.get(ip);
         
-        // Always track visitor (no debounce)
-        console.log('🔍 Calling insertVisitor...');
+        if (lastVisit && (now - lastVisit) < VISITOR_DEBOUNCE_MS) {
+            console.log('🔍 IP already tracked recently, skipping:', ip);
+            return next();
+        }
+        
+        // Update the last visit time
+        recentVisitors.set(ip, now);
+        
+        // Clean up old entries (keep map size reasonable)
+        if (recentVisitors.size > 1000) {
+            const cutoff = now - VISITOR_DEBOUNCE_MS;
+            for (const [key, value] of recentVisitors.entries()) {
+                if (value < cutoff) {
+                    recentVisitors.delete(key);
+                }
+            }
+        }
+        
+        // Track visitor
         dbManager.insertVisitor(ip, userAgent).then((success) => {
-            console.log('🔍 insertVisitor result:', success);
             if (success) {
-                console.log('✅ Visitor tracked successfully:', ip);
+                console.log('✅ Visitor tracked:', ip);
             } else {
-                console.log('⚠️ Visitor tracking failed (database may not be connected)');
+                console.log('⚠️ Visitor tracking failed');
             }
         }).catch((error) => {
             console.log('❌ Visitor tracking error:', error.message);
-            console.log('❌ Error stack:', error.stack);
         });
     } catch (error) {
         console.log('❌ Visitor middleware error:', error.message);
@@ -248,7 +262,7 @@ ensureSherlockInstalled();
 dbManager.connect().then(async (connected) => {
     if (connected) {
         console.log('✅ Database connection established');
-        
+
         if (process.env.NODE_ENV === 'production' && process.env.RESET_COUNTS === 'true') {
             try {
                 console.log('🔄 Resetting counts for production deployment...');
@@ -258,7 +272,7 @@ dbManager.connect().then(async (connected) => {
                 console.error('❌ Failed to reset counts:', error.message);
             }
         }
-        
+
         // Remove any previous ghunt auto-login usage
         // GHunt is initialized via token/cookies above
     } else {
@@ -371,7 +385,7 @@ app.post('/api/aggregate', async (req, res) => {
             // Also try social media search with phone number
             const phoneUsername = trimmed.replace(/[^a-zA-Z0-9+]/g, '');
             tasks.push(runToolIfAvailable('sherlock', [phoneUsername], parseSherlock));
-                         tasks.push(runToolIfAvailable('maigret', [phoneUsername], parseMaigretSimple));
+            tasks.push(runToolIfAvailable('maigret', [phoneUsername], parseMaigretSimple));
         }
         if (qtype === 'email') {
             tasks.push(runToolIfAvailable('holehe', [trimmed], parseHolehe));
@@ -381,8 +395,8 @@ app.post('/api/aggregate', async (req, res) => {
                     if (ghuntData) {
                         return parseGHuntSimple(ghuntData);
                     }
-                            }
-                            return null;
+                }
+                return null;
             }));
             // Sherlock and Maigret now work with email input
             tasks.push(runToolIfAvailable('sherlock', [trimmed], parseSherlock));
@@ -392,8 +406,8 @@ app.post('/api/aggregate', async (req, res) => {
             // Sherlock and Maigret now require email input, skip for username queries
             // Consider treating username as email if it contains @ symbol
             if (trimmed.includes('@')) {
-            tasks.push(runToolIfAvailable('sherlock', [trimmed], parseSherlock));
-                         tasks.push(runToolIfAvailable('maigret', [trimmed], parseMaigretSimple));
+                tasks.push(runToolIfAvailable('sherlock', [trimmed], parseSherlock));
+                tasks.push(runToolIfAvailable('maigret', [trimmed], parseMaigretSimple));
             }
         }
 
@@ -412,14 +426,14 @@ app.post('/api/aggregate', async (req, res) => {
 app.post('/api/email-lookup', async (req, res) => {
     try {
         const { email } = req.body;
-        
+
         if (!email || typeof email !== 'string' || !email.includes('@')) {
-            return res.status(400).json({ 
-                success: false, 
-                error: 'Invalid email address' 
+            return res.status(400).json({
+                success: false,
+                error: 'Invalid email address'
             });
         }
-        
+
         // Log search and get search ID for tracking
         let searchId = null;
         try {
@@ -428,7 +442,7 @@ app.post('/api/email-lookup', async (req, res) => {
             console.log('⚠️ Search logging failed:', error.message);
         }
         console.log(`🔍 Starting email lookup for: ${email}`);
-        
+
         // Collect data from all available sources
         const results = {
             email: email,
@@ -438,7 +452,7 @@ app.post('/api/email-lookup', async (req, res) => {
             google: null,
             metadata: {}
         };
-        
+
         // 1. CUFinder API (primary source)
         try {
             console.log('📡 Fetching from CUFinder...');
@@ -458,7 +472,7 @@ app.post('/api/email-lookup', async (req, res) => {
                         timeout: 15000
                     });
                     if (r && r.data) { cuf = r.data; break; }
-                } catch {}
+                } catch { }
             }
             if (cuf) {
                 console.log('✅ CUFinder data received');
@@ -472,26 +486,26 @@ app.post('/api/email-lookup', async (req, res) => {
                     results.basic.domain = person.domain || person.company_domain || person.website ||
                         (email.includes('@') ? email.split('@')[1] : null);
                     results.basic.confidence = person.confidence || cuf.confidence || person.score || person.likelihood;
-                                         // Extract social profiles, normalize to clean URLs only
-                     const rawSocial = person.social_profiles || person.social || person.links || [];
-                     const normalized = Array.isArray(rawSocial) ? rawSocial
-                         .map(s => {
-                             if (typeof s === 'string') {
-                                 // Clean the URL by removing any platform prefixes
-                                 const cleanUrl = s.replace(/^[^h]*https?:\/\//i, 'https://');
-                                 return { url: cleanUrl };
-                             }
-                             if (s && typeof s === 'object') {
-                                 const url = s.url || s.link || s.profile || s.href;
-                                 if (!url) return null;
-                                 // Clean the URL by removing any platform prefixes
-                                 const cleanUrl = url.replace(/^[^h]*https?:\/\//i, 'https://');
-                                 return { url: cleanUrl };
-                             }
-                             return null;
-                         })
-                         .filter(Boolean) : [];
-                     if (normalized.length) results.social = [...results.social, ...normalized];
+                    // Extract social profiles, normalize to clean URLs only
+                    const rawSocial = person.social_profiles || person.social || person.links || [];
+                    const normalized = Array.isArray(rawSocial) ? rawSocial
+                        .map(s => {
+                            if (typeof s === 'string') {
+                                // Clean the URL by removing any platform prefixes
+                                const cleanUrl = s.replace(/^[^h]*https?:\/\//i, 'https://');
+                                return { url: cleanUrl };
+                            }
+                            if (s && typeof s === 'object') {
+                                const url = s.url || s.link || s.profile || s.href;
+                                if (!url) return null;
+                                // Clean the URL by removing any platform prefixes
+                                const cleanUrl = url.replace(/^[^h]*https?:\/\//i, 'https://');
+                                return { url: cleanUrl };
+                            }
+                            return null;
+                        })
+                        .filter(Boolean) : [];
+                    if (normalized.length) results.social = [...results.social, ...normalized];
                     results.metadata.cufinder = cuf;
                 }
             } else {
@@ -500,78 +514,78 @@ app.post('/api/email-lookup', async (req, res) => {
         } catch (error) {
             console.log('❌ CUFinder failed:', error.message);
         }
-        
-                                                                      // 2. GHunt (Google account OSINT) - Direct Python module execution
-         try {
-             console.log('🔍 Running GHunt with Python module...');
-             
-             const ghuntData = await runToolIfAvailable('ghunt', ['email', email], (stdout, stderr) => {
-                 try {
-                     // Try to parse the output directly
-                     if (stdout && stdout.trim()) {
-                         const ghuntData = parseGHuntFromText(stdout);
-                         if (ghuntData) {
-                             return parseGHuntSimple(ghuntData);
-                         }
-                     }
-                     return null;
-                     } catch (parseError) {
-                     console.log('❌ GHunt parsing error:', parseError.message);
-                     return null;
-                 }
-             });
-             
-             if (ghuntData && Object.keys(ghuntData).length > 0) {
-                 results.google = ghuntData;
-                 
-                 // Extract additional info from GHunt
-                 if (ghuntData.name && !results.basic.name) {
-                     results.basic.name = ghuntData.name;
-                 }
-                 if (ghuntData.picture && !results.metadata.picture) {
-                     results.metadata.picture = ghuntData.picture;
-                 }
-             } else {
-                 console.log('❌ GHunt extracted no useful data');
-             }
+
+        // 2. GHunt (Google account OSINT) - Direct Python module execution
+        try {
+            console.log('🔍 Running GHunt with Python module...');
+
+            const ghuntData = await runToolIfAvailable('ghunt', ['email', email], (stdout, stderr) => {
+                try {
+                    // Try to parse the output directly
+                    if (stdout && stdout.trim()) {
+                        const ghuntData = parseGHuntFromText(stdout);
+                        if (ghuntData) {
+                            return parseGHuntSimple(ghuntData);
+                        }
+                    }
+                    return null;
+                } catch (parseError) {
+                    console.log('❌ GHunt parsing error:', parseError.message);
+                    return null;
+                }
+            });
+
+            if (ghuntData && Object.keys(ghuntData).length > 0) {
+                results.google = ghuntData;
+
+                // Extract additional info from GHunt
+                if (ghuntData.name && !results.basic.name) {
+                    results.basic.name = ghuntData.name;
+                }
+                if (ghuntData.picture && !results.metadata.picture) {
+                    results.metadata.picture = ghuntData.picture;
+                }
+            } else {
+                console.log('❌ GHunt extracted no useful data');
+            }
         } catch (error) {
             console.log('❌ GHunt failed:', error.message);
         }
-        
-                 // 3. Holehe (email breach checker)
-         try {
-             console.log('🔍 Running Holehe...');
-             const holeheResult = await runToolIfAvailable('holehe', [email], async (stdout, stderr) => {
+
+        // 3. Holehe (email breach checker)
+        try {
+            console.log('🔍 Running Holehe...');
+            const holeheResult = await runToolIfAvailable('holehe', [email], async (stdout, stderr) => {
                 // Wait a bit for the CSV file to be written
                 await new Promise(resolve => setTimeout(resolve, 8000));
-                
-                                 // Check if CSV file was created and schedule cleanup
-                 const csvFiles = fs.readdirSync('.').filter(f => f.startsWith('holehe_') && f.endsWith('_results.csv'));
-                 console.log('🔍 CSV files found after execution:', csvFiles);
-                 
-                 // Schedule cleanup for all CSV files
-                 csvFiles.forEach(csvFile => {
-                     scheduleFileCleanup(csvFile);
-                 });
-                 
-                 return parseHolehe(stdout, stderr);
+
+                // Check if CSV file was created and schedule cleanup
+                const csvFiles = fs.readdirSync('.').filter(f => f.startsWith('holehe_') && f.endsWith('_results.csv'));
+                console.log('🔍 CSV files found after execution:', csvFiles);
+
+                // Schedule cleanup for all CSV files
+                csvFiles.forEach(csvFile => {
+                    scheduleFileCleanup(csvFile);
+                });
+
+                return parseHolehe(stdout, stderr);
             });
-            
+
             if (holeheResult) {
                 console.log('✅ Holehe data received:', JSON.stringify(holeheResult).substring(0, 200) + '...');
-                
+
                 // Extract breaches and registrations
                 if (Array.isArray(holeheResult.leaks)) {
                     results.leaks = holeheResult.leaks;
                     console.log('✅ Found breaches:', results.leaks.length);
                 }
-                
+
                 // Extract social media registrations
                 if (holeheResult.social && Array.isArray(holeheResult.social)) {
                     results.social = [...new Set([...results.social, ...holeheResult.social])];
                     console.log('✅ Found social profiles:', results.social.length);
                 }
-                
+
                 results.metadata.holehe = holeheResult;
             } else {
                 console.log('❌ Holehe returned no data');
@@ -579,31 +593,31 @@ app.post('/api/email-lookup', async (req, res) => {
         } catch (error) {
             console.log('❌ Holehe failed:', error.message);
         }
-        
-                 // 4. Sherlock (email search across social media) + Specific Platform Checks
-         try {
-             console.log('🔍 Running Sherlock...');
-             console.log('🔍 Using email for Sherlock:', email);
-             
-             // First run Sherlock for general search
-             const sherlockResult = await runToolIfAvailable('sherlock', [email], (stdout) => {
+
+        // 4. Sherlock (email search across social media) + Specific Platform Checks
+        try {
+            console.log('🔍 Running Sherlock...');
+            console.log('🔍 Using email for Sherlock:', email);
+
+            // First run Sherlock for general search
+            const sherlockResult = await runToolIfAvailable('sherlock', [email], (stdout) => {
                 console.log('🔍 Sherlock raw output length:', stdout.length);
                 console.log('🔍 Sherlock raw output preview:', stdout.substring(0, 300) + '...');
                 try {
                     // Sherlock outputs found profiles line by line
                     const lines = stdout.split('\n').filter(line => line.trim() && line.includes('http'));
                     console.log('🔍 Sherlock found lines with URLs:', lines.length);
-                                         const result = lines.map(line => {
-                         const match = line.match(/\[([^\]]+)\]\s*(.+)/);
-                         if (match) {
-                             // Clean the URL by removing any platform prefixes
-                             const cleanUrl = match[2].trim().replace(/^[^h]*https?:\/\//i, 'https://');
-                             return { url: cleanUrl };
-                         }
-                         // Clean the URL by removing any platform prefixes
-                         const cleanUrl = line.trim().replace(/^[^h]*https?:\/\//i, 'https://');
-                         return { url: cleanUrl };
-                     });
+                    const result = lines.map(line => {
+                        const match = line.match(/\[([^\]]+)\]\s*(.+)/);
+                        if (match) {
+                            // Clean the URL by removing any platform prefixes
+                            const cleanUrl = match[2].trim().replace(/^[^h]*https?:\/\//i, 'https://');
+                            return { url: cleanUrl };
+                        }
+                        // Clean the URL by removing any platform prefixes
+                        const cleanUrl = line.trim().replace(/^[^h]*https?:\/\//i, 'https://');
+                        return { url: cleanUrl };
+                    });
                     console.log('🔍 Sherlock parsed result:', result);
                     return result;
                 } catch (e) {
@@ -611,45 +625,45 @@ app.post('/api/email-lookup', async (req, res) => {
                     return null;
                 }
             });
-            
-                         if (sherlockResult && Array.isArray(sherlockResult)) {
-                 console.log('✅ Sherlock data received, count:', sherlockResult.length);
-                 results.social = [...new Set([...results.social, ...sherlockResult])];
-             } else {
-                 console.log('❌ Sherlock returned no valid data');
-             }
-             
-             // Sherlock default search (no specific sites)
-             console.log('✅ Sherlock default search completed');
+
+            if (sherlockResult && Array.isArray(sherlockResult)) {
+                console.log('✅ Sherlock data received, count:', sherlockResult.length);
+                results.social = [...new Set([...results.social, ...sherlockResult])];
+            } else {
+                console.log('❌ Sherlock returned no valid data');
+            }
+
+            // Sherlock default search (no specific sites)
+            console.log('✅ Sherlock default search completed');
         } catch (error) {
             console.log('❌ Sherlock failed:', error.message);
         }
-        
+
         // 5. Maigret (extended Sherlock sources)
         try {
             console.log('🔍 Running Maigret...');
             console.log('🔍 Using email for Maigret:', email);
             const maigretResult = await runToolIfAvailable('maigret', [email], parseMaigretSimple);
-            
+
             if (maigretResult && maigretResult.socialProfiles) {
                 console.log('✅ Maigret data received, social profiles:', maigretResult.socialProfiles.length);
-                
+
                 // Add Maigret social profiles to results
                 const maigretProfiles = maigretResult.socialProfiles.map(url => ({ url }));
                 results.social = [...new Set([...results.social, ...maigretProfiles])];
-                
+
                 results.metadata.maigret = maigretResult;
             } else {
                 console.log('❌ Maigret returned no valid data');
             }
-            
+
             // Debug: Log current social profiles
             console.log('🔍 Total social profiles after Maigret:', results.social.length);
             console.log('🔍 Social profiles:', results.social.slice(0, 5)); // Show first 5
         } catch (error) {
             console.log('❌ Maigret failed:', error.message);
         }
-        
+
         // Clean and structure final result
         const finalResult = {
             email: email,
@@ -683,24 +697,24 @@ app.post('/api/email-lookup', async (req, res) => {
                 : [];
             const all = Array.from(new Set([...
                 socialLinks,
-                ...leakLinks
+            ...leakLinks
             ]));
             finalResult.links = all;
-        } catch {}
-        
+        } catch { }
+
         // Store final results in database
         try {
-        if (searchId) {
-            await dbManager.insertSearch(email, 'email', finalResult);
-            console.log(`💾 Results stored in database with ID: ${searchId}`);
-            
-            // No temp files created for tool outputs
-            
+            if (searchId) {
+                await dbManager.insertSearch(email, 'email', finalResult);
+                console.log(`💾 Results stored in database with ID: ${searchId}`);
+
+                // No temp files created for tool outputs
+
             }
         } catch (error) {
             console.log('⚠️ Result storage failed:', error.message);
         }
-        
+
         console.log('✅ Email lookup completed successfully');
         console.log('📊 Final result summary:');
         console.log('  - Name:', finalResult.name);
@@ -710,15 +724,15 @@ app.post('/api/email-lookup', async (req, res) => {
         console.log('  - Google data:', finalResult.google ? 'Yes' : 'No');
         console.log('  - Metadata keys:', Object.keys(finalResult.metadata));
         console.log('🔍 Final result structure:', JSON.stringify(finalResult, null, 2).substring(0, 1000) + '...');
-        
+
         res.json({ success: true, data: finalResult });
-        
+
     } catch (error) {
         console.error('❌ Email lookup error:', error.message);
-        res.status(500).json({ 
-            success: false, 
+        res.status(500).json({
+            success: false,
             error: 'Failed to retrieve email information',
-            details: error.message 
+            details: error.message
         });
     }
 });
@@ -727,14 +741,14 @@ app.post('/api/email-lookup', async (req, res) => {
 app.post('/api/phone-lookup', async (req, res) => {
     try {
         const { phone } = req.body;
-        
+
         if (!phone || typeof phone !== 'string' || phone.trim().length < 7) {
-            return res.status(400).json({ 
-                success: false, 
-                error: 'Invalid phone number' 
+            return res.status(400).json({
+                success: false,
+                error: 'Invalid phone number'
             });
         }
-        
+
         // Log search and get search ID for tracking
         let searchId = null;
         try {
@@ -743,7 +757,7 @@ app.post('/api/phone-lookup', async (req, res) => {
             console.log('⚠️ Search logging failed:', error.message);
         }
         console.log(`🔍 Starting phone lookup for: ${phone}`);
-        
+
         // Collect data from all available sources
         const results = {
             phone: phone,
@@ -752,24 +766,24 @@ app.post('/api/phone-lookup', async (req, res) => {
             leaks: [],
             metadata: {}
         };
-        
-                 // 1. PhoneInfoga (primary phone OSINT tool) - LINUX/RENDER NATIVE APPROACH
+
+        // 1. PhoneInfoga (primary phone OSINT tool) - LINUX/RENDER NATIVE APPROACH
         try {
             console.log('📱 Running PhoneInfoga...');
             let infoga = null;
-            
-                         // Method 1: Try native PhoneInfoga first (most reliable on Linux/Render)
+
+            // Method 1: Try native PhoneInfoga first (most reliable on Linux/Render)
             // Native PhoneInfoga only (Docker removed)
             try {
                 console.log('🔍 Attempting PhoneInfoga (native)...');
-                    infoga = await runToolIfAvailable('phoneinfoga', ['scan', '-n', phone, '--no-color'], parsePhoneInfoga);
+                infoga = await runToolIfAvailable('phoneinfoga', ['scan', '-n', phone, '--no-color'], parsePhoneInfoga);
                 if (infoga) console.log('✅ PhoneInfoga native execution successful');
             } catch (nativeError) {
                 console.log('❌ PhoneInfoga native failed:', nativeError.message);
             }
-            
+
             // Docker path removed entirely
-            
+
             // Method 3: Try CLI helper as last resort
             if (!infoga) {
                 try {
@@ -796,16 +810,16 @@ app.post('/api/phone-lookup', async (req, res) => {
         } catch (error) {
             console.log('❌ PhoneInfoga not available');
         }
-        
+
         // 2. phone-number-api.com (carrier and formatting info)
         try {
             console.log('🌐 Fetching from phone-number-api.com...');
             const phoneApiResult = await scrapePhoneNumberApiHtml(phone);
-            
+
             if (phoneApiResult && phoneApiResult.phoneApi) {
                 console.log('✅ phone-number-api.com data received');
                 const pna = phoneApiResult.phoneApi;
-                
+
                 // Fill in missing basic info
                 if (!results.basic.carrier && pna.carrier) {
                     results.basic.carrier = pna.carrier;
@@ -819,7 +833,7 @@ app.post('/api/phone-lookup', async (req, res) => {
                 if (pna.validity !== undefined && pna.validity !== null) {
                     results.basic.valid = pna.validity;
                 }
-                
+
                 // Extract additional metadata
                 if (pna.metadata) {
                     results.metadata.phoneApi = pna.metadata;
@@ -828,16 +842,16 @@ app.post('/api/phone-lookup', async (req, res) => {
         } catch (error) {
             console.log('❌ phone-number-api.com failed:', error.message);
         }
-        
-                 // 3. Sherlock - SKIP for phone numbers (now requires email input)
+
+        // 3. Sherlock - SKIP for phone numbers (now requires email input)
         console.log('⏭️ Skipping Sherlock for phone number (now requires email input)');
-        
+
         // 4. Maigret - SKIP for phone numbers (now requires email input)
         console.log('⏭️ Skipping Maigret for phone number (now requires email input)');
-        
+
         // 5. Holehe (phone breach checker) - SKIP for phone numbers, only works with emails
         console.log('⏭️ Skipping Holehe for phone number (only works with emails)');
-        
+
         // Clean and structure final result
         const finalResult = {
             phone: phone,
@@ -855,7 +869,7 @@ app.post('/api/phone-lookup', async (req, res) => {
             metadata: results.metadata,
             timestamp: new Date().toISOString()
         };
-        
+
         console.log('📊 Final phone lookup result:');
         console.log('  - Phone:', finalResult.phone);
         console.log('  - Country:', finalResult.country);
@@ -865,29 +879,29 @@ app.post('/api/phone-lookup', async (req, res) => {
         console.log('  - Local:', finalResult.local);
         console.log('  - Social Media:', finalResult.socialMedia.length);
         console.log('  - Metadata keys:', Object.keys(finalResult.metadata));
-        
+
         // Store final results in database
         try {
-        if (searchId) {
-            await dbManager.insertSearch(phone, 'phone', finalResult);
-            console.log(`💾 Phone results stored in database with ID: ${searchId}`);
-            
-            // No temp files created for tool outputs
-            
+            if (searchId) {
+                await dbManager.insertSearch(phone, 'phone', finalResult);
+                console.log(`💾 Phone results stored in database with ID: ${searchId}`);
+
+                // No temp files created for tool outputs
+
             }
         } catch (error) {
             console.log('⚠️ Result storage failed:', error.message);
         }
-        
+
         console.log('✅ Phone lookup completed successfully');
         res.json({ success: true, data: finalResult });
-        
+
     } catch (error) {
         console.error('❌ Phone lookup error:', error.message);
-        res.status(500).json({ 
-            success: false, 
+        res.status(500).json({
+            success: false,
             error: 'Failed to retrieve phone information',
-            details: error.message 
+            details: error.message
         });
     }
 });
@@ -896,7 +910,7 @@ app.post('/api/phone-lookup', async (req, res) => {
 app.post('/api/ip-lookup', async (req, res) => {
     try {
         const { ip } = req.body;
-        
+
         // Log search and get search ID for tracking
         let searchId = null;
         try {
@@ -911,9 +925,9 @@ app.post('/api/ip-lookup', async (req, res) => {
                 'User-Agent': 'OSINT-Lookup-Engine/1.0'
             }
         });
-        
+
         const ipData = ipResponse.data;
-        
+
         const result = {
             ip: ip,
             city: ipData.city || 'Unknown',
@@ -926,31 +940,31 @@ app.post('/api/ip-lookup', async (req, res) => {
             organization: ipData.org || 'Unknown',
             timestamp: new Date().toISOString()
         };
-        
+
         // Store final results in database
         try {
-        if (searchId) {
-            await dbManager.insertSearch(ip, 'ip', result);
-            console.log(`💾 IP results stored in database with ID: ${searchId}`);
-            
-            // Track any temporary files created during the search
-            const tempFiles = [
-                path.join(tempDir, `ipinfo_${Date.now()}.json`)
-            ];
-            
+            if (searchId) {
+                await dbManager.insertSearch(ip, 'ip', result);
+                console.log(`💾 IP results stored in database with ID: ${searchId}`);
+
+                // Track any temporary files created during the search
+                const tempFiles = [
+                    path.join(tempDir, `ipinfo_${Date.now()}.json`)
+                ];
+
             }
         } catch (error) {
             console.log('⚠️ Result storage failed:', error.message);
         }
-        
+
         res.json({ success: true, data: result });
-        
+
     } catch (error) {
         console.error('IP lookup error:', error.message);
-        res.status(500).json({ 
-            success: false, 
+        res.status(500).json({
+            success: false,
             error: 'Failed to retrieve IP information',
-            details: error.message 
+            details: error.message
         });
     }
 });
@@ -960,14 +974,14 @@ app.get('/api/stats', async (req, res) => {
     try {
         const visitorStats = await dbManager.getVisitorStats();
         const searchCount = await dbManager.getSearchCount();
-        
+
         // Add cache-busting headers
         res.set({
             'Cache-Control': 'no-cache, no-store, must-revalidate',
             'Pragma': 'no-cache',
             'Expires': '0'
         });
-        
+
         const stats = {
             visitors_today: visitorStats.visitors_today,
             total_visitors: visitorStats.total_visitors,
@@ -976,7 +990,7 @@ app.get('/api/stats', async (req, res) => {
             searches: searchCount,
             timestamp: new Date().toISOString()
         };
-        
+
         res.json(stats);
     } catch (error) {
         console.log('❌ Stats error:', error.message);
@@ -987,10 +1001,10 @@ app.get('/api/stats', async (req, res) => {
 // Tool test endpoint to verify OSINT tools are working
 app.get('/api/test-tools', async (req, res) => {
     const results = {};
-    
+
     // Test each tool
     const tools = ['sherlock', 'holehe', 'maigret', 'ghunt'];
-    
+
     for (const tool of tools) {
         try {
             console.log(`🧪 Testing tool: ${tool}`);
@@ -999,18 +1013,18 @@ app.get('/api/test-tools', async (req, res) => {
                 resolved: resolved,
                 available: !!resolved.command
             };
-            
+
             if (resolved.command) {
                 // Try a simple help command
                 try {
-                    const { stdout, stderr } = await execFileAsync(resolved.command, 
-                        resolved.viaPython 
-                            ? (resolved.viaPython.startsWith('-m ') 
+                    const { stdout, stderr } = await execFileAsync(resolved.command,
+                        resolved.viaPython
+                            ? (resolved.viaPython.startsWith('-m ')
                                 ? ['-m', resolved.viaPython.replace('-m ', ''), '--help']
                                 : resolved.viaPython.startsWith('-m')
-                                ? [resolved.viaPython, '--help']
-                                : [resolved.viaPython, '--help'])
-                            : ['--help'], 
+                                    ? [resolved.viaPython, '--help']
+                                    : [resolved.viaPython, '--help'])
+                            : ['--help'],
                         { timeout: 10000 }
                     );
                     results[tool].helpTest = {
@@ -1033,7 +1047,7 @@ app.get('/api/test-tools', async (req, res) => {
             };
         }
     }
-    
+
     res.json({
         success: true,
         tools: results,
@@ -1047,7 +1061,7 @@ app.get('/api/search-history', async (req, res) => {
     try {
         const limit = parseInt(req.query.limit) || 10;
         const searchHistory = await dbManager.getSearchHistory(limit);
-        
+
         res.json({
             success: true,
             data: searchHistory,
@@ -1056,10 +1070,10 @@ app.get('/api/search-history', async (req, res) => {
         });
     } catch (error) {
         console.log('❌ Search history error:', error.message);
-        res.status(500).json({ 
+        res.status(500).json({
             success: false,
             error: 'Failed to retrieve search history',
-            details: error.message 
+            details: error.message
         });
     }
 });
@@ -1068,7 +1082,7 @@ app.get('/api/search-history', async (req, res) => {
 app.post('/api/reset-counts', async (req, res) => {
     try {
         const success = await dbManager.resetCounts();
-        
+
         if (success) {
             res.json({
                 success: true,
@@ -1083,10 +1097,10 @@ app.post('/api/reset-counts', async (req, res) => {
         }
     } catch (error) {
         console.log('❌ Reset counts error:', error.message);
-        res.status(500).json({ 
+        res.status(500).json({
             success: false,
             error: 'Failed to reset counts',
-            details: error.message 
+            details: error.message
         });
     }
 });
@@ -1095,7 +1109,7 @@ app.post('/api/reset-counts', async (req, res) => {
 app.post('/api/cleanup-files', async (req, res) => {
     try {
         const deletedFiles = await dbManager.cleanupExpiredFiles();
-        
+
         res.json({
             success: true,
             message: `Cleaned up ${deletedFiles.length} expired files`,
@@ -1104,10 +1118,10 @@ app.post('/api/cleanup-files', async (req, res) => {
         });
     } catch (error) {
         console.log('❌ Manual cleanup error:', error.message);
-        res.status(500).json({ 
+        res.status(500).json({
             success: false,
             error: 'Failed to cleanup files',
-            details: error.message 
+            details: error.message
         });
     }
 });
@@ -1117,23 +1131,23 @@ app.get('/api/download-holehe-csv', (req, res) => {
     try {
         // Find the most recent Holehe CSV file
         const csvFiles = fs.readdirSync('.').filter(f => f.includes('holehe_') && f.includes('_results.csv'));
-        
+
         if (csvFiles.length === 0) {
             return res.status(404).json({ error: 'No Holehe CSV files found' });
         }
-        
+
         // Get the newest file
         const newestFile = csvFiles.sort((a, b) => fs.statSync(b).mtimeMs - fs.statSync(a).mtimeMs)[0];
         const filePath = path.join(process.cwd(), newestFile);
-        
+
         // Set headers for file download
         res.setHeader('Content-Type', 'text/csv');
         res.setHeader('Content-Disposition', `attachment; filename="${newestFile}"`);
-        
+
         // Stream the file
         const fileStream = fs.createReadStream(filePath);
         fileStream.pipe(res);
-        
+
     } catch (error) {
         console.error('Error downloading Holehe CSV:', error);
         res.status(500).json({ error: 'Failed to download CSV file' });
@@ -1146,19 +1160,19 @@ function parseGHuntFromText(text) {
         // GHunt outputs information in a structured text format
         // Extract key information from the text output
         const result = {};
-        
+
         // Extract name
         const nameMatch = text.match(/Name:\s*(.+)/i);
         if (nameMatch) result.name = nameMatch[1].trim();
-        
+
         // Extract email
         const emailMatch = text.match(/Email:\s*(.+)/i);
         if (emailMatch) result.email = emailMatch[1].trim();
-        
+
         // Extract picture URL
         const pictureMatch = text.match(/Picture:\s*(https?:\/\/[^\s]+)/i);
         if (pictureMatch) result.picture = pictureMatch[1].trim();
-        
+
         // Extract services
         const servicesMatch = text.match(/Services:\s*([\s\S]*?)(?=\n\n|\n[A-Z]|$)/i);
         if (servicesMatch) {
@@ -1168,13 +1182,13 @@ function parseGHuntFromText(text) {
                 .map(line => line.replace(/^[-*]\s*/, ''));
             result.services = services;
         }
-        
+
         // Extract additional info
         const infoMatch = text.match(/Additional Info:\s*([\s\S]*?)(?=\n\n|\n[A-Z]|$)/i);
         if (infoMatch) {
             result.additionalInfo = infoMatch[1].trim();
         }
-        
+
         return Object.keys(result).length > 0 ? result : null;
     } catch (error) {
         console.log('❌ GHunt text parsing failed:', error.message);
@@ -1195,11 +1209,11 @@ async function isCommandAvailable(cmd) {
     try {
         // Linux/Render: use 'which' command
         await execAsync(`which ${cmd}`);
-            return true;
-        } catch {
-            return false;
-        }
+        return true;
+    } catch {
+        return false;
     }
+}
 
 // Helper function to extract username from email
 function extractUsernameFromEmail(email) {
@@ -1247,7 +1261,7 @@ const toolTemplates = {
 // Extend resolver to map to tool templates for these tools
 async function resolveToolCommand(cmd) {
     console.log(`🔍 Resolving tool command for: ${cmd}`);
-    
+
     // Template-driven tools (native Python execution)
     if (toolTemplates[cmd]) {
         // Use CLI entrypoints provided by pipx - just use tool names directly
@@ -1267,7 +1281,7 @@ async function resolveToolCommand(cmd) {
             path.join(process.env.HOME || '', '.local', 'bin', cliName) ||
             path.join('/root', '.local', 'bin', cliName);
         const placeholder = toolTemplates[cmd].placeholder;
-        
+
         // GHunt requires subcommand "email"
         let baseArgs = cmd === 'ghunt' ? ['email', placeholder] : [placeholder];
         // Maigret defaults for Render stability with JSON output
@@ -1275,10 +1289,10 @@ async function resolveToolCommand(cmd) {
             baseArgs = ['--timeout', '60', '-n', '50', '--print-errors', placeholder];
         }
         // PhoneInfoga preferred syntax
-    if (cmd === 'phoneinfoga') {
+        if (cmd === 'phoneinfoga') {
             baseArgs = ['scan', '-n', placeholder];
         }
-        
+
         return {
             command: resolvedPath && fs.existsSync(resolvedPath) ? resolvedPath : cliName,
             viaTemplate: true,
@@ -1289,9 +1303,9 @@ async function resolveToolCommand(cmd) {
 
     // GHunt via direct CLI (installed by pipx)
     if (cmd === 'ghunt') {
-        return { 
-            command: 'ghunt', 
-            viaTemplate: false, 
+        return {
+            command: 'ghunt',
+            viaTemplate: false,
             templateArgs: ['email', '<email>'],
             placeholder: '<email>'
         };
@@ -1300,8 +1314,8 @@ async function resolveToolCommand(cmd) {
     // Fallback to direct availability
     const ok = await isCommandAvailable(cmd);
     console.log(`🔍 Direct command availability for ${cmd}: ${ok}`);
-        if (ok) return { command: cmd, viaPython: false };
-        
+    if (ok) return { command: cmd, viaPython: false };
+
     // Final fallback: try direct CLI name only (no python -m)
     console.log(`🔍 Using final fallback for ${cmd}: direct CLI name`);
     return { command: cmd };
@@ -1311,17 +1325,17 @@ async function resolveToolCommand(cmd) {
 async function runOsintScript(email) {
     try {
         console.log(`🐍 Running OSINT script for email: ${email}`);
-        
+
         const { stdout, stderr } = await execFileAsync('python3', ['osint_runner.py', email], {
             timeout: 600000, // 10 minutes timeout
             maxBuffer: 1024 * 1024 * 50, // 50MB buffer
             env: { ...process.env, PYTHONUNBUFFERED: '1' },
             encoding: 'utf8'
         });
-        
+
         console.log(`✅ OSINT script completed`);
         console.log(`📄 Output length: ${stdout.length} characters`);
-        
+
         // Parse the output to extract individual tool results
         return parseOsintScriptOutput(stdout, stderr);
     } catch (err) {
@@ -1341,11 +1355,11 @@ function parseOsintScriptOutput(stdout, stderr) {
         maigret: null,
         ghunt: null
     };
-    
-    const lines = stdout.split('\n'); 
+
+    const lines = stdout.split('\n');
     let currentTool = null;
     let toolOutput = [];
-    
+
     for (const line of lines) {
         if (line.includes('Running Holehe')) {
             if (currentTool && toolOutput.length > 0) {
@@ -1375,37 +1389,37 @@ function parseOsintScriptOutput(stdout, stderr) {
             toolOutput.push(line);
         }
     }
-    
+
     // Handle the last tool
     if (currentTool && toolOutput.length > 0) {
         results[currentTool] = toolOutput.join('\n');
     }
-    
+
     return results;
 }
 
 // Update runToolIfAvailable to ONLY use Python script for email lookups
 async function runToolIfAvailable(cmd, args, parseFn) {
     console.log(`🔧 Running tool: ${cmd} with args:`, args);
-    
+
     // For email lookups, ONLY use the Python script
     if (args.length > 0 && args[0].includes('@')) {
         const email = args[0];
         console.log(`📧 Email detected, using OSINT script for comprehensive analysis`);
         const scriptResults = await runOsintScript(email);
-        
+
         if (scriptResults && scriptResults[cmd]) {
             console.log(`✅ Tool ${cmd} data from script:`, scriptResults[cmd].substring(0, 200) + '...');
             return parseFn ? parseFn(scriptResults[cmd], '') : scriptResults[cmd];
         }
-        
+
         // If script didn't return data for this specific tool, return empty result
         return null;
     }
-    
+
     // For non-email lookups, return null (disabled)
     console.log(`❌ Tool ${cmd} disabled - only email lookups via Python script are supported`);
-        return null;
+    return null;
 }
 
 // Use GHunt smart runner in email-lookup
@@ -1437,7 +1451,7 @@ async function fetchPhoneNumberApiJSON(phone) {
         try {
             const r = await axios.get(url, { timeout: 12000, headers: { 'User-Agent': 'Mozilla/5.0' } });
             if (r.status === 200 && typeof r.data === 'object') return r.data;
-        } catch {}
+        } catch { }
     }
     // Fallback to existing HTML parser for formatting fields if JSON not available
     const htmlParsed = await scrapePhoneNumberApiHtml(phone);
@@ -1464,7 +1478,7 @@ async function fetchBreaches(phone) {
             if (r.status === 200 && r.data && ((r.data.entries && r.data.entries.length) || r.data.total)) {
                 sources.push('dehashed');
             }
-        } catch {}
+        } catch { }
     }
     return { sources };
 }
@@ -1500,7 +1514,7 @@ async function fetchFromPhoneNumberApi(phone) {
                     formatE164: d.formatE164 || null
                 };
             }
-        } catch {}
+        } catch { }
     }
     return null;
 }
@@ -1523,28 +1537,28 @@ async function fetchFromLeaksApis(phone) {
             if (r.status === 200 && r.data && (r.data.entries?.length || 0) > 0) {
                 sources.push({ provider: 'dehashed', count: r.data.entries.length });
             }
-        } catch {}
+        } catch { }
     }
     // HaveIBeenPwned primarily supports emails; skip unless you map phone->email externally.
     return { sources };
 }
 
 function parseSherlock(stdout) {
-     // Sherlock --print-found lists lines with found URLs
-     const urls = stdout.split(/\r?\n/).filter(l => /https?:\/\//i.test(l))
-         .map(url => {
-             // Clean the URL by removing any platform prefixes
-             return url.replace(/^[^h]*https?:\/\//i, 'https://');
-         });
-     return { socialProfiles: urls };
- }
+    // Sherlock --print-found lists lines with found URLs
+    const urls = stdout.split(/\r?\n/).filter(l => /https?:\/\//i.test(l))
+        .map(url => {
+            // Clean the URL by removing any platform prefixes
+            return url.replace(/^[^h]*https?:\/\//i, 'https://');
+        });
+    return { socialProfiles: urls };
+}
 
 function parseMaigret(stdout) {
     console.log('🔍 Maigret parsing input length:', stdout?.length || 0);
-    
+
     // Clean the output by removing progress bars and control characters
     let cleanOutput = stdout;
-    
+
     // Remove progress bar lines and control characters
     cleanOutput = cleanOutput.replace(/\r/g, ''); // Remove carriage returns
     cleanOutput = cleanOutput.replace(/\x1b\[[0-9;]*[a-zA-Z]/g, ''); // Remove ANSI escape codes
@@ -1552,9 +1566,9 @@ function parseMaigret(stdout) {
     cleanOutput = cleanOutput.replace(/\[-].*?\n/g, ''); // Remove info lines
     cleanOutput = cleanOutput.replace(/\[!].*?\n/g, ''); // Remove warning lines
     cleanOutput = cleanOutput.replace(/\[*].*?\n/g, ''); // Remove info lines
-    
+
     console.log('🔍 Maigret cleaned output preview:', cleanOutput.substring(0, 500) || 'empty');
-    
+
     // Try JSON first; fallback to URL extraction
     try {
         // Handle ndjson format (newline-delimited JSON)
@@ -1596,64 +1610,64 @@ function parseMaigret(stdout) {
 }
 
 function parseMaigretSimple(stdout) {
-     console.log('🔍 Maigret Simple parsing input length:', stdout?.length || 0);
-     
-     // Clean the output by removing progress bars and control characters
-     let cleanOutput = stdout;
-     
-     // Remove progress bar lines and control characters
-     cleanOutput = cleanOutput.replace(/\r/g, ''); // Remove carriage returns
-     cleanOutput = cleanOutput.replace(/\x1b\[[0-9;]*[a-zA-Z]/g, ''); // Remove ANSI escape codes
-     cleanOutput = cleanOutput.replace(/Searching \|.*?\|.*?\[.*?\] in.*?\n/g, ''); // Remove progress bars
-     cleanOutput = cleanOutput.replace(/\[-].*?\n/g, ''); // Remove info lines
-     cleanOutput = cleanOutput.replace(/\[!].*?\n/g, ''); // Remove warning lines
-     cleanOutput = cleanOutput.replace(/\[*].*?\n/g, ''); // Remove info lines
-     
-     console.log('🔍 Maigret Simple cleaned output preview:', cleanOutput.substring(0, 500) || 'empty');
-     
-     // Extract URLs from the cleaned output and clean them
-     const urls = cleanOutput.split(/\r?\n/).filter(l => /https?:\/\//i.test(l))
-         .map(url => {
-             // Clean the URL by removing any platform prefixes
-             return url.replace(/^[^h]*https?:\/\//i, 'https://');
-         });
-     console.log('✅ Maigret Simple found URLs:', urls.length);
-     return { socialProfiles: urls };
- }
+    console.log('🔍 Maigret Simple parsing input length:', stdout?.length || 0);
+
+    // Clean the output by removing progress bars and control characters
+    let cleanOutput = stdout;
+
+    // Remove progress bar lines and control characters
+    cleanOutput = cleanOutput.replace(/\r/g, ''); // Remove carriage returns
+    cleanOutput = cleanOutput.replace(/\x1b\[[0-9;]*[a-zA-Z]/g, ''); // Remove ANSI escape codes
+    cleanOutput = cleanOutput.replace(/Searching \|.*?\|.*?\[.*?\] in.*?\n/g, ''); // Remove progress bars
+    cleanOutput = cleanOutput.replace(/\[-].*?\n/g, ''); // Remove info lines
+    cleanOutput = cleanOutput.replace(/\[!].*?\n/g, ''); // Remove warning lines
+    cleanOutput = cleanOutput.replace(/\[*].*?\n/g, ''); // Remove info lines
+
+    console.log('🔍 Maigret Simple cleaned output preview:', cleanOutput.substring(0, 500) || 'empty');
+
+    // Extract URLs from the cleaned output and clean them
+    const urls = cleanOutput.split(/\r?\n/).filter(l => /https?:\/\//i.test(l))
+        .map(url => {
+            // Clean the URL by removing any platform prefixes
+            return url.replace(/^[^h]*https?:\/\//i, 'https://');
+        });
+    console.log('✅ Maigret Simple found URLs:', urls.length);
+    return { socialProfiles: urls };
+}
 
 function parseHolehe(stdout) {
     console.log('🔍 Holehe parsing input length:', stdout?.length || 0);
     console.log('🔍 Holehe raw output preview:', stdout?.substring(0, 500) || 'empty');
-    
+
     // Parse CSV using header mapping for robustness
     try {
         const csvFiles = fs.readdirSync('.').filter(f => f.startsWith('holehe_') && f.endsWith('_results.csv'));
         console.log('🔍 Found Holehe CSV files:', csvFiles);
-        
+
         if (csvFiles.length) {
-            const newestFile = csvFiles.sort((a,b)=>fs.statSync(b).mtimeMs - fs.statSync(a).mtimeMs)[0];
+            const newestFile = csvFiles.sort((a, b) => fs.statSync(b).mtimeMs - fs.statSync(a).mtimeMs)[0];
             console.log('🔍 Using newest CSV file:', newestFile);
-            
+
             const csv = fs.readFileSync(newestFile, 'utf8');
             const lines = csv.split(/\r?\n/).filter(Boolean);
             console.log('🔍 CSV lines count:', lines.length);
-            
+
             if (lines.length < 2) {
                 console.log('❌ CSV file has insufficient data');
                 return null;
             }
-            
+
             const header = lines[0].split(',').map(h => h.trim().toLowerCase());
             console.log('🔍 CSV header:', header);
-            
+
             const nameIdx = header.indexOf('name');
             const existsIdx = header.indexOf('exists');
-            
+
             if (nameIdx === -1 || existsIdx === -1) {
                 console.log('❌ CSV header missing required columns');
                 return null;
             }
-            
+
             const out = [];
             const isDomainLike = (s) => {
                 if (!s) return false;
@@ -1662,7 +1676,7 @@ function parseHolehe(stdout) {
                 if (/^https?:\/\//i.test(cleaned)) return true;
                 return /^[a-z0-9.-]+\.[a-z]{2,}$/i.test(cleaned);
             };
-            
+
             for (let i = 1; i < lines.length; i++) {
                 const cols = lines[i].split(',');
                 const site = (cols[nameIdx] || '').trim();
@@ -1670,7 +1684,7 @@ function parseHolehe(stdout) {
                 const exists = existsVal === 'true' || existsVal === '[+]' || existsVal === 'yes';
                 if (site && exists && isDomainLike(site)) out.push({ site, exists: true });
             }
-            
+
             console.log('✅ Holehe found breaches from CSV:', out.length);
             return { leaks: out };
         }
@@ -1702,7 +1716,7 @@ function parseHolehe(stdout) {
                 }
             });
             if (out.length) return { leaks: out };
-        } catch {}
+        } catch { }
         return null;
     }
 }
@@ -1710,7 +1724,7 @@ function parseHolehe(stdout) {
 function parseGHuntSimple(data) {
     console.log('🔍 GHunt simple parser - input data type:', typeof data);
     console.log('🔍 GHunt simple parser - input keys:', Object.keys(data || {}));
-    
+
     // Initialize result object
     let result = {
         name: null,
@@ -1721,19 +1735,19 @@ function parseGHuntSimple(data) {
         services: [],
         metadata: { ghunt: data }
     };
-    
+
     try {
         // Method 1: Try to extract from PROFILE_CONTAINER structure
         if (data.PROFILE_CONTAINER && data.PROFILE_CONTAINER.profile) {
             console.log('🔍 Found PROFILE_CONTAINER structure');
             const profile = data.PROFILE_CONTAINER.profile;
-            
+
             result.name = profile.name || profile.displayName || profile.fullName || null;
             result.picture = profile.picture || profile.profilePicture || profile.photo || null;
             result.email = profile.email || profile.primaryEmail || null;
             result.google_id = profile.personId || profile.id || profile.googleId || null;
             result.profile_id = profile.profileId || profile.id || null;
-            
+
             console.log('🔍 Extracted from PROFILE_CONTAINER:', {
                 name: result.name,
                 picture: result.picture ? 'found' : 'not found',
@@ -1742,14 +1756,14 @@ function parseGHuntSimple(data) {
                 profile_id: result.profile_id
             });
         }
-        
+
         // Method 2: Try to extract from SERVICES_CONTAINER structure
         if (data.SERVICES_CONTAINER && data.SERVICES_CONTAINER.services) {
             console.log('🔍 Found SERVICES_CONTAINER structure');
             result.services = data.SERVICES_CONTAINER.services || [];
             console.log('🔍 Extracted services count:', result.services.length);
         }
-        
+
         // Method 3: Try direct properties (fallback)
         if (!result.name) {
             result.name = data.name || data.full_name || data.display_name || data.displayName || null;
@@ -1769,24 +1783,24 @@ function parseGHuntSimple(data) {
         if (!result.services.length) {
             result.services = data.services || data.connected_services || data.connectedServices || [];
         }
-        
+
         // Method 4: Try nested structures
         if (!result.name && data.profile) {
             result.name = data.profile.name || data.profile.displayName || null;
             result.picture = data.profile.picture || data.profile.profilePicture || null;
             result.email = data.profile.email || null;
         }
-        
+
         // Clean up null/undefined values
         Object.keys(result).forEach(key => {
             if (result[key] === null || result[key] === undefined || result[key] === '') {
                 delete result[key];
             }
         });
-        
+
         console.log('🔍 Final GHunt result:', result);
         return result;
-        
+
     } catch (error) {
         console.log('❌ GHunt simple parser error:', error.message);
         return null;
@@ -1824,8 +1838,8 @@ function parsePhoneInfoga(stdout) {
                 owner: owner || null,
                 metadata: { phoneinfoga: data, associated_people: names }
             };
-        } catch {}
-        
+        } catch { }
+
         // Parse text output format
         const lines = String(stdout || '').split(/\r?\n/).filter(Boolean);
         const result = {
@@ -1834,15 +1848,15 @@ function parsePhoneInfoga(stdout) {
             owner: null,
             metadata: { phoneinfoga: { raw_output: lines } }
         };
-        
+
         console.log('🔍 PhoneInfoga parsing lines:', lines.length);
-        
+
         for (const line of lines) {
             const trimmed = line.trim();
             if (!trimmed) continue;
-            
+
             console.log('🔍 Processing line:', trimmed);
-            
+
             // Extract carrier info - try multiple patterns
             if (trimmed.toLowerCase().includes('carrier') || trimmed.toLowerCase().includes('network') || trimmed.toLowerCase().includes('provider')) {
                 const match = trimmed.match(/[:=]\s*(.+)/i) || trimmed.match(/\s+(.+)$/i);
@@ -1855,7 +1869,7 @@ function parsePhoneInfoga(stdout) {
                     }
                 }
             }
-            
+
             // Extract country info
             if (trimmed.toLowerCase().includes('country') || trimmed.toLowerCase().includes('region') || trimmed.toLowerCase().includes('nation')) {
                 const match = trimmed.match(/[:=]\s*(.+)/i) || trimmed.match(/\s+(.+)$/i);
@@ -1864,7 +1878,7 @@ function parsePhoneInfoga(stdout) {
                     console.log('✅ Found country:', result.basic.country);
                 }
             }
-            
+
             // Extract line type
             if (trimmed.toLowerCase().includes('type') || trimmed.toLowerCase().includes('line type') || trimmed.toLowerCase().includes('linetype')) {
                 const match = trimmed.match(/[:=]\s*(.+)/i) || trimmed.match(/\s+(.+)$/i);
@@ -1873,7 +1887,7 @@ function parsePhoneInfoga(stdout) {
                     console.log('✅ Found type:', result.basic.type);
                 }
             }
-            
+
             // Extract location
             if (trimmed.toLowerCase().includes('location') || trimmed.toLowerCase().includes('city') || trimmed.toLowerCase().includes('area')) {
                 const match = trimmed.match(/[:=]\s*(.+)/i) || trimmed.match(/\s+(.+)$/i);
@@ -1882,7 +1896,7 @@ function parsePhoneInfoga(stdout) {
                     console.log('✅ Found location:', result.basic.location);
                 }
             }
-            
+
             // Extract validity
             if (trimmed.toLowerCase().includes('valid')) {
                 const match = trimmed.match(/[:=]\s*(.+)/i) || trimmed.match(/\s+(.+)$/i);
@@ -1892,7 +1906,7 @@ function parsePhoneInfoga(stdout) {
                     console.log('✅ Found validity:', result.basic.valid);
                 }
             }
-            
+
             // Extract phone number info - but only actual phone numbers, not URLs
             if ((trimmed.toLowerCase().includes('number') || trimmed.toLowerCase().includes('phone')) && !trimmed.includes('http')) {
                 const match = trimmed.match(/[:=]\s*(.+)/i) || trimmed.match(/\s+(.+)$/i);
@@ -1905,7 +1919,7 @@ function parsePhoneInfoga(stdout) {
                     }
                 }
             }
-            
+
             // Extract E164 format specifically
             if (trimmed.includes('E164:') || trimmed.includes('E164')) {
                 const match = trimmed.match(/E164:\s*(.+)/i);
@@ -1914,7 +1928,7 @@ function parsePhoneInfoga(stdout) {
                     console.log('✅ Found E164:', result.basic.e164);
                 }
             }
-            
+
             // Extract International format
             if (trimmed.includes('International:') || trimmed.includes('International')) {
                 const match = trimmed.match(/International:\s*(.+)/i);
@@ -1923,7 +1937,7 @@ function parsePhoneInfoga(stdout) {
                     console.log('✅ Found International:', result.basic.international);
                 }
             }
-            
+
             // Extract Local format
             if (trimmed.includes('Local:') || trimmed.includes('Local')) {
                 const match = trimmed.match(/Local:\s*(.+)/i);
@@ -1933,26 +1947,26 @@ function parsePhoneInfoga(stdout) {
                 }
             }
         }
-        
+
         // If we didn't find much info, try to extract from the full text
         if (!result.carrier && !result.basic.country) {
             console.log('🔍 Trying alternative text extraction...');
             const fullText = lines.join(' ').toLowerCase();
-            
+
             // Try to find carrier in the full text
             const carrierMatch = fullText.match(/(?:carrier|network|provider)\s*[:=]?\s*([a-zA-Z0-9\s&]+?)(?:\s|$|\.|,)/i);
             if (carrierMatch && !result.carrier) {
                 result.carrier = carrierMatch[1].trim();
                 console.log('✅ Found carrier (alt):', result.carrier);
             }
-            
+
             // Try to find country in the full text
             const countryMatch = fullText.match(/(?:country|region|nation)\s*[:=]?\s*([a-zA-Z0-9\s]+?)(?:\s|$|\.|,)/i);
             if (countryMatch && !result.basic.country) {
                 result.basic.country = countryMatch[1].trim();
                 console.log('✅ Found country (alt):', result.basic.country);
             }
-            
+
             // Try to find line type in the full text
             const typeMatch = fullText.match(/(?:line\s*type|type|linetype)\s*[:=]?\s*([a-zA-Z0-9\s]+?)(?:\s|$|\.|,)/i);
             if (typeMatch && !result.basic.type) {
@@ -1960,7 +1974,7 @@ function parsePhoneInfoga(stdout) {
                 console.log('✅ Found type (alt):', result.basic.type);
             }
         }
-        
+
         console.log('🔍 Final PhoneInfoga result:', result);
         return result;
     } catch (error) {
@@ -2003,9 +2017,9 @@ async function scrapePhoneNumberApiHtml(phone) {
                         };
                         return { phoneApi: { carrier, country, validity, type, metadata } };
                     }
-                } catch {}
+                } catch { }
             }
-        } catch {}
+        } catch { }
         const urlCandidates = [
             `https://phone-number-api.com/${encodeURIComponent(normalized)}`,
             `https://phone-number-api.com/number/${encodeURIComponent(normalized)}`,
@@ -2031,7 +2045,7 @@ async function scrapePhoneNumberApiHtml(phone) {
                     html = resp.data;
                     break;
                 }
-            } catch {}
+            } catch { }
         }
         if (!html) return null;
         const $ = cheerio.load(html);
@@ -2065,7 +2079,7 @@ async function scrapePhoneNumberApiHtml(phone) {
                 };
                 return { phoneApi: { carrier, country, validity, type, metadata } };
             }
-        } catch {}
+        } catch { }
 
         // Parse tables and definition lists
         const labelToValue = {};
@@ -2184,9 +2198,9 @@ function mergeAggregatedResults(context, parts) {
             : [];
         aggregated.links = Array.from(new Set([...
             socialLinks,
-            ...leakLinks
+        ...leakLinks
         ]));
-    } catch {}
+    } catch { }
 
     // Build leaks with confidence
     aggregated.leaks = Array.from(leaksToSources.entries()).map(([key, sources]) => {
@@ -2206,7 +2220,7 @@ async function getPhoneApiData(phone) {
                 'User-Agent': 'OSINT-Lookup-Engine/1.0'
             }
         });
-        
+
         return {
             name: response.data.name,
             email: response.data.email,
@@ -2252,33 +2266,33 @@ app.get('/api/health', (req, res) => {
 app.post('/api/run-osint-script', async (req, res) => {
     try {
         const { email } = req.body;
-        
+
         if (!email || !email.includes('@')) {
             return res.status(400).json({
                 success: false,
                 error: 'Valid email address required'
             });
         }
-        
+
         console.log(`🐍 Running OSINT script for email: ${email}`);
-        
+
         const { stdout, stderr } = await execFileAsync('python3', ['osint_runner.py', email], {
             timeout: 600000, // 10 minutes timeout
             maxBuffer: 1024 * 1024 * 50, // 50MB buffer
             env: { ...process.env, PYTHONUNBUFFERED: '1' },
             encoding: 'utf8'
         });
-        
+
         console.log(`✅ OSINT script completed`);
-    
-    res.json({
+
+        res.json({
             success: true,
             email: email,
             output: stdout,
             error: stderr,
             message: 'OSINT analysis completed'
         });
-        
+
     } catch (error) {
         console.log(`❌ OSINT script failed:`, error.message);
         res.status(500).json({
@@ -2302,7 +2316,7 @@ app.listen(PORT, () => {
     console.log(`   - PYTHON_PATH: ${process.env.PYTHON_PATH}`);
     console.log(`   - PATH: ${process.env.PATH?.substring(0, 100)}...`);
     console.log(`📦 Available Tools Test: Visit /api/test-tools to verify OSINT tools`);
-    
+
     // Test tool availability at startup (import check only)
     console.log(`🔍 Testing tool availability at startup (import)...`);
     const tools = ['sherlock', 'holehe', 'maigret', 'ghunt'];
@@ -2338,7 +2352,7 @@ app.get('/api/tools-health', async (req, res) => {
 
         // Check Python tools availability
         const tools = ['sherlock', 'holehe', 'maigret', 'ghunt'];
-        
+
         for (const tool of tools) {
             try {
                 const result = await runToolIfAvailable(tool, ['--help'], (output) => output);
@@ -2375,7 +2389,7 @@ app.get('/api/tools-health', async (req, res) => {
         // Overall status
         const availableTools = Object.values(toolsHealth.tools).filter(t => t.available).length;
         const totalTools = Object.keys(toolsHealth.tools).length;
-        
+
         if (availableTools === totalTools) {
             toolsHealth.status = 'healthy';
         } else if (availableTools > 0) {
@@ -2412,14 +2426,14 @@ app.get('/api/db-health', async (req, res) => {
 
         if (dbManager.isConnected && dbManager.db) {
             try {
-                    const client = await dbManager.db.connect();
-                    const result = await client.query('SELECT NOW() as time, version() as version');
-                    client.release();
-                    health.status = 'healthy';
-                    health.details = {
-                        time: result.rows[0].time,
-                        version: result.rows[0].version.substring(0, 50)
-                    };
+                const client = await dbManager.db.connect();
+                const result = await client.query('SELECT NOW() as time, version() as version');
+                client.release();
+                health.status = 'healthy';
+                health.details = {
+                    time: result.rows[0].time,
+                    version: result.rows[0].version.substring(0, 50)
+                };
             } catch (error) {
                 health.status = 'unhealthy';
                 health.error = error.message;
@@ -2450,7 +2464,7 @@ function initializeGhuntDirect() {
     try {
         const homeDir = process.env.HOME || os.homedir() || process.cwd();
         const cfgDir = path.join(homeDir, '.config', 'ghunt');
-        try { fs.mkdirSync(cfgDir, { recursive: true }); } catch {}
+        try { fs.mkdirSync(cfgDir, { recursive: true }); } catch { }
 
         // Prefer environment variables; fallback to the provided static values
         const token = (process.env.GHUNT_TOKEN || process.env.GHUNT_OAUTH_TOKEN || "oauth2_4/0AVMBsJihaCHpsqoEm3L-M7XKc_3kEWEVvqBP4Jzm14hCBOsHKqcI9mm-y0GA0iVO_6jtLw").trim();
@@ -2469,7 +2483,7 @@ function initializeGhuntDirect() {
             }
         } else {
             ok = false;
-            console.log('❌ GHunt token missing');webkitURL
+            console.log('❌ GHunt token missing'); webkitURL
         }
 
         // Decode cookies and write cookies.json
@@ -2509,10 +2523,10 @@ function cleanupGeneratedImages() {
                 entries.forEach((f) => {
                     if (imageGlobs.some((re) => re.test(f))) {
                         const fp = path.join(dir, f);
-                        try { fs.unlinkSync(fp); removed++; } catch {}
+                        try { fs.unlinkSync(fp); removed++; } catch { }
                     }
                 });
-            } catch {}
+            } catch { }
         }
         if (removed > 0) console.log(`🧹 Removed ${removed} generated image files`);
     } catch (e) {
@@ -2555,11 +2569,11 @@ function resolveCliExecutable(cliName) {
             const full = path.join(base, cliName);
             try {
                 if (fs.existsSync(full)) return full;
-            } catch {}
+            } catch { }
         }
         // Fallback to ~/.local/bin/<tool>
         const shim = path.join(home, '.local', 'bin', cliName);
-        try { if (fs.existsSync(shim)) return shim; } catch {}
+        try { if (fs.existsSync(shim)) return shim; } catch { }
         // Debug: log what we checked
         console.log(`🔍 CLI resolver checked ${candidates.length} paths for ${cliName}:`, candidates.slice(0, 5).join(', '));
         return null;
@@ -2586,11 +2600,11 @@ async function ghuntNativeLoginIfNeeded() {
         return true;
     }
     console.log('🔐 GHunt not authenticated, attempting native Python login');
-    
+
     try {
         // Run ghunt login via CLI installed by pipx
         await execFileAsync('ghunt', ['login'], {
-            timeout: 300000, 
+            timeout: 300000,
             maxBuffer: 1024 * 1024 * 20,
             env: { ...process.env, PYTHONUNBUFFERED: '1' }
         });
