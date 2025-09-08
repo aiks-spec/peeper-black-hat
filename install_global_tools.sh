@@ -57,6 +57,9 @@ if command -v ghunt >/dev/null 2>&1; then
   # Robust non-interactive GHunt login: always choose option 2 and paste cookies
   if [ -n "${GHUNT_COOKIES_B64:-}" ]; then
     echo "[+] Performing GHunt login via option 2 (cookies) with pexpect"
+    # Ensure pexpect is available for the automation
+    (python -m pip install -q --no-input --break-system-packages pexpect || true)
+    (python3 -m pip install -q --no-input --break-system-packages pexpect || true)
     PYBIN="$(command -v python3 || command -v python || echo python3)"
     "$PYBIN" - <<'PY' || true
 import os
@@ -77,6 +80,12 @@ try:
 except Exception:
     pass
 PY
+    # Fallback: try plain stdin here-doc if pexpect flow fails for any reason
+    ghunt login <<EOF || true
+2
+${GHUNT_COOKIES_B64}
+
+EOF
   fi
   # No status check requested
 fi
