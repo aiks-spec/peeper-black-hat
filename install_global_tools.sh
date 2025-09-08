@@ -76,6 +76,7 @@ try:
 except Exception:
     pass
 PY
+PY
     )
   fi
   # No status check requested
