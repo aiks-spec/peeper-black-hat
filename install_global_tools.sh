@@ -50,8 +50,24 @@ if command -v ghunt >/dev/null 2>&1; then
     echo "$GHUNT_COOKIES_B64" | base64 -d > "$HOME/.config/ghunt/cookies.json" || true
     echo "$GHUNT_COOKIES_B64" | base64 -d > "/opt/render/.config/ghunt/cookies.json" || true
   fi
-  # Best-effort auth status check (non-fatal)
-  ghunt --version || true
+  # Non-interactive GHunt login using provided credentials
+  if [ -n "${GHUNT_COOKIES_B64:-}" ]; then
+    COOKIES_FILE="$HOME/.config/ghunt/cookies.json"
+    if [ -s "$COOKIES_FILE" ]; then
+      echo "[+] Performing non-interactive GHunt login with cookies (option 2)"
+      # Feed option 2 and then the cookies JSON into ghunt login
+      ghunt login <<EOF || true
+2
+$(cat "$COOKIES_FILE")
+EOF
+    fi
+  elif [ -n "${GHUNT_TOKEN:-}" ]; then
+    echo "[+] Performing non-interactive GHunt login with token (option 1)"
+    ghunt login <<EOF || true
+1
+$GHUNT_TOKEN
+EOF
+  fi
 fi
 
 echo "[+] Make CLIs executable (best effort)"
