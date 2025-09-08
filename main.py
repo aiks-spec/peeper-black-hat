@@ -26,6 +26,9 @@ class OSINTRunner:
             }
         }
     
+    def _tool_script(self, folder: str, script: str) -> str:
+        return os.path.join(os.path.dirname(__file__), folder, script)
+
     def extract_username(self, email: str) -> str:
         """Extract username from email (part before @)"""
         return email.split('@')[0] if '@' in email else email
@@ -118,7 +121,17 @@ class OSINTRunner:
         print(f"🔍 Running Holehe on: {email}")
         
         # Run Holehe from local cloned repo (no --json; capture raw output)
-        script_cmd = ['python3', os.path.join(os.path.dirname(__file__), 'holehe', 'holehe.py'), email]
+        script_path = self._tool_script('holehe', 'holehe.py')
+        if not os.path.exists(script_path):
+            msg = f"Holehe script missing at: {script_path}"
+            print(f"❌ {msg}")
+            self.results['tools']['holehe'] = {
+                'success': False,
+                'output': '',
+                'error': msg
+            }
+            return {'success': False}
+        script_cmd = ['python3', script_path, email]
         result = self.run_subprocess_tool(script_cmd, 'Holehe')
         if result['success']:
             self.results['tools']['holehe'] = {
@@ -142,7 +155,17 @@ class OSINTRunner:
         print(f"🔍 Running GHunt on: {email}")
         
         # Run GHunt from local cloned repo (no --json; capture raw output)
-        script_cmd = ['python3', os.path.join(os.path.dirname(__file__), 'ghunt', 'ghunt.py'), 'email', email]
+        script_path = self._tool_script('ghunt', 'ghunt.py')
+        if not os.path.exists(script_path):
+            msg = f"GHunt script missing at: {script_path}"
+            print(f"❌ {msg}")
+            self.results['tools']['ghunt'] = {
+                'success': False,
+                'output': '',
+                'error': msg
+            }
+            return {'success': False}
+        script_cmd = ['python3', script_path, 'email', email]
         result = self.run_subprocess_tool(script_cmd, 'GHunt')
         if result['success']:
             self.results['tools']['ghunt'] = {
@@ -166,7 +189,17 @@ class OSINTRunner:
         print(f"🔍 Running Sherlock on: {username}")
         
         # Run Sherlock from local cloned repo (no --json; capture raw output)
-        script_cmd = ['python3', os.path.join(os.path.dirname(__file__), 'sherlock', 'sherlock.py'), username]
+        script_path = self._tool_script('sherlock', 'sherlock.py')
+        if not os.path.exists(script_path):
+            msg = f"Sherlock script missing at: {script_path}"
+            print(f"❌ {msg}")
+            self.results['tools']['sherlock'] = {
+                'success': False,
+                'output': '',
+                'error': msg
+            }
+            return {'success': False}
+        script_cmd = ['python3', script_path, username]
         result = self.run_subprocess_tool(script_cmd, 'Sherlock')
         if result['success']:
             self.results['tools']['sherlock'] = {
@@ -190,7 +223,17 @@ class OSINTRunner:
         print(f"🔍 Running Maigret on: {username}")
         
         # Run Maigret from local cloned repo (no --json; capture raw output)
-        script_cmd = ['python3', os.path.join(os.path.dirname(__file__), 'maigret', 'maigret.py'), username]
+        script_path = self._tool_script('maigret', 'maigret.py')
+        if not os.path.exists(script_path):
+            msg = f"Maigret script missing at: {script_path}"
+            print(f"❌ {msg}")
+            self.results['tools']['maigret'] = {
+                'success': False,
+                'output': '',
+                'error': msg
+            }
+            return {'success': False}
+        script_cmd = ['python3', script_path, username]
         result = self.run_subprocess_tool(script_cmd, 'Maigret')
         if result['success']:
             self.results['tools']['maigret'] = {
