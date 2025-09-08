@@ -18,9 +18,10 @@ export PIPX_HOME="$HOME/.local/pipx"
 export PIPX_BIN_DIR="$HOME/.local/bin"
 mkdir -p "$PIPX_HOME" "$PIPX_BIN_DIR"
 export PATH="$PIPX_BIN_DIR:/usr/local/bin:/usr/bin:/bin:$PATH"
+export PIP_BREAK_SYSTEM_PACKAGES=1
 
 echo "[+] Install/upgrade pipx and ensure PATH"
-python -m pip install --upgrade pip pipx || python3 -m pip install --upgrade pip pipx || pip3 install --upgrade pip pipx
+python -m pip install --upgrade pip pipx --break-system-packages || python3 -m pip install --upgrade pip pipx --break-system-packages || pip3 install --upgrade pip pipx --break-system-packages
 python -m pipx ensurepath || python3 -m pipx ensurepath || pipx ensurepath || true
 export PATH="$PIPX_BIN_DIR:/usr/local/bin:/usr/bin:/bin:$PATH"
 
