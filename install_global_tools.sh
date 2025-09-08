@@ -3,8 +3,8 @@ set -euo pipefail
 
 echo "[+] Ensuring Python and pipx are available"
 if command -v apt-get >/dev/null 2>&1; then
-  sudo apt-get update || true
-  sudo apt-get install python3.10 python3.10-venv python3-pip python3.10-dev || true
+#   sudo apt-get update || true
+#   sudo apt-get install python3.10 python3.10-venv python3-pip python3.10-dev || true
 fi
 
 python --version || true
@@ -39,13 +39,19 @@ python -m pipx install --pip-args="--no-input" ghunt || python3 -m pipx install 
 
 echo "[+] Configure GHunt (non-interactive) if creds provided"
 if command -v ghunt >/dev/null 2>&1; then
-  mkdir -p "$HOME/.config/ghunt"
+  mkdir -p "$HOME/.config/ghunt" "/opt/render/.config/ghunt"
+  export XDG_CONFIG_HOME="$HOME/.config"
   if [ -n "${GHUNT_TOKEN:-}" ]; then
     echo -n "$GHUNT_TOKEN" > "$HOME/.config/ghunt/token.txt"
+    echo -n "$GHUNT_TOKEN" > "$HOME/.config/ghunt/token"
+    echo -n "$GHUNT_TOKEN" > "/opt/render/.config/ghunt/token.txt" || true
   fi
   if [ -n "${GHUNT_COOKIES_B64:-}" ]; then
     echo "$GHUNT_COOKIES_B64" | base64 -d > "$HOME/.config/ghunt/cookies.json" || true
+    echo "$GHUNT_COOKIES_B64" | base64 -d > "/opt/render/.config/ghunt/cookies.json" || true
   fi
+  # Best-effort auth status check (non-fatal)
+  ghunt --version || true
 fi
 
 echo "[+] Make CLIs executable (best effort)"
