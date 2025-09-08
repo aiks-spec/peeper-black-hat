@@ -1322,7 +1322,28 @@ async function runToolIfAvailable(cmd, args, parseFn) {
         console.log(`❌ ${cmd} failed:`, e.message);
         const stderr = e.stderr ? String(e.stderr).slice(0, 400) : '';
         if (stderr) console.log(`↪ stderr (${cmd}):`, stderr);
-        return null;
+        // Fallback: try via shell so PATH and shebangs resolve like in interactive shells
+        try {
+            const shellCmd = [cmd, ...args.map(a => `'${String(a).replace(/'/g, "'\\''")}'`)].join(' ');
+            const exportPath = `${process.env.HOME || '/opt/render'}/.local/bin:/usr/local/bin:/usr/bin:/bin`;
+            const wrapped = `export PATH="${exportPath}:$PATH"; ${shellCmd}`;
+            console.log(`🔁 Retrying via shell: ${shellCmd}`);
+            const { stdout: sOut, stderr: sErr } = await execAsync(wrapped, {
+                timeout: 300000,
+                maxBuffer: 1024 * 1024 * 50,
+                env: { ...process.env },
+                shell: '/bin/bash'
+            });
+            if (sErr) console.log(`↪ stderr (${cmd}/shell):`, String(sErr).slice(0, 300));
+            if (parseFn) {
+                return await parseFn(sOut, sErr);
+            }
+            return sOut;
+        } catch (e2) {
+            console.log(`❌ ${cmd} shell retry failed:`, e2.message);
+            if (e2.stderr) console.log(`↪ stderr (${cmd}/shell):`, String(e2.stderr).slice(0, 400));
+            return null;
+        }
     }
 }
 
