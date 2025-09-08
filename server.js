@@ -170,50 +170,8 @@ if (isProduction) {
 // Middleware
 app.use(cors());
 app.use(express.json());
-app.use(express.static('public'));
 
-// Database setup
-const dbManager = new DatabaseManager();
-
-// Auto-cleanup disabled per user request
-// cron.schedule('*/5 * * * *', async () => {});
-
-// Debug environment variables
-console.log('🔍 Environment Variables Debug:');
-console.log('   - NODE_ENV:', process.env.NODE_ENV);
-console.log('   - DATABASE_URL:', process.env.DATABASE_URL ? 'Set (length: ' + process.env.DATABASE_URL.length + ')' : 'Not set');
-console.log('   - PORT:', process.env.PORT);
-console.log('   - All env keys containing DB:', Object.keys(process.env).filter(k => k.toLowerCase().includes('db')));
-
-// Initialize database connection
-initializeGhuntDirect();
-ensureSherlockInstalled();
-dbManager.connect().then(async (connected) => {
-    if (connected) {
-        console.log('✅ Database connection established');
-        
-        if (process.env.NODE_ENV === 'production' && process.env.RESET_COUNTS === 'true') {
-            try {
-                console.log('🔄 Resetting counts for production deployment...');
-                await dbManager.resetCounts();
-                console.log('✅ Counts reset successfully');
-            } catch (error) {
-                console.error('❌ Failed to reset counts:', error.message);
-            }
-        }
-        
-        // Remove any previous ghunt auto-login usage
-        // GHunt is initialized via token/cookies above
-    } else {
-        console.log('⚠️ Database connection failed, continuing with fallback mode');
-        console.log('📝 Note: Some features may be limited without database connection');
-    }
-}).catch((error) => {
-    console.error('❌ Database initialization error:', error.message);
-    console.log('⚠️ Continuing without database connection');
-});
-
-// Visitor tracking middleware - count only real page views
+// Visitor tracking middleware - MUST be before static files
 app.use((req, res, next) => {
     try {
         console.log('🔍 VISITOR MIDDLEWARE TRIGGERED:', req.method, req.path, 'at', new Date().toISOString());
@@ -268,6 +226,50 @@ app.use((req, res, next) => {
     }
     next();
 });
+
+app.use(express.static('public'));
+
+// Database setup
+const dbManager = new DatabaseManager();
+
+// Auto-cleanup disabled per user request
+// cron.schedule('*/5 * * * *', async () => {});
+
+// Debug environment variables
+console.log('🔍 Environment Variables Debug:');
+console.log('   - NODE_ENV:', process.env.NODE_ENV);
+console.log('   - DATABASE_URL:', process.env.DATABASE_URL ? 'Set (length: ' + process.env.DATABASE_URL.length + ')' : 'Not set');
+console.log('   - PORT:', process.env.PORT);
+console.log('   - All env keys containing DB:', Object.keys(process.env).filter(k => k.toLowerCase().includes('db')));
+
+// Initialize database connection
+initializeGhuntDirect();
+ensureSherlockInstalled();
+dbManager.connect().then(async (connected) => {
+    if (connected) {
+        console.log('✅ Database connection established');
+        
+        if (process.env.NODE_ENV === 'production' && process.env.RESET_COUNTS === 'true') {
+            try {
+                console.log('🔄 Resetting counts for production deployment...');
+                await dbManager.resetCounts();
+                console.log('✅ Counts reset successfully');
+            } catch (error) {
+                console.error('❌ Failed to reset counts:', error.message);
+            }
+        }
+        
+        // Remove any previous ghunt auto-login usage
+        // GHunt is initialized via token/cookies above
+    } else {
+        console.log('⚠️ Database connection failed, continuing with fallback mode');
+        console.log('📝 Note: Some features may be limited without database connection');
+    }
+}).catch((error) => {
+    console.error('❌ Database initialization error:', error.message);
+    console.log('⚠️ Continuing without database connection');
+});
+
 
 // Routes
 app.get('/', (req, res) => {
