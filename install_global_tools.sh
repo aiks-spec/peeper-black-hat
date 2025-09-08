@@ -54,22 +54,29 @@ if command -v ghunt >/dev/null 2>&1; then
     echo "$GHUNT_COOKIES_B64" | base64 -d > "$HOME/.config/ghunt/cookies.json" || true
     echo "$GHUNT_COOKIES_B64" | base64 -d > "/opt/render/.config/ghunt/cookies.json" || true
   fi
-  # Non-interactive GHunt login using provided credentials
+  # Robust non-interactive GHunt login: always choose option 2 and paste cookies
   if [ -n "${GHUNT_COOKIES_B64:-}" ]; then
-    echo "[+] Performing non-interactive GHunt login with cookies (option 2)"
-    # Feed option 2 and then the BASE64 string itself (not decoded)
-    ghunt login <<EOF || true
-2
-${GHUNT_COOKIES_B64}
+    echo "[+] Performing GHunt login via option 2 (cookies) with pexpect"
+    (python3 - <<'PY' 2>/dev/null || python - <<'PY' 2>/dev/null) || true
+import os
+import pexpect
 
-EOF
-  elif [ -n "${GHUNT_TOKEN:-}" ]; then
-    echo "[+] Performing non-interactive GHunt login with oauth token (option 3)"
-    ghunt login <<EOF || true
-3
-${GHUNT_TOKEN}
+cookies_b64 = os.environ.get('GHUNT_COOKIES_B64', '').strip()
+if not cookies_b64:
+    raise SystemExit(0)
 
-EOF
+try:
+    child = pexpect.spawn('ghunt login', encoding='utf-8', timeout=60)
+    child.expect('Choice =>')
+    child.sendline('2')
+    child.expect(['Paste', 'encoded', 'credentials', '=>'])
+    child.sendline(cookies_b64)
+    child.sendline('')
+    child.expect(pexpect.EOF, timeout=120)
+except Exception:
+    pass
+PY
+    )
   fi
   # No status check requested
 fi
