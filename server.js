@@ -95,54 +95,8 @@ process.on('SIGINT', async () => {
     process.exit(0);
 });
 
-// Linux/Render PATH handling
-try {
-    console.log('🌐 Running on Linux/Render platform');
-    
-    // Simplify PATH: include only venv/bin and system paths, deduping entries
-    const basePaths = [
-        path.join(process.cwd(), '.venv', 'bin'),
-        '/usr/local/bin',
-        '/usr/bin',
-        '/bin'
-    ];
-    const existingPath = process.env.PATH || '';
-    const sep = process.platform === 'win32' ? ';' : ':';
-    const current = existingPath.split(sep).filter(Boolean);
-    const seen = new Set(current);
-    const toPrepend = basePaths.filter(p => !seen.has(p));
-    process.env.PATH = `${toPrepend.join(sep)}${toPrepend.length ? sep : ''}${current.join(sep)}`;
-    console.log('✅ Simplified PATH for Render');
-
-    // Debug: Check what's actually available
-    console.log('🔍 Current PATH:', process.env.PATH);
-    console.log('🔍 Checking for sherlock in PATH...');
-    try {
-        const { execSync } = require('child_process');
-        const whichSherlock = execSync('which sherlock', { encoding: 'utf8' }).trim();
-        console.log('✅ Sherlock found at:', whichSherlock);
-    } catch (e) {
-        console.log('❌ Sherlock not found in PATH');
-        }
-        
-    // Set environment variables for Python tools and prevent shell issues
-        process.env.PYTHONUNBUFFERED = '1';
-        process.env.PYTHONIOENCODING = 'utf-8';
-    process.env.PYTHONUTF8 = '1';
-    process.env.LC_ALL = 'C.UTF-8';
-    process.env.LANG = 'C.UTF-8';
-    process.env.LANGUAGE = 'C.UTF-8';
-    process.env.TERM = 'dumb';
-    process.env.NO_COLOR = '1';
-    process.env.FORCE_COLOR = '0';
-    process.env.ANSI_COLORS_DISABLED = '1';
-    process.env.CLICOLOR = '0';
-    process.env.CLICOLOR_FORCE = '0';
-    delete process.env.BASH_ENV;
-    delete process.env.ENV;
-} catch (error) {
-    console.log('⚠️ PATH expansion failed, using default:', error.message);
-}
+// Global CLI tools should be available via $HOME/.local/bin per build script
+console.log('🌐 Running on Render with global CLI tools (pipx/pip)');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
