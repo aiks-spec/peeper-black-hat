@@ -3,31 +3,12 @@ services:
     name: osint-lookup-engine
     env: node
     buildCommand: |
-      # Ensure Python3 is available
-      echo "🐍 Checking Python3 availability..."
-      python3 --version || (echo "❌ Python3 not found" && exit 1)
-
-      echo "🐍 Creating and activating Python virtual environment (.venv)..."
-      python3 -m venv .venv
-      . .venv/bin/activate
-      echo "⬆️ Upgrading pip inside venv..."
-      pip install --upgrade pip
-
-      echo "📚 Installing OSINT tools into .venv..."
-      pip install ghunt holehe sherlock-project maigret phoneinfoga || true
-      
-      echo "🔧 Making main.py executable..."
-      chmod +x main.py
-
-      echo "🔑 Fixing permissions on venv..."
-      chmod +x ".venv/bin"/* || true
-
-      # Install Node.js dependencies
+      echo "🔧 Installing global OSINT tools..."
+      bash scripts/install_global_tools.sh
       echo "📦 Installing Node.js dependencies..."
-      npm install
-
-      echo "✅ Build process completed successfully"
-    startCommand: export PATH="/opt/render/project/src/.venv/bin:/usr/local/bin:/usr/bin:$PATH" && npm start
+      npm ci || npm install
+      echo "✅ Build process completed"
+    startCommand: export PATH="$HOME/.local/bin:/usr/local/bin:/usr/bin:/bin:$PATH" && npm start
     envVars:
       - key: NODE_ENV
         value: production
@@ -54,9 +35,9 @@ services:
       - key: CLEANUP_DELAY
         value: 3600000
       - key: GHUNT_TOKEN
-        value: oauth2_4/0AVMBsJihaCHpsqoEm3L-M7XKc_3kEWEVvqBP4Jzm14hCBOsHKqcI9mm-y0GA0iVO_6jtLw
+        sync: false
       - key: GHUNT_COOKIES_B64
-        value: eyJjb29raWVzIjp7IlNJRCI6ImcuYTAwMDB3anlHMXVCT0FKQWQtUGVIWlUwVFo4RkZGeFdZenZzRnphYTBON1NEZElRcHZGTjZsYlIyY010Z0VUTlpLXy1HSGpOTHdBQ2dZS0FYb1NBUkFTRlFIR1gyTWlkemlvN0gxU2pEazBpcm4tUEN3MzN4b1ZBVUY4eUtvbXZncmZKSWh0bVJRYTBwTlVjd3YyMDA3NiIsIl9fU2VjdXJlLTNQU0lEIjoiZy5hMDAwMHdqeUcxdUJPQUpBZC1QZUhaVTBUWjhGRkZ4V1l6dnNGemFhME43U0RkSVFwdkZOMTNYX2cxRDB3SXVSTi1lT3pRTnpjQUFDZ1lLQWNFU0FSQVNGUUhHWDJNaUdTY0lpMktxa3A1WVgzRVZBUU40TVJvVkFVRjh5S3BSWGxxY3huQlE2aGNQTmtCVjZFRngwMDc2IiwiTFNJRCI6Im8ubXlhY2NvdW50Lmdvb2dsZS5jb218cy5JTnxzLnlvdXR1YmU6Zy5hMDAwMHdqeUc2dmJ1LTRyWUJHSTZ1aE5hU1ZsekVIZjN4OGJHV2tTdmYwNWxtS2J5eEFSRGpCbVJlSmd2TUkybDlaQmVZdjAyd0FDZ1lLQWQwU0FSQVNGUUhHWDJNaUdTbU1yQ1dtMUhCcU5hVnVhQ3A5S1JvVkFVRjh5S3F5R0MxdHJDUmp3R204clFGcTJHTnYwMDc2IiwiSFNJRCI6IkFkYlQ4aXZxVzMwbjBMQkpwIiwiU1NJRCI6IkE0TkNnYkEzTVNYQWhCVV8tIiwiQVBJU0lEIjoiMU9oOEc1Rm5XV1FCY3ZrdC9BODBGVmVBbjltdUU5aUlZWCIsIlNBUElTSUQiOiItTExlWnNFNmJGTlFMY042L0FCMG1rTF9xNTJqQ0ZwTWUxIn0sIm9hdXRoX3Rva2VuIjoib2F1dGgyXzQvMEFWTUJzSmloYUNIcHNxb0VtM0wtTTdYS2NfM2tFV0VWdnFCUDRKem0xNGhDQk9zSEtxY0k5bW0teTBHQTBpVk9fNmp0THcifQ==
+        sync: false
 
 databases:
   - name: osint-db
