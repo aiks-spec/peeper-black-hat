@@ -13,24 +13,24 @@ pip --version || true
 pip3 --version || true
 
 echo "[+] Install/upgrade pipx and ensure PATH"
-python -m pip install --user --upgrade pip pipx || pip3 install --user --upgrade pip pipx
-python -m pipx ensurepath || pipx ensurepath || true
-export PATH="$HOME/.local/bin:$PATH"
+python -m pip install --user --upgrade pip pipx || python3 -m pip install --user --upgrade pip pipx || pip3 install --user --upgrade pip pipx
+python -m pipx ensurepath || python3 -m pipx ensurepath || pipx ensurepath || true
+export PATH="$HOME/.local/bin:/usr/local/bin:/usr/bin:/bin:$PATH"
 
 echo "[+] Install sherlock via pipx"
-pipx install sherlock-project || true
+python -m pipx install sherlock-project || python3 -m pipx install sherlock-project || pipx install sherlock-project || true
 
 echo "[+] Install Maigret"
-pip3 install --user --upgrade maigret || python -m pip install --user --upgrade maigret
+python -m pip install --user --upgrade maigret || python3 -m pip install --user --upgrade maigret || pip3 install --user --upgrade maigret
 
 echo "[+] Install Holehe from GitHub"
 git clone --depth=1 https://github.com/megadose/holehe.git /tmp/holehe || true
 cd /tmp/holehe
-python setup.py install || python3 setup.py install
+python setup.py install || python3 setup.py install || pip3 install . || python -m pip install . || true
 cd -
 
 echo "[+] Install GHunt via pipx"
-pipx install ghunt || true
+python -m pipx install ghunt || python3 -m pipx install ghunt || pipx install ghunt || true
 
 echo "[+] Configure GHunt (non-interactive) if creds provided"
 if command -v ghunt >/dev/null 2>&1; then
@@ -45,12 +45,25 @@ fi
 
 echo "[+] Make CLIs executable (best effort)"
 chmod +x "$HOME/.local/bin/"* || true
+# best-effort symlinks for CLIs into /usr/local/bin when writable
+for bin in sherlock maigret holehe ghunt; do
+  if command -v $bin >/dev/null 2>&1; then
+    src=$(command -v $bin)
+    dest="/usr/local/bin/$bin"
+    if [ -w "/usr/local/bin" ] && [ ! -e "$dest" ]; then
+      ln -s "$src" "$dest" 2>/dev/null || true
+    fi
+  fi
+done
 
 echo "[+] Final tool availability:"
-command -v sherlock || echo "sherlock not found"
-command -v maigret || echo "maigret not found"
-command -v holehe || echo "holehe not found"
-command -v ghunt || echo "ghunt not found"
+for bin in sherlock maigret holehe ghunt; do
+  if command -v $bin >/dev/null 2>&1; then
+    echo "[✓] $bin: $(command -v $bin)"
+  else
+    echo "[✗] $bin not found in PATH"
+  fi
+done
 
 echo "[✓] Global tool install finished"
 
