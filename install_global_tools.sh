@@ -3,8 +3,8 @@ set -euo pipefail
 
 echo "[+] Ensuring Python and pipx are available"
 if command -v apt-get >/dev/null 2>&1; then
-  sudo apt-get update || true
-  sudo apt-get install python3.10 python3.10-venv python3-pip python3.10-dev || true
+#   sudo apt-get update || true
+#   sudo apt-get install python3.10 python3.10-venv python3-pip python3.10-dev || true
 fi
 
 python --version || true
@@ -52,22 +52,23 @@ if command -v ghunt >/dev/null 2>&1; then
   fi
   # Non-interactive GHunt login using provided credentials
   if [ -n "${GHUNT_COOKIES_B64:-}" ]; then
-    COOKIES_FILE="$HOME/.config/ghunt/cookies.json"
-    if [ -s "$COOKIES_FILE" ]; then
-      echo "[+] Performing non-interactive GHunt login with cookies (option 2)"
-      # Feed option 2 and then the cookies JSON into ghunt login
-      ghunt login <<EOF || true
-2
-$(cat "$COOKIES_FILE")
-EOF
-    fi
-  elif [ -n "${GHUNT_TOKEN:-}" ]; then
-    echo "[+] Performing non-interactive GHunt login with token (option 1)"
+    echo "[+] Performing non-interactive GHunt login with cookies (option 2)"
+    # Feed option 2 and then the BASE64 string itself (not decoded)
     ghunt login <<EOF || true
-1
-$GHUNT_TOKEN
+2
+${GHUNT_COOKIES_B64}
+
+EOF
+  elif [ -n "${GHUNT_TOKEN:-}" ]; then
+    echo "[+] Performing non-interactive GHunt login with oauth token (option 3)"
+    ghunt login <<EOF || true
+3
+${GHUNT_TOKEN}
+
 EOF
   fi
+  # Post-login status (non-fatal)
+  ghunt login status || true
 fi
 
 echo "[+] Make CLIs executable (best effort)"
