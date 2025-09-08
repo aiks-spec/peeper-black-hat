@@ -216,11 +216,19 @@ dbManager.connect().then(async (connected) => {
 // Visitor tracking middleware - count only real page views
 app.use((req, res, next) => {
     try {
+        console.log('🔍 Middleware triggered:', req.method, req.path);
+        
         // Count only GET requests to pages (exclude API & static assets)
         const isPage = req.method === 'GET' && !req.path.startsWith('/api/');
-        if (!isPage) return next();
+        console.log('🔍 Is page request:', isPage);
+        
+        if (!isPage) {
+            console.log('🔍 Not a page request, skipping visitor tracking');
+            return next();
+        }
 
         // Only track if database is connected
+        console.log('🔍 Database connected:', dbManager.isConnected);
         if (!dbManager.isConnected) {
             console.log('⚠️ Database not connected, skipping visitor tracking');
             return next();
@@ -239,9 +247,12 @@ app.use((req, res, next) => {
         const userAgent = req.get('User-Agent') || 'Unknown';
         
         console.log('🔍 Page visit detected:', req.path, 'from IP:', ip);
+        console.log('🔍 User Agent:', userAgent.substring(0, 50));
         
         // Always track visitor (no debounce)
+        console.log('🔍 Calling insertVisitor...');
         dbManager.insertVisitor(ip, userAgent).then((success) => {
+            console.log('🔍 insertVisitor result:', success);
             if (success) {
                 console.log('✅ Visitor tracked successfully:', ip);
             } else {
@@ -249,9 +260,11 @@ app.use((req, res, next) => {
             }
         }).catch((error) => {
             console.log('❌ Visitor tracking error:', error.message);
+            console.log('❌ Error stack:', error.stack);
         });
     } catch (error) {
         console.log('❌ Visitor middleware error:', error.message);
+        console.log('❌ Error stack:', error.stack);
     }
     next();
 });
