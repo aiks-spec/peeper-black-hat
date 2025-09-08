@@ -745,7 +745,7 @@ app.post('/api/email-lookup', async (req, res) => {
                 console.log('❌ Could not parse main.py outputs after failure:', parseErr.message);
             }
         }
-
+        
         // Clean and structure final result
         const finalResult = {
             email: email,
@@ -1407,8 +1407,8 @@ async function resolveToolCommand(cmd) {
 
 // Disable all direct tool execution - tools are now handled by main.py
 async function runToolIfAvailable(cmd, args, parseFn) {
-    console.log(`🔧 Tool ${cmd} disabled - use main.py for OSINT analysis`);
-        return null;
+    // Intentionally silent; unified runner handles tools.
+    return null;
 }
 
 // Use GHunt smart runner in email-lookup
