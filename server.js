@@ -710,6 +710,40 @@ app.post('/api/email-lookup', async (req, res) => {
             }
         } catch (e) {
             console.log('❌ main.py fallback failed:', e.message);
+            try {
+                const out = String(e.stdout || '');
+                const err = String(e.stderr || '');
+                if (err) console.log('↪ stderr:', err.slice(0, 400));
+                if (out) {
+                    console.log('↪ stdout preview:', out.slice(0, 400));
+                    const match = out.match(/Results saved to:\s*(.+)/);
+                    if (match && match[1]) {
+                        const savedPath = match[1].trim();
+                        console.log('💾 Reading unified results from (error path):', savedPath);
+                        const raw = fs.readFileSync(savedPath, 'utf8');
+                        const data = JSON.parse(raw);
+                        const urls = new Set();
+                        const t = (data && data.tools) || {};
+                        for (const key of ['holehe', 'sherlock', 'maigret']) {
+                            const tool = t[key];
+                            if (tool && Array.isArray(tool.data)) {
+                                tool.data.forEach(item => { if (item && item.url) urls.add(item.url); });
+                            }
+                        }
+                        const socialArr = Array.from(urls).map(url => ({ url }));
+                        if (socialArr.length) {
+                            results.social = [...new Set([...results.social, ...socialArr])];
+                            console.log('✅ Added social profiles from main.py (error path):', socialArr.length);
+                        }
+                        results.metadata.unified = {
+                            execution_time: data.execution_time,
+                            summary: data.summary
+                        };
+                    }
+                }
+            } catch (parseErr) {
+                console.log('❌ Could not parse main.py outputs after failure:', parseErr.message);
+            }
         }
 
         // Clean and structure final result
