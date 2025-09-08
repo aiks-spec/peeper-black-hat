@@ -152,7 +152,7 @@ class OSINTRunner:
                 'error': msg
             }
             return {'success': False}
-        script_cmd = ['python3', script_path, email]
+        script_cmd = ['python', script_path, email]
         result = self.run_subprocess_tool(script_cmd, 'Holehe')
         if result['success']:
             self.results['tools']['holehe'] = {
@@ -192,7 +192,7 @@ class OSINTRunner:
                 'error': msg
             }
             return {'success': False}
-        script_cmd = ['python3', script_path, 'email', email]
+        script_cmd = ['python', script_path, 'email', email]
         result = self.run_subprocess_tool(script_cmd, 'GHunt')
         if result['success']:
             self.results['tools']['ghunt'] = {
@@ -231,7 +231,7 @@ class OSINTRunner:
                 'error': msg
             }
             return {'success': False}
-        script_cmd = ['python3', script_path, username]
+        script_cmd = ['python', script_path, username]
         result = self.run_subprocess_tool(script_cmd, 'Sherlock')
         if result['success']:
             self.results['tools']['sherlock'] = {
@@ -270,7 +270,7 @@ class OSINTRunner:
                 'error': msg
             }
             return {'success': False}
-        script_cmd = ['python3', script_path, username]
+        script_cmd = ['python', script_path, username]
         result = self.run_subprocess_tool(script_cmd, 'Maigret')
         if result['success']:
             self.results['tools']['maigret'] = {
