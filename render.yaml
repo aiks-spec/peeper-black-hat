@@ -9,9 +9,17 @@ services:
       npm ci || npm install
       echo "✅ Build process completed"
     startCommand: |
-      export PATH="$HOME/.local/bin:/usr/local/bin:/usr/bin:/bin:$PATH"
+      export PATH="/opt/render/.local/bin:$HOME/.local/bin:/usr/local/bin:/usr/bin:/bin:$PATH"
       echo "🔧 Ensuring global OSINT tools are installed at runtime..."
       bash scripts/install_global_tools.sh || true
+      echo "🔍 Final PATH check:"
+      echo "PATH=$PATH"
+      echo "🔍 Tool locations:"
+      which ghunt || echo "ghunt not found"
+      which holehe || echo "holehe not found" 
+      which sherlock || echo "sherlock not found"
+      which maigret || echo "maigret not found"
+      which pipx || echo "pipx not found"
       npm start
     envVars:
       - key: NODE_ENV
