@@ -45,14 +45,10 @@ if command -v ghunt >/dev/null 2>&1; then
   if [ -z "${GHUNT_COOKIES_B64:-}" ]; then
     export GHUNT_COOKIES_B64="eyJjb29raWVzIjp7IlNJRCI6ImcuYTAwMDFBanlHeVhfNVR2Rm1vMEtZOFBaM3N3cTdkejJ4RUI0eWhzVG12SGJFV1JJUE5BQk5RS1cwOERGVmRaWng5bm50elJGMUFBQ2dZS0FTb1NBUkFTRlFIR1gyTWl6S1daWTN0RmhDbFVEVzBLTENhNnhSb1ZBVUY4eUtvTkR4RTJxcnhXVFJaVkE5cWJHVHE5MDA3NiIsIl9fU2VjdXJlLTNQU0lEIjoiZy5hMDAwMUFqeUd5WF81VHZGbW8wS1k4UFozc3dxN2R6MnhFQjR5aHNUbXZIYkVXUklQTkFCMnp1Q09WLUF0SEFUcFdGRU1xdWhDQUFDZ1lLQVp3U0FSQVNGUUhHWDJNaWFwd05KUUVpYVhqUWxLLTY1ZS1RYkJvVkFVRjh5S3JBbE1rLWNZektQYXJvUURwVW5FRFcwMDc2IiwiTFNJRCI6Im8ubXlhY2NvdW50Lmdvb2dsZS5jb218cy5JTnxzLnlvdXR1YmU6Zy5hMDAwMUFqeUd3ZXllWFhVb184WnBOLVoyLTFnT2lWQVFHQkNYemE3V0pzXzhDaXE3eDE3bTZnSnhEaUFHWU92Q3BpVjZvQUhJUUFDZ1lLQVl3U0FSQVNGUUhHWDJNaVBPVlRvWDB1RUhfeVhqQ2dwSGJyYlJvVkFVRjh5S3FjRzF1UWZfaFVhNTJjWWZ4TlZlQkYwMDc2IiwiSFNJRCI6IkFnUUlOdXVndGhwX3JuXzlUIiwiU1NJRCI6IkFwMGVwdW5KalZDelpQeHRqIiwiQVBJU0lEIjoiTFN3X0h0dmFNZ1VkR3NKNi9BWGRVQ1F2UGw1NW1jc2lwdiIsIlNBUElTSUQiOiJDWTF3UFJHXzYzQ0dOMjd6L0FYQ3J4Z0Z4OHhpTVpqSkdlIn0sIm9hdXRoX3Rva2VuIjoib2F1dGgyXzQvMEFWTUJzSmhaWG9ZeVl5NU1QSkdRbGotTHFwbWlCY3E4cDE3S3ZrRHFwMFdhRDczbkhHTDRoSDNncFp0bXR6OERtOEMxQmcifQ=="
   fi
-  if [ -z "${GHUNT_TOKEN:-}" ]; then
-    export GHUNT_TOKEN="oauth2_4/0AVMBsJhZXoYyYy5MPJGQlj-LqpmiBcq8p17KvkDqp0WaD73nHGL4hH3gpZtmtz8Dm8C1Bg"
-  fi
-  if [ -n "${GHUNT_TOKEN:-}" ]; then
-    echo -n "$GHUNT_TOKEN" > "$HOME/.config/ghunt/token.txt"
-    echo -n "$GHUNT_TOKEN" > "$HOME/.config/ghunt/token"
-    echo -n "$GHUNT_TOKEN" > "/opt/render/.config/ghunt/token.txt" || true
-  fi
+  # Clear any token to force cookies-only login
+  unset GHUNT_TOKEN || true
+  # Remove any existing token files
+  rm -f "$HOME/.config/ghunt/token.txt" "$HOME/.config/ghunt/token" "/opt/render/.config/ghunt/token.txt" || true
   if [ -n "${GHUNT_COOKIES_B64:-}" ]; then
     echo "$GHUNT_COOKIES_B64" | base64 -d > "$HOME/.config/ghunt/cookies.json" || true
     echo "$GHUNT_COOKIES_B64" | base64 -d > "/opt/render/.config/ghunt/cookies.json" || true
@@ -77,14 +73,12 @@ try:
     child = pexpect.spawn('ghunt login', encoding='utf-8', timeout=60)
     child.expect('Choice =>')
     child.sendline('2')
-    time.sleep(1.2)
-    child.sendline('')  # press Enter
-    time.sleep(1.2)
+    time.sleep(2.0)
     child.expect(['Paste', 'encoded', 'credentials', '=>'], timeout=60)
     child.sendline(cookies_b64)
-    time.sleep(1.2)
+    time.sleep(2.0)
     child.sendline('')  # press Enter after pasting
-    time.sleep(1.2)
+    time.sleep(3.0)
     child.expect(pexpect.EOF, timeout=180)
 except Exception:
     pass
