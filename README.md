@@ -1,6 +1,6 @@
 # OSINT Lookup Engine - FastAPI
 
-A clean FastAPI application that runs OSINT tools directly from PATH without virtualenv or hardcoded paths.
+A clean FastAPI application that runs OSINT tools directly from PATH without virtualenv, hardcoded paths, or external scripts.
 
 ## Features
 
@@ -8,6 +8,7 @@ A clean FastAPI application that runs OSINT tools directly from PATH without vir
 - **Username Investigation**: `/osint/username?target=USERNAME` - Runs sherlock and maigret  
 - **Health Check**: `/health` - Service status
 - **Tool Status**: `/tools/status` - Check availability of all OSINT tools
+- **Self-contained**: No external scripts or complex setup required
 
 ## API Endpoints
 
@@ -35,7 +36,17 @@ GET /tools/status
 
 ### Local Development
 ```bash
+# Install OSINT tools via pipx
+pip install pipx
+pipx install sherlock-project
+pipx install maigret
+pipx install 'git+https://github.com/megadose/holehe.git'
+pipx install ghunt
+
+# Install Python dependencies
 pip install -r requirements.txt
+
+# Run the FastAPI server
 python main.py
 ```
 
@@ -48,7 +59,7 @@ docker run -p 8000:8000 osint-engine
 ### Render Deployment
 1. Push code to GitHub
 2. Connect repository to Render
-3. Deploy using render.yaml configuration
+3. Deploy using render.yaml configuration (automatically installs tools via pipx)
 
 ## OSINT Tools
 
