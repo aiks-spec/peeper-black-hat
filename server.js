@@ -1420,10 +1420,23 @@ async function runToolIfAvailable(cmd, args, parseFn) {
                 const script = `
 import sys
 import ${cmd}
-sys.argv = ['${cmd}', ...${JSON.stringify(args)}]
+sys.argv = ['${cmd}'] + ${JSON.stringify(args)}
 ${cmd}.main()
 `;
                 const { stdout, stderr } = await execFileAsync('python', ['-c', script], {
+                    timeout: 300000,
+                    maxBuffer: 1024 * 1024 * 50,
+                    env: { ...process.env, PATH: `/opt/render/.local/bin:${process.env.PATH}` },
+                });
+                return { stdout, stderr };
+            }
+            throw new Error('Not applicable');
+        },
+        // Method 7: Try with system python (not venv)
+        async () => {
+            if (['ghunt', 'holehe', 'sherlock', 'maigret'].includes(cmd)) {
+                console.log(`🔧 Method 7 - System python: /usr/bin/python3 -m ${cmd} ${args.join(' ')}`);
+                const { stdout, stderr } = await execFileAsync('/usr/bin/python3', ['-m', cmd, ...args], {
                     timeout: 300000,
                     maxBuffer: 1024 * 1024 * 50,
                     env: { ...process.env, PATH: `/opt/render/.local/bin:${process.env.PATH}` },
