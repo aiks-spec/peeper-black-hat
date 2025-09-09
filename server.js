@@ -1399,6 +1399,38 @@ async function runToolIfAvailable(cmd, args, parseFn) {
                 return { stdout, stderr };
             }
             throw new Error('Not applicable');
+        },
+        // Method 5: Try with python3 -m
+        async () => {
+            if (['ghunt', 'holehe', 'sherlock', 'maigret'].includes(cmd)) {
+                console.log(`🔧 Method 5 - Python3 module: python3 -m ${cmd} ${args.join(' ')}`);
+                const { stdout, stderr } = await execFileAsync('python3', ['-m', cmd, ...args], {
+                    timeout: 300000,
+                    maxBuffer: 1024 * 1024 * 50,
+                    env: { ...process.env, PATH: `/opt/render/.local/bin:${process.env.PATH}` },
+                });
+                return { stdout, stderr };
+            }
+            throw new Error('Not applicable');
+        },
+        // Method 6: Try direct python script execution
+        async () => {
+            if (['ghunt', 'holehe', 'sherlock', 'maigret'].includes(cmd)) {
+                console.log(`🔧 Method 6 - Direct python script: python -c "import ${cmd}; ${cmd}.main()" ${args.join(' ')}`);
+                const script = `
+import sys
+import ${cmd}
+sys.argv = ['${cmd}', ...${JSON.stringify(args)}]
+${cmd}.main()
+`;
+                const { stdout, stderr } = await execFileAsync('python', ['-c', script], {
+                    timeout: 300000,
+                    maxBuffer: 1024 * 1024 * 50,
+                    env: { ...process.env, PATH: `/opt/render/.local/bin:${process.env.PATH}` },
+                });
+                return { stdout, stderr };
+            }
+            throw new Error('Not applicable');
         }
     ];
 
