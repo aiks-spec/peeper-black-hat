@@ -3,23 +3,15 @@ services:
     name: osint-lookup-engine
     env: node
     buildCommand: |
-      echo "🔧 Installing global OSINT tools..."
-      bash scripts/install_global_tools.sh
+      echo "🧹 Cleaning previous installations and setting up tools"
+      bash scripts/setup_tools.sh
       echo "📦 Installing Node.js dependencies..."
       npm ci || npm install
       echo "✅ Build process completed"
     startCommand: |
-      export PATH="/opt/render/.local/bin:$HOME/.local/bin:/usr/local/bin:/usr/bin:/bin:$PATH"
-      echo "🔧 Ensuring global OSINT tools are installed at runtime..."
-      bash scripts/install_global_tools.sh || true
-      echo "🔍 Final PATH check:"
-      echo "PATH=$PATH"
-      echo "🔍 Tool locations:"
-      which ghunt || echo "ghunt not found"
-      which holehe || echo "holehe not found" 
-      which sherlock || echo "sherlock not found"
-      which maigret || echo "maigret not found"
-      which pipx || echo "pipx not found"
+      export PATH="./tools/bin:/usr/local/bin:/usr/bin:/bin:$PATH"
+      echo "🔍 Tool wrappers available:"
+      ls -la ./tools/bin || true
       npm start
     envVars:
       - key: NODE_ENV
