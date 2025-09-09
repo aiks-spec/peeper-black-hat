@@ -1409,13 +1409,28 @@ async function runToolIfAvailable(cmd, args, parseFn) {
         // Method 4: Try with python -m for tools that support it (module-level)
         async () => {
             if (['ghunt', 'holehe', 'sherlock', 'maigret'].includes(cmd)) {
-                console.log(`🔧 Method 4 - Python module: python -m ${cmd} ${args.join(' ')}`);
-                const { stdout, stderr } = await execFileAsync('python', ['-m', cmd, ...args], {
-                    timeout: 300000,
-                    maxBuffer: 1024 * 1024 * 50,
-                    env: { ...process.env, PATH: `/opt/render/.local/bin:${process.env.PATH}` },
-                });
-                return { stdout, stderr };
+                const moduleCandidates = {
+                    ghunt: ['ghunt', 'ghunt.ghunt'],
+                    holehe: ['holehe', 'holehe.cli'],
+                    sherlock: ['sherlock', 'sherlock.__main__'],
+                    maigret: ['maigret', 'maigret.__main__']
+                }[cmd];
+                const pyBins = ['python', 'python3', '/usr/bin/python3'];
+                for (const py of pyBins) {
+                    for (const mod of moduleCandidates) {
+                        try {
+                            console.log(`🔧 Method 4 - Python module: ${py} -m ${mod} ${args.join(' ')}`);
+                            const { stdout, stderr } = await execFileAsync(py, ['-m', mod, ...args], {
+                                timeout: 300000,
+                                maxBuffer: 1024 * 1024 * 50,
+                                env: { ...process.env, PATH: `/opt/render/.local/bin:${process.env.PATH}` },
+                            });
+                            return { stdout, stderr };
+                        } catch (e) {
+                            // try next candidate
+                        }
+                    }
+                }
             }
             throw new Error('Not applicable');
         },
