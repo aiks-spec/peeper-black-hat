@@ -1,38 +1,57 @@
 services:
   - type: web
     name: osint-lookup-engine
-    env: python
-    runtime: python
+    env: node
     buildCommand: |
-      echo "🚀 Starting FastAPI OSINT Engine build..."
-      echo "🧹 Cleaning any old Node.js files..."
-      rm -f package.json package-lock.json server.js
-      rm -rf node_modules scripts/
-      echo "🔧 Installing OSINT tools via pipx..."
-      pip install --break-system-packages pipx
-      pipx ensurepath
-      export PATH="/opt/render/.local/bin:$PATH"
-      pipx install sherlock-project
-      pipx install maigret
-      pipx install 'git+https://github.com/megadose/holehe.git'
-      pipx install ghunt
-      echo "📦 Installing Python dependencies..."
-      pip install --break-system-packages -r requirements.txt
-      echo "🔧 Setting up GHunt authentication..."
-      python setup_ghunt.py || echo "GHunt setup failed, continuing..."
-      echo "🧪 Testing FastAPI setup..."
-      python test_fastapi.py || echo "FastAPI test failed, continuing..."
-      echo "✅ FastAPI build completed"
+      echo "🔧 Installing global OSINT tools..."
+      bash scripts/install_global_tools.sh
+      echo "📦 Installing Node.js dependencies..."
+      npm ci || npm install
+      echo "✅ Build process completed"
     startCommand: |
-      export PATH="/opt/render/.local/bin:$PATH"
-      echo "🚀 Starting FastAPI OSINT Engine..."
-      python start.py
+      export PATH="/opt/render/.local/bin:$HOME/.local/bin:/usr/local/bin:/usr/bin:/bin:$PATH"
+      echo "🔧 Ensuring global OSINT tools are installed at runtime..."
+      bash scripts/install_global_tools.sh || true
+      echo "🔍 Final PATH check:"
+      echo "PATH=$PATH"
+      echo "🔍 Tool locations:"
+      which ghunt || echo "ghunt not found"
+      which holehe || echo "holehe not found" 
+      which sherlock || echo "sherlock not found"
+      which maigret || echo "maigret not found"
+      which pipx || echo "pipx not found"
+      npm start
     envVars:
-      - key: PYTHON_VERSION
-        value: 3.10.12
+      - key: NODE_ENV
+        value: production
       - key: PORT
-        value: 8000
+        value: 10000
+      - key: DB_TYPE
+        value: postgres
+      - key: DATABASE_URL
+        fromDatabase:
+          name: osint-db
+          property: connectionString
+      - key: DB_PATH
+        value: /tmp/osint.db
+      - key: CORS_ORIGIN
+        value: "*"
+      - key: TIMEOUT
+        value: 30000
+      - key: MAX_FILE_SIZE
+        value: 10485760
+      - key: DEBUG
+        value: "false"
+      - key: LOG_LEVEL
+        value: info
+      - key: CLEANUP_DELAY
+        value: 3600000
       - key: GHUNT_TOKEN
         value: oauth2_4/0AVMBsJhZXoYyYy5MPJGQlj-LqpmiBcq8p17KvkDqp0WaD73nHGL4hH3gpZtmtz8Dm8C1Bg
       - key: GHUNT_COOKIES_B64
         value: eyJjb29raWVzIjp7IlNJRCI6ImcuYTAwMDFBanlHeVhfNVR2Rm1vMEtZOFBaM3N3cTdkejJ4RUI0eWhzVG12SGJFV1JJUE5BQk5RS1cwOERGVmRaWng5bm50elJGMUFBQ2dZS0FTb1NBUkFTRlFIR1gyTWl6S1daWTN0RmhDbFVEVzBLTENhNnhSb1ZBVUY4eUtvTkR4RTJxcnhXVFJaVkE5cWJHVHE5MDA3NiIsIl9fU2VjdXJlLTNQU0lEIjoiZy5hMDAwMUFqeUd5WF81VHZGbW8wS1k4UFozc3dxN2R6MnhFQjR5aHNUbXZIYkVXUklQTkFCMnp1Q09WLUF0SEFUcFdGRU1xdWhDQUFDZ1lLQVp3U0FSQVNGUUhHWDJNaWFwd05KUUVpYVhqUWxLLTY1ZS1RYkJvVkFVRjh5S3JBbE1rLWNZektQYXJvUURwVW5FRFcwMDc2IiwiTFNJRCI6Im8ubXlhY2NvdW50Lmdvb2dsZS5jb218cy5JTnxzLnlvdXR1YmU6Zy5hMDAwMUFqeUd3ZXllWFhVb184WnBOLVoyLTFnT2lWQVFHQkNYemE3V0pzXzhDaXE3eDE3bTZnSnhEaUFHWU92Q3BpVjZvQUhJUUFDZ1lLQVl3U0FSQVNGUUhHWDJNaVBPVlRvWDB1RUhfeVhqQ2dwSGJyYlJvVkFVRjh5S3FjRzF1UWZfaFVhNTJjWWZ4TlZlQkYwMDc2IiwiSFNJRCI6IkFnUUlOdXVndGhwX3JuXzlUIiwiU1NJRCI6IkFwMGVwdW5KalZDelpQeHRqIiwiQVBJU0lEIjoiTFN3X0h0dmFNZ1VkR3NKNi9BWGRVQ1F2UGw1NW1jc2lwdiIsIlNBUElTSUQiOiJDWTF3UFJHXzYzQ0dOMjd6L0FYQ3J4Z0Z4OHhpTVpqSkdlIn0sIm9hdXRoX3Rva2VuIjoib2F1dGgyXzQvMEFWTUJzSmhaWG9ZeVl5NU1QSkdRbGotTHFwbWlCY3E4cDE3S3ZrRHFwMFdhRDczbkhHTDRoSDNncFp0bXR6OERtOEMxQmcifQ==
+
+databases:
+  - name: osint-db
+    databaseName: osint
+    user: osint
