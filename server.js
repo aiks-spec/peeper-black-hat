@@ -1352,20 +1352,16 @@ function resolveCli(cmd) {
 async function runToolIfAvailable(cmd, args, parseFn) {
     // Try multiple execution methods in order of preference
     const methods = [
-        // Preferred: system Python3 module execution based on verified working paths
+        // Preferred: use local wrappers in ./tools/bin
         async () => {
-            if (['holehe', 'sherlock', 'maigret', 'ghunt'].includes(cmd)) {
-                const moduleMap = { holehe: 'holehe', sherlock: 'sherlock', maigret: 'maigret', ghunt: 'ghunt' };
-                const mod = moduleMap[cmd];
-                console.log(`🔧 Preferred - /usr/bin/python3 -m ${mod} ${args.join(' ')}`);
-                const { stdout, stderr } = await execFileAsync('/usr/bin/python3', ['-m', mod, ...args], {
-                    timeout: 300000,
-                    maxBuffer: 1024 * 1024 * 50,
-                    env: { ...process.env },
-                });
-                return { stdout, stderr };
-            }
-            throw new Error('Not applicable');
+            const wrapper = path.join(process.cwd(), 'tools', 'bin', cmd);
+            console.log(`🔧 Preferred - wrapper: ${wrapper} ${args.join(' ')}`);
+            const { stdout, stderr } = await execFileAsync(wrapper, args, {
+                timeout: 300000,
+                maxBuffer: 1024 * 1024 * 50,
+                env: { ...process.env },
+            });
+            return { stdout, stderr };
         },
         // Method 1: Direct execution with absolute candidate paths
         async () => {
