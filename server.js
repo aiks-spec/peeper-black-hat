@@ -218,11 +218,20 @@ app.post('/tmux/send', async (req, res) => {
         const cmd = (req.body && typeof req.body.cmd === 'string') ? req.body.cmd : '';
         console.log('🛰️ /tmux/send received:', JSON.stringify(cmd));
         if (!cmd.trim()) return res.status(400).json({ ok: false, error: 'Missing cmd' });
-        const child = spawn('tmux', ['send-keys', '-t', 'osint', cmd, 'Enter']);
-        child.on('error', (e) => { console.log('❌ tmux send error:', e.message); });
+        const tmuxPath = process.env.TMUX_BIN || 'tmux';
+        const child = spawn(tmuxPath, ['send-keys', '-t', 'osint', cmd, 'Enter']);
+        let usedTmux = true;
+        child.on('error', (e) => {
+            console.log('❌ tmux send error:', e.message);
+            usedTmux = false;
+            // Fallback: write to a shell history file read by ttyd bash (simple echo)
+            try {
+                fs.appendFileSync('/tmp/ttyd_inject.sh', cmd + '\n');
+            } catch {}
+        });
         child.on('close', (code) => { console.log('✅ tmux send closed with code', code); });
         child.unref();
-        return res.json({ ok: true });
+        return res.json({ ok: true, via: usedTmux ? 'tmux' : 'fallback' });
     } catch (e) {
         return res.status(500).json({ ok: false, error: e.message });
     }
