@@ -9,28 +9,51 @@ if ! command -v curl >/dev/null 2>&1; then
     apt-get update && apt-get install -y curl
 fi
 
-# Start FastAPI in background
+# Check if FastAPI dependencies are installed
+echo "🔍 Checking FastAPI dependencies..."
+python3 -c "import fastapi, uvicorn" 2>/dev/null || {
+    echo "❌ FastAPI dependencies not found, installing..."
+    pip install fastapi uvicorn
+}
+
+# Test FastAPI startup
+echo "🧪 Testing FastAPI startup..."
+python3 test_fastapi.py || {
+    echo "❌ FastAPI test failed"
+    exit 1
+}
+
+# Start FastAPI in background with detailed logging
 echo "🐍 Starting FastAPI on port 8000..."
-python3 main.py &
+python3 main.py > /tmp/fastapi.log 2>&1 &
 FASTAPI_PID=$!
 
-# Wait for FastAPI to be ready
+# Give FastAPI time to start
 echo "⏳ Waiting for FastAPI to start..."
+sleep 5
+
+# Wait for FastAPI to be ready
 for i in {1..30}; do
     if curl -s http://127.0.0.1:8000/health > /dev/null 2>&1; then
         echo "✅ FastAPI is ready!"
         break
     fi
     echo "   Attempt $i/30: FastAPI not ready yet..."
+    echo "   FastAPI logs:"
+    tail -5 /tmp/fastapi.log 2>/dev/null || echo "   No logs yet"
     sleep 2
 done
 
 # Check if FastAPI started successfully
 if ! curl -s http://127.0.0.1:8000/health > /dev/null 2>&1; then
     echo "❌ FastAPI failed to start after 60 seconds"
-    echo "📋 FastAPI logs:"
-    cat /var/log/fastapi.log 2>/dev/null || echo "No FastAPI logs found"
-    exit 1
+    echo "📋 Full FastAPI logs:"
+    cat /tmp/fastapi.log 2>/dev/null || echo "No FastAPI logs found"
+    echo "🔍 Checking if FastAPI process is running:"
+    ps aux | grep python3 || echo "No Python processes found"
+    echo "🔍 Checking port 8000:"
+    netstat -tlnp | grep 8000 || echo "Port 8000 not in use"
+    echo "⚠️ Continuing without FastAPI..."
 fi
 
 # Start Node.js
