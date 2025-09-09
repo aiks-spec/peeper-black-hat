@@ -2,8 +2,12 @@ services:
   - type: web
     name: osint-lookup-engine
     env: python
+    runtime: python
     buildCommand: |
       echo "🚀 Starting FastAPI OSINT Engine build..."
+      echo "🧹 Cleaning any old Node.js files..."
+      rm -f package.json package-lock.json server.js
+      rm -rf node_modules scripts/
       echo "🔧 Installing OSINT tools via pipx..."
       pip install --break-system-packages pipx
       pipx ensurepath
@@ -24,8 +28,8 @@ services:
       echo "🚀 Starting FastAPI OSINT Engine..."
       python start.py
     envVars:
-      - key: NODE_ENV
-        value: production
+      - key: PYTHON_VERSION
+        value: 3.10.12
       - key: PORT
         value: 8000
       - key: GHUNT_TOKEN
