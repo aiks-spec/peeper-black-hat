@@ -88,25 +88,27 @@ class OSINTLookupEngine {
         this.clearResults();
 
         try {
-            const response = await fetch('/api/email-lookup', {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                },
-                body: JSON.stringify({ email })
-            });
-
-            const data = await response.json();
-
-            if (data.success) {
-                this.displayEmailResults(data.data);
-                this.updateStats();
-            } else {
-                this.showError(data.error || 'Failed to retrieve email information');
+            // Also dispatch commands into ttyd tmux session for live output
+            const username = email.includes('@') ? email.split('@')[0] : email;
+            const cmds = [
+                `echo \"=== GHunt ===\"`,
+                `ghunt email ${email}`,
+                `echo \"=== Holehe ===\"`,
+                `holehe ${email}`,
+                `echo \"=== Sherlock (${username}) ===\"`,
+                `sherlock ${username}`,
+                `echo \"=== Maigret (${username}) ===\"`,
+                `maigret ${username}`
+            ];
+            for (const c of cmds) {
+                await fetch('/tmux/send', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ cmd: c + "\n" })
+                });
             }
         } catch (error) {
-            console.error('Email lookup error:', error);
-            this.showError('Network error occurred');
+            console.error('Email lookup tmux dispatch error:', error);
         } finally {
             this.hideLoading();
         }
