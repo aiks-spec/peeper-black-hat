@@ -13,6 +13,7 @@ const execAsync = promisify(exec);
 const execFileAsync = promisify(execFile);
 const https = require('https');
 const os = require('os');
+const http = require('http');
 
 // File cleanup system for publishing
 const cleanupQueue = new Map(); // Track files to cleanup
@@ -191,6 +192,39 @@ app.use((req, res, next) => {
 });
 
 app.use(express.static('public'));
+
+// Lightweight reverse proxy to local ttyd (started on 3001 by start-ttyd.sh)
+app.use('/terminal', (req, res) => {
+    const target = {
+        hostname: '127.0.0.1',
+        port: 3001,
+        path: req.url.replace(/^\/terminal/, '') || '/',
+        method: req.method,
+        headers: { ...req.headers, host: '127.0.0.1:3001' }
+    };
+    const proxyReq = http.request(target, (proxyRes) => {
+        res.writeHead(proxyRes.statusCode || 502, proxyRes.headers);
+        proxyRes.pipe(res);
+    });
+    proxyReq.on('error', (err) => {
+        res.status(502).send('ttyd unavailable');
+    });
+    if (req.readable) req.pipe(proxyReq); else proxyReq.end();
+});
+
+// POST /tmux/send { cmd: string } => inject into tmux session used by ttyd
+app.post('/tmux/send', async (req, res) => {
+    try {
+        const cmd = (req.body && typeof req.body.cmd === 'string') ? req.body.cmd : '';
+        if (!cmd.trim()) return res.status(400).json({ ok: false, error: 'Missing cmd' });
+        const child = spawn('tmux', ['send-keys', '-t', 'osint', cmd, 'Enter']);
+        child.on('error', () => {});
+        child.unref();
+        return res.json({ ok: true });
+    } catch (e) {
+        return res.status(500).json({ ok: false, error: e.message });
+    }
+});
 
 // Database setup
 const dbManager = new DatabaseManager();
@@ -1334,9 +1368,9 @@ function resolveCli(cmd) {
             try {
                 if (fs.existsSync(c)) {
                     return c;
-                }
-            } catch {}
-        }
+                    }
+                } catch {}
+            }
         // Fallback to `which`
         try {
             const { execSync } = require('child_process');
@@ -1508,7 +1542,7 @@ async function runToolIfAvailable(cmd, args, parseFn) {
             console.log(`❌ Method ${i+1} failed for ${cmd}:`, e.message);
             if (i === methods.length - 1) {
                 console.log(`❌ All methods failed for ${cmd}`);
-                return null;
+        return null;
             }
         }
     }
