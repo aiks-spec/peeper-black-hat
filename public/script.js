@@ -88,27 +88,18 @@ class OSINTLookupEngine {
         this.clearResults();
 
         try {
-            // Also dispatch commands into ttyd tmux session for live output
-            const username = email.includes('@') ? email.split('@')[0] : email;
-            const cmds = [
-                `echo \"=== GHunt ===\"`,
-                `ghunt email ${email}`,
-                `echo \"=== Holehe ===\"`,
-                `holehe ${email}`,
-                `echo \"=== Sherlock (${username}) ===\"`,
-                `sherlock ${username}`,
-                `echo \"=== Maigret (${username}) ===\"`,
-                `maigret ${username}`
-            ];
-            for (const c of cmds) {
-                await fetch('/tmux/send', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ cmd: c + "\n" })
-                });
+            const response = await fetch(`/api/scan/full?value=${encodeURIComponent(email)}`);
+            const data = await response.json();
+
+            if (response.ok) {
+                this.displayEmailResults(data);
+                this.updateStats();
+            } else {
+                this.showError(data.error || 'Failed to retrieve email information');
             }
         } catch (error) {
-            console.error('Email lookup tmux dispatch error:', error);
+            console.error('Email lookup error:', error);
+            this.showError('Network error occurred');
         } finally {
             this.hideLoading();
         }
@@ -346,89 +337,68 @@ class OSINTLookupEngine {
 
     displayEmailResults(data) {
         const container = document.getElementById('results-container');
-
-        const fields = this.buildFields([
-            { label: 'Email Address', value: data.email },
-            { label: 'Full Name', value: data.name },
-            { label: 'Company', value: data.company },
-            { label: 'Position', value: data.position },
-            { label: 'Domain', value: data.domain },
-            { label: 'Confidence', value: data.confidence }
-        ]);
+        
+        // Handle FastAPI response format
+        const email = data.input || data.email;
+        const timestamp = data.timestamp || new Date().toISOString();
 
         const resultHTML = `
             <div class="result-item">
                 <div class="result-header">
                     <div class="result-title">EMAIL LOOKUP RESULTS</div>
-                    <div class="result-timestamp">${this.formatTimestamp(data.timestamp)}</div>
+                    <div class="result-timestamp">${this.formatTimestamp(timestamp)}</div>
                 </div>
                 <div class="result-data">
-                    ${fields}
-                    ${Array.isArray(data.socialProfiles) && data.socialProfiles.length > 0 ? `
+                    <div class="data-field">
+                        <div class="field-label">Email Address</div>
+                        <div class="field-value">${email}</div>
+                    </div>
+                    ${data.holehe && data.holehe.accounts ? `
                         <div class="data-field" style="grid-column: 1 / -1;">
-                            <div class="field-label">Social Profiles</div>
+                            <div class="field-label">Holehe Results (${data.holehe.total} accounts found)</div>
                             <div class="field-value">
                                 <ul style="margin: 0; padding-left: 20px;">
-                                                                         ${data.socialProfiles
-                    .filter(p => (typeof p === 'string' && /^https?:\/\//i.test(p)) || (p && p.url))
-                    .map(profile => {
-                        if (typeof profile === 'string') {
-                            return `<li><a href="${profile}" target="_blank">${profile}</a></li>`;
-                        }
-                        const url = profile.url;
-                        return `<li><a href="${url}" target="_blank">${url}</a></li>`;
-                    }).join('')}
+                                    ${data.holehe.accounts.map(account => 
+                                        `<li>${account.site}: ${account.exists ? '✅ Found' : '❌ Not found'} - ${account.status}</li>`
+                                    ).join('')}
                                 </ul>
                             </div>
                         </div>
                     ` : ''}
-                    ${Array.isArray(data.breaches) && data.breaches.length > 0 ? `
+                    ${data.ghunt && data.ghunt.google_info ? `
                         <div class="data-field" style="grid-column: 1 / -1;">
-                            <div class="field-label">Data Breaches (Holehe)</div>
-                            <div class="field-value">
-                                <ul style="margin: 0; padding-left: 20px;">
-                                    ${data.breaches.map(breach => `<li>${breach.site || breach.name || 'Unknown site'}</li>`).join('')}
-                                </ul>
-                            </div>
-                        </div>
-                    ` : ''}
-                    ${data.metadata && data.metadata.holehe ? `
-                        <div class="data-field" style="grid-column: 1 / -1;">
-                            <div class="field-label">Holehe Results</div>
-                            <div class="field-value">
-                                <button onclick="window.osintEngine.downloadHoleheCSV()" class="download-btn">
-                                    📥 Download Holehe CSV
-                                </button>
-                            </div>
-                        </div>
-                    ` : ''}
-                    ${data.metadata && data.metadata.maigret && data.metadata.maigret.socialProfiles && data.metadata.maigret.socialProfiles.length > 0 ? `
-                        <div class="data-field" style="grid-column: 1 / -1;">
-                            <div class="field-label">Maigret Social Profiles</div>
-                            <div class="field-value">
-                                <ul style="margin: 0; padding-left: 20px;">
-                                    ${data.metadata.maigret.socialProfiles.map(profile => {
-                        if (typeof profile === 'string') {
-                            return `<li>${profile} <a href="${profile}" target="_blank">🔗</a></li>`;
-                        } else if (profile.url) {
-                            return `<li>${profile.url} <a href="${profile.url}" target="_blank">🔗</a></li>`;
-                        }
-                        return `<li>${JSON.stringify(profile)}</li>`;
-                    }).join('')}
-                                </ul>
-                            </div>
-                        </div>
-                    ` : ''}
-                    ${data.google ? `
-                        <div class="data-field" style="grid-column: 1 / -1;">
-                            <div class="field-label">Google Account Info</div>
+                            <div class="field-label">GHunt Google Account Info</div>
                             <div class="field-value">
                                 <details>
                                     <summary>Click to expand</summary>
                                     <div style="background: #1a1a1a; padding: 10px; border-radius: 5px; overflow-x: auto; font-family: 'Share Tech Mono', monospace; font-size: 12px;">
-                                        ${this.formatGoogleData(data.google)}
+                                        ${JSON.stringify(data.ghunt.google_info, null, 2)}
                                     </div>
                                 </details>
+                            </div>
+                        </div>
+                    ` : ''}
+                    ${data.sherlock && data.sherlock.profiles ? `
+                        <div class="data-field" style="grid-column: 1 / -1;">
+                            <div class="field-label">Sherlock Social Profiles (${data.sherlock.total} found)</div>
+                            <div class="field-value">
+                                <ul style="margin: 0; padding-left: 20px;">
+                                    ${data.sherlock.profiles.map(profile => 
+                                        `<li><a href="${profile.url}" target="_blank">${profile.site}</a></li>`
+                                    ).join('')}
+                                </ul>
+                            </div>
+                        </div>
+                    ` : ''}
+                    ${data.maigret && data.maigret.profiles ? `
+                        <div class="data-field" style="grid-column: 1 / -1;">
+                            <div class="field-label">Maigret Social Profiles (${data.maigret.total} found)</div>
+                            <div class="field-value">
+                                <ul style="margin: 0; padding-left: 20px;">
+                                    ${data.maigret.profiles.map(profile => 
+                                        `<li><a href="${profile.url}" target="_blank">${profile.url}</a></li>`
+                                    ).join('')}
+                                </ul>
                             </div>
                         </div>
                     ` : ''}
