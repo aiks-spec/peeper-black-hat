@@ -26,24 +26,33 @@ python -m pipx ensurepath || python3 -m pipx ensurepath || pipx ensurepath || tr
 export PATH="$PIPX_BIN_DIR:/opt/render/.local/bin:/usr/local/bin:/usr/bin:/bin:$PATH"
 echo "[+] Current PATH after pipx setup: $PATH"
 
+# Force pipx to use the correct directories
+export PIPX_HOME="/opt/render/.local/pipx"
+export PIPX_BIN_DIR="/opt/render/.local/bin"
+mkdir -p "$PIPX_HOME" "$PIPX_BIN_DIR"
+
 echo "[+] Install sherlock via pipx"
-python -m pipx install --pip-args="--no-input" sherlock-project || python3 -m pipx install --pip-args="--no-input" sherlock-project || pipx install sherlock-project || true
+PIPX_HOME="/opt/render/.local/pipx" PIPX_BIN_DIR="/opt/render/.local/bin" python -m pipx install --pip-args="--no-input" sherlock-project || PIPX_HOME="/opt/render/.local/pipx" PIPX_BIN_DIR="/opt/render/.local/bin" python3 -m pipx install --pip-args="--no-input" sherlock-project || PIPX_HOME="/opt/render/.local/pipx" PIPX_BIN_DIR="/opt/render/.local/bin" pipx install sherlock-project || true
 echo "[+] Verify sherlock installation"
+ls -la /opt/render/.local/bin/sherlock* || echo "sherlock not found in /opt/render/.local/bin"
 which sherlock || echo "sherlock not found in PATH"
 
 echo "[+] Install Maigret"
-python -m pipx install --pip-args="--no-input" maigret || python3 -m pipx install --pip-args="--no-input" maigret || pipx install maigret || true
+PIPX_HOME="/opt/render/.local/pipx" PIPX_BIN_DIR="/opt/render/.local/bin" python -m pipx install --pip-args="--no-input" maigret || PIPX_HOME="/opt/render/.local/pipx" PIPX_BIN_DIR="/opt/render/.local/bin" python3 -m pipx install --pip-args="--no-input" maigret || PIPX_HOME="/opt/render/.local/pipx" PIPX_BIN_DIR="/opt/render/.local/bin" pipx install maigret || true
 echo "[+] Verify maigret installation"
+ls -la /opt/render/.local/bin/maigret* || echo "maigret not found in /opt/render/.local/bin"
 which maigret || echo "maigret not found in PATH"
 
 echo "[+] Install Holehe via pipx from GitHub"
-python -m pipx install 'git+https://github.com/megadose/holehe.git' || python3 -m pipx install 'git+https://github.com/megadose/holehe.git' || pipx install 'git+https://github.com/megadose/holehe.git' || true
+PIPX_HOME="/opt/render/.local/pipx" PIPX_BIN_DIR="/opt/render/.local/bin" python -m pipx install 'git+https://github.com/megadose/holehe.git' || PIPX_HOME="/opt/render/.local/pipx" PIPX_BIN_DIR="/opt/render/.local/bin" python3 -m pipx install 'git+https://github.com/megadose/holehe.git' || PIPX_HOME="/opt/render/.local/pipx" PIPX_BIN_DIR="/opt/render/.local/bin" pipx install 'git+https://github.com/megadose/holehe.git' || true
 echo "[+] Verify holehe installation"
+ls -la /opt/render/.local/bin/holehe* || echo "holehe not found in /opt/render/.local/bin"
 which holehe || echo "holehe not found in PATH"
 
 echo "[+] Install GHunt via pipx"
-python -m pipx install --pip-args="--no-input" ghunt || python3 -m pipx install --pip-args="--no-input" ghunt || pipx install ghunt || true
+PIPX_HOME="/opt/render/.local/pipx" PIPX_BIN_DIR="/opt/render/.local/bin" python -m pipx install --pip-args="--no-input" ghunt || PIPX_HOME="/opt/render/.local/pipx" PIPX_BIN_DIR="/opt/render/.local/bin" python3 -m pipx install --pip-args="--no-input" ghunt || PIPX_HOME="/opt/render/.local/pipx" PIPX_BIN_DIR="/opt/render/.local/bin" pipx install ghunt || true
 echo "[+] Verify ghunt installation"
+ls -la /opt/render/.local/bin/ghunt* || echo "ghunt not found in /opt/render/.local/bin"
 which ghunt || echo "ghunt not found in PATH"
 
 echo "[+] Configure GHunt (non-interactive) if creds provided"
@@ -142,6 +151,37 @@ if command -v pipx >/dev/null 2>&1; then
 else
   echo "[✗] pipx not found"
 fi
+
+# Fallback: Install tools directly if pipx failed
+echo "[+] Fallback: Installing tools directly if pipx failed"
+for tool in sherlock holehe maigret ghunt; do
+  if ! command -v $tool >/dev/null 2>&1; then
+    echo "[+] Installing $tool directly as fallback"
+    case $tool in
+      sherlock)
+        python -m pip install --break-system-packages sherlock-project || python3 -m pip install --break-system-packages sherlock-project || true
+        ;;
+      holehe)
+        python -m pip install --break-system-packages holehe || python3 -m pip install --break-system-packages holehe || true
+        ;;
+      maigret)
+        python -m pip install --break-system-packages maigret || python3 -m pip install --break-system-packages maigret || true
+        ;;
+      ghunt)
+        python -m pip install --break-system-packages ghunt || python3 -m pip install --break-system-packages ghunt || true
+        ;;
+    esac
+  fi
+done
+
+echo "[+] Final verification after fallback installs"
+for tool in sherlock holehe maigret ghunt; do
+  if command -v $tool >/dev/null 2>&1; then
+    echo "[✓] $tool: $(command -v $tool)"
+  else
+    echo "[✗] $tool still not found"
+  fi
+done
 
 echo "[✓] Global tool install finished"
 npm install && npm run build
