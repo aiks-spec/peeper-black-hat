@@ -33,30 +33,40 @@ RUN python3 -m pip install --no-cache-dir -r requirements.txt
 # Copy application code
 COPY . .
 
+# Make start script executable
+RUN chmod +x /app/start.sh
+
 # Create supervisor config
-RUN echo '[supervisord]' > /etc/supervisor/conf.d/supervisord.conf && \
-    echo 'nodaemon=true' >> /etc/supervisor/conf.d/supervisord.conf && \
-    echo '' >> /etc/supervisor/conf.d/supervisord.conf && \
-    echo '[program:nodejs]' >> /etc/supervisor/conf.d/supervisord.conf && \
-    echo 'command=node server.js' >> /etc/supervisor/conf.d/supervisord.conf && \
-    echo 'directory=/app' >> /etc/supervisor/conf.d/supervisord.conf && \
-    echo 'autostart=true' >> /etc/supervisor/conf.d/supervisord.conf && \
-    echo 'autorestart=true' >> /etc/supervisor/conf.d/supervisord.conf && \
-    echo 'stdout_logfile=/var/log/nodejs.log' >> /etc/supervisor/conf.d/supervisord.conf && \
-    echo 'stderr_logfile=/var/log/nodejs.log' >> /etc/supervisor/conf.d/supervisord.conf && \
-    echo '' >> /etc/supervisor/conf.d/supervisord.conf && \
-    echo '[program:fastapi]' >> /etc/supervisor/conf.d/supervisord.conf && \
-    echo 'command=python3 main.py' >> /etc/supervisor/conf.d/supervisord.conf && \
-    echo 'directory=/app' >> /etc/supervisor/conf.d/supervisord.conf && \
-    echo 'autostart=true' >> /etc/supervisor/conf.d/supervisord.conf && \
-    echo 'autorestart=true' >> /etc/supervisor/conf.d/supervisord.conf && \
-    echo 'stdout_logfile=/var/log/fastapi.log' >> /etc/supervisor/conf.d/supervisord.conf && \
-    echo 'stderr_logfile=/var/log/fastapi.log' >> /etc/supervisor/conf.d/supervisord.conf
+RUN cat > /etc/supervisor/conf.d/supervisord.conf << 'EOF'
+[supervisord]
+nodaemon=true
+logfile=/var/log/supervisord.log
+pidfile=/var/run/supervisord.pid
+
+[program:fastapi]
+command=python3 main.py
+directory=/app
+autostart=true
+autorestart=true
+stdout_logfile=/var/log/fastapi.log
+stderr_logfile=/var/log/fastapi.log
+user=root
+
+[program:nodejs]
+command=node server.js
+directory=/app
+autostart=true
+autorestart=true
+stdout_logfile=/var/log/nodejs.log
+stderr_logfile=/var/log/nodejs.log
+user=root
+depends_on=fastapi
+EOF
 
 # Expose ports
 EXPOSE 3000 8000
 
-# Start both services with supervisor
-CMD ["/usr/bin/supervisord", "-c", "/etc/supervisor/conf.d/supervisord.conf"]
+# Start both services with custom script
+CMD ["/app/start.sh"]
 
 
