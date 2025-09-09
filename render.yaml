@@ -10,8 +10,6 @@ services:
         value: production
       - key: PORT
         value: 3000
-      - key: FASTAPI_PORT
-        value: 8000
       - key: DB_TYPE
         value: postgres
       - key: DATABASE_URL
