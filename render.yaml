@@ -22,13 +22,7 @@ services:
     startCommand: |
       export PATH="/opt/render/.local/bin:$PATH"
       echo "🚀 Starting FastAPI OSINT Engine..."
-      echo "🔍 Tool availability check:"
-      which ghunt || echo "ghunt not found"
-      which holehe || echo "holehe not found"
-      which sherlock || echo "sherlock not found"
-      which maigret || echo "maigret not found"
-      echo "🐍 Starting FastAPI server..."
-      python main.py
+      python start.py
     envVars:
       - key: NODE_ENV
         value: production
