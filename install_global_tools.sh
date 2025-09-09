@@ -159,16 +159,16 @@ for tool in sherlock holehe maigret ghunt; do
     echo "[+] Installing $tool directly as fallback"
     case $tool in
       sherlock)
-        python -m pip install --break-system-packages sherlock-project || python3 -m pip install --break-system-packages sherlock-project || true
+        /usr/bin/python3 -m pip install --break-system-packages sherlock-project || python3 -m pip install --break-system-packages sherlock-project || python -m pip install --break-system-packages sherlock-project || true
         ;;
       holehe)
-        python -m pip install --break-system-packages holehe || python3 -m pip install --break-system-packages holehe || true
+        /usr/bin/python3 -m pip install --break-system-packages holehe || python3 -m pip install --break-system-packages holehe || python -m pip install --break-system-packages holehe || true
         ;;
       maigret)
-        python -m pip install --break-system-packages maigret || python3 -m pip install --break-system-packages maigret || true
+        /usr/bin/python3 -m pip install --break-system-packages maigret || python3 -m pip install --break-system-packages maigret || python -m pip install --break-system-packages maigret || true
         ;;
       ghunt)
-        python -m pip install --break-system-packages ghunt || python3 -m pip install --break-system-packages ghunt || true
+        /usr/bin/python3 -m pip install --break-system-packages ghunt || python3 -m pip install --break-system-packages ghunt || python -m pip install --break-system-packages ghunt || true
         ;;
     esac
   fi
@@ -180,6 +180,31 @@ for tool in sherlock holehe maigret ghunt; do
     echo "[✓] $tool: $(command -v $tool)"
   else
     echo "[✗] $tool still not found"
+    # Test if it's available as a Python module
+    if /usr/bin/python3 -c "import $tool" 2>/dev/null; then
+      echo "  └─ Available as Python module: /usr/bin/python3 -m $tool"
+    elif python3 -c "import $tool" 2>/dev/null; then
+      echo "  └─ Available as Python module: python3 -m $tool"
+    elif python -c "import $tool" 2>/dev/null; then
+      echo "  └─ Available as Python module: python -m $tool"
+    else
+      echo "  └─ Not available as Python module either"
+    fi
+  fi
+done
+
+# Test actual execution
+echo "[+] Testing tool execution"
+for tool in holehe sherlock maigret ghunt; do
+  echo "[+] Testing $tool execution:"
+  if /usr/bin/python3 -c "import $tool" 2>/dev/null; then
+    echo "  └─ /usr/bin/python3 -m $tool works"
+  elif python3 -c "import $tool" 2>/dev/null; then
+    echo "  └─ python3 -m $tool works"
+  elif python -c "import $tool" 2>/dev/null; then
+    echo "  └─ python -m $tool works"
+  else
+    echo "  └─ $tool not available in any Python"
   fi
 done
 
