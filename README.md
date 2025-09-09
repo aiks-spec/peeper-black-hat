@@ -1,203 +1,69 @@
-# 🔍 OSINT Lookup Engine
+# OSINT Lookup Engine - FastAPI
 
-A powerful OSINT (Open Source Intelligence) tool that provides comprehensive information gathering capabilities for emails, phone numbers, usernames, and IP addresses.
+A clean FastAPI application that runs OSINT tools directly from PATH without virtualenv or hardcoded paths.
 
-## ✨ Features
+## Features
 
-- **🔍 Email Lookup**: CUFinder API, GHunt, Holehe, Sherlock, Maigret
-- **📱 Phone Lookup**: PhoneInfoga, phone-number-api, social media search
-- **👤 Username Search**: Sherlock, Maigret across 100+ platforms
-- **🌐 IP Geolocation**: IPInfo integration with detailed location data
-- **🔄 Real-time Results**: Live data from multiple sources
-- **🧹 Auto-cleanup**: Optional (disabled by default)
-- **🌍 Cross-platform**: Works on Windows, Linux, and Mac
+- **Email Investigation**: `/osint/email?target=EMAIL` - Runs holehe, ghunt, sherlock, and maigret
+- **Username Investigation**: `/osint/username?target=USERNAME` - Runs sherlock and maigret  
+- **Health Check**: `/health` - Service status
+- **Tool Status**: `/tools/status` - Check availability of all OSINT tools
 
-## 🚀 Live Demo
-
-**Coming Soon** - Will be deployed on Render.com
-
-## 🛠️ Technologies Used
-
-- **Backend**: Node.js, Express.js
-- **Database**: PostgreSQL (Render) with SQLite fallback
-- **Frontend**: HTML, CSS, JavaScript
-- **OSINT Tools**: Sherlock, Maigret, PhoneInfoga, GHunt, Holehe
-- **APIs**: CUFinder, IPInfo, Phone-Number-API
-
-## 📋 Prerequisites
-
-- Node.js (v14 or higher)
-- npm or yarn
-- Python 3.8+ (for OSINT tools)
-
-## 🔧 Installation
-
-### 1. Clone the Repository
-```bash
-git clone https://github.com/yourusername/osint-lookup-engine.git
-cd osint-lookup-engine
-```
-
-### 2. Install Node.js Dependencies
-```bash
-npm install
-```
-
-### 3. Set Up Python Virtual Environment
-
-#### Linux/macOS:
-```bash
-# Make setup script executable
-chmod +x setup_python_env.sh start_with_venv.sh
-
-# Create virtual environment and install Python tools
-./setup_python_env.sh
-```
-
-#### Windows:
-```batch
-# Create virtual environment and install Python tools
-setup_python_env.bat
-```
-
-### 4. Set Environment Variables
-Create a `.env` file:
-```env
-NODE_ENV=development
-PORT=3000
-CUFINDER_API_KEY=your_cufinder_api_key
-IPINFO_TOKEN=your_ipinfo_token
-DEHASHED_EMAIL=your_email
-DEHASHED_API_KEY=your_api_key
-```
-
-### 5. Start the Application
-
-#### Linux/macOS:
-```bash
-./start_with_venv.sh
-```
-
-#### Windows:
-```batch
-start_with_venv.bat
-```
-
-#### Manual Start (if virtual environment is already active):
-```bash
-npm start
-```
-
-The application will be available at `http://localhost:3000`
-
-## 📱 Usage
+## API Endpoints
 
 ### Email Lookup
-- Enter an email address
-- Get comprehensive information including:
-  - Personal details (name, company, position)
-  - Social media profiles
-  - Data breach information
-  - Google account details
+```
+GET /osint/email?target=example@email.com
+```
 
-### Phone Lookup
-- Enter a phone number
-- Receive information about:
-  - Carrier and country
-  - Line type and validity
-  - Associated social media accounts
-  - Location data
+### Username Lookup  
+```
+GET /osint/username?target=username
+```
 
-### Username Search
-- Search for usernames across:
-  - Social media platforms
-  - Professional networks
-  - Gaming platforms
-  - And 100+ more sites
+### Health Check
+```
+GET /health
+```
 
-### IP Lookup
-- Get detailed geolocation information
-- ISP and organization details
-- Timezone and coordinates
+### Tool Status
+```
+GET /tools/status
+```
 
-## 🌐 Deployment
+## Installation
 
-### Render.com (Recommended)
-The application is configured for automatic deployment on Render.com with Python virtual environment support:
+### Local Development
+```bash
+pip install -r requirements.txt
+python main.py
+```
 
-1. Push your code to GitHub
-2. Connect your repository to Render.com
-3. Set environment variables in Render dashboard
-4. Deploy automatically
+### Docker
+```bash
+docker build -t osint-engine .
+docker run -p 8000:8000 osint-engine
+```
 
-**Key Features for Render:**
-- ✅ Automatic Python virtual environment setup
-- ✅ Isolated Python dependencies
-- ✅ Pre-configured `render.yaml` for seamless deployment
-- ✅ Comprehensive deployment guide in `RENDER_DEPLOYMENT.md`
+### Render Deployment
+1. Push code to GitHub
+2. Connect repository to Render
+3. Deploy using render.yaml configuration
 
-### Other Platforms
-- **Heroku**: Use the Procfile and environment variables
-- **Railway**: Connect GitHub repository directly
-- **DigitalOcean**: App Platform with automatic deployments
-- **Vercel**: Serverless deployment option
+## OSINT Tools
 
-## 🐍 Virtual Environment Benefits
+The application uses these tools (installed via pipx):
+- **holehe**: Email breach checking
+- **ghunt**: Google account investigation  
+- **sherlock**: Username search across social networks
+- **maigret**: Username search with additional sources
 
-The application now uses Python virtual environments for better dependency management:
+## Configuration
 
-- **🔒 Dependency Isolation**: Prevents conflicts between system and project Python packages
-- **🔄 Reproducible Environment**: Ensures consistent behavior across different systems
-- **📦 Easy Management**: Simple setup and cleanup of Python dependencies
-- **🚀 Render Compatibility**: Works seamlessly with Render's Node.js environment
-- **🛠️ Development Flexibility**: Easy switching between different Python versions and packages
+Set environment variables for GHunt authentication:
+- `GHUNT_TOKEN`: OAuth token for GHunt
+- `GHUNT_COOKIES_B64`: Base64 encoded cookies (alternative)
 
-## 🔒 Security Features
+## Results
 
-- Environment variable protection for API keys
-- Automatic file cleanup (30-minute timeout)
-- CORS configuration for web access
-- No sensitive data logging in production
-- Cross-platform security hardening
-
-## 📊 API Endpoints
-
-- `POST /api/email-lookup` - Email intelligence gathering
-- `POST /api/phone-lookup` - Phone number analysis
-- `POST /api/aggregate` - Multi-source OSINT lookup
-- `POST /api/ip-lookup` - IP geolocation
-- `GET /api/stats` - Usage statistics
-
-## 🤝 Contributing
-
-1. Fork the repository
-2. Create a feature branch (`git checkout -b feature/amazing-feature`)
-3. Commit your changes (`git commit -m 'Add amazing feature'`)
-4. Push to the branch (`git push origin feature/amazing-feature`)
-5. Open a Pull Request
-
-## 📄 License
-
-This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
-
-## ⚠️ Disclaimer
-
-This tool is for **educational and legitimate OSINT purposes only**. Users are responsible for complying with applicable laws and terms of service. The developers are not responsible for misuse of this tool.
-
-## 🆘 Support
-
-- **Issues**: Report bugs and feature requests on GitHub
-- **Documentation**: Check the [DEPLOYMENT.md](DEPLOYMENT.md) for detailed setup guides
-- **Community**: Join our discussions for help and tips
-
-## 🎯 Roadmap
-
-- [ ] Additional OSINT tools integration
-- [ ] Advanced analytics dashboard
-- [ ] API rate limiting and caching
-- [ ] Mobile-responsive improvements
-- [ ] Multi-language support
-
----
-
-**Made with ❤️ for the OSINT community**
+All results are saved as JSON files in the `results/` directory with timestamps for reference.
