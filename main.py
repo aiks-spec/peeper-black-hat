@@ -2,6 +2,7 @@
 import subprocess
 import json
 import re
+import os
 from typing import Dict, List
 from fastapi import FastAPI, HTTPException, Query
 from fastapi.middleware.cors import CORSMiddleware
@@ -191,5 +192,6 @@ async def scan_full(value: str = Query(..., description="Email or username to sc
     return results
 
 if __name__ == "__main__":
-    print("🐍 FastAPI starting on 0.0.0.0:8000...")
-    uvicorn.run(app, host="0.0.0.0", port=8000, log_level="info")
+    port = int(os.getenv("FASTAPI_PORT", 8000))
+    print(f"🐍 FastAPI starting on 0.0.0.0:{port}...")
+    uvicorn.run(app, host="0.0.0.0", port=port, log_level="info")
