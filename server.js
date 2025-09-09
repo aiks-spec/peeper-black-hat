@@ -196,6 +196,25 @@ app.use(express.static('public'));
 // Proxy endpoints to FastAPI backend
 const FASTAPI_URL = 'http://127.0.0.1:8000';
 
+// Wait for FastAPI to be ready before starting server
+async function waitForFastAPI() {
+    const maxRetries = 30;
+    for (let i = 0; i < maxRetries; i++) {
+        try {
+            await axios.get(`${FASTAPI_URL}/health`);
+            console.log('✅ FastAPI backend is ready');
+            return true;
+        } catch (error) {
+            if (i === maxRetries - 1) {
+                console.log('❌ FastAPI backend not available after 30 attempts');
+                return false;
+            }
+            console.log(`⏳ Waiting for FastAPI... (${i + 1}/${maxRetries})`);
+            await new Promise(resolve => setTimeout(resolve, 2000));
+        }
+    }
+}
+
 // Proxy scan requests to FastAPI
 app.get('/api/scan/email', async (req, res) => {
     try {
@@ -2439,43 +2458,55 @@ app.post('/api/run-osint-script', async (req, res) => {
     }
 });
 
-app.listen(PORT, () => {
-    console.log(`🚀 OSINT Lookup Engine running on port ${PORT}`);
-    console.log(`🌐 Access at: http://localhost:${PORT}`);
-    console.log(`📊 Environment: ${process.env.NODE_ENV || 'development'}`);
-    console.log(`🗄️ Database Type: PostgreSQL`);
-    console.log(`🐍 Python Path: ${process.env.PYTHON_PATH || 'python3'}`);
-    console.log(`📁 Working Directory: ${process.cwd()}`);
-    console.log(`🔧 Node Version: ${process.version}`);
-    console.log(`🔍 Environment Variables Debug:`);
-    console.log(`   - DATABASE_URL: ${process.env.DATABASE_URL ? 'Set' : 'Not set'}`);
-    console.log(`   - PYTHON_PATH: ${process.env.PYTHON_PATH}`);
-    console.log(`   - PATH: ${process.env.PATH?.substring(0, 100)}...`);
-    console.log(`📦 Available Tools Test: Visit /api/test-tools to verify OSINT tools`);
+// Start server after FastAPI is ready
+async function startServer() {
+    console.log('⏳ Waiting for FastAPI backend...');
+    const fastapiReady = await waitForFastAPI();
     
-    // Test tool availability at startup (import check only)
-    console.log(`🔍 Testing tool availability at startup (import)...`);
-    const tools = ['sherlock', 'holehe', 'maigret', 'ghunt'];
-    tools.forEach(async (tool) => {
-        try {
-            const resolved = await resolveToolCommand(tool);
-            console.log(`   - ${tool}: ${resolved.command} ${resolved.viaPython || ''}`);
-            if (resolved.command && resolved.viaPython) {
-                execFileAsync(resolved.command, ['-c', `import ${resolved.viaPython}; print('ok')`], {
-                    timeout: 8000,
-                    maxBuffer: 1024 * 256,
-                    env: { ...process.env, PYTHONUNBUFFERED: '1', NO_COLOR: '1' }
-                }).then(() => {
-                    console.log(`   ✅ ${tool}: Import test passed`);
-                }).catch(() => {
-                    console.log(`   ❌ ${tool}: Import test failed`);
-                });
+    if (!fastapiReady) {
+        console.log('⚠️ Starting without FastAPI backend (some features may not work)');
+    }
+    
+    app.listen(PORT, () => {
+        console.log(`🚀 OSINT Lookup Engine running on port ${PORT}`);
+        console.log(`🌐 Access at: http://localhost:${PORT}`);
+        console.log(`📊 Environment: ${process.env.NODE_ENV || 'development'}`);
+        console.log(`🗄️ Database Type: PostgreSQL`);
+        console.log(`🐍 Python Path: ${process.env.PYTHON_PATH || 'python3'}`);
+        console.log(`📁 Working Directory: ${process.cwd()}`);
+        console.log(`🔧 Node Version: ${process.version}`);
+        console.log(`🔍 Environment Variables Debug:`);
+        console.log(`   - DATABASE_URL: ${process.env.DATABASE_URL ? 'Set' : 'Not set'}`);
+        console.log(`   - PYTHON_PATH: ${process.env.PYTHON_PATH}`);
+        console.log(`   - PATH: ${process.env.PATH?.substring(0, 100)}...`);
+        console.log(`📦 Available Tools Test: Visit /api/test-tools to verify OSINT tools`);
+        
+        // Test tool availability at startup (import check only)
+        console.log(`🔍 Testing tool availability at startup (import)...`);
+        const tools = ['sherlock', 'holehe', 'maigret', 'ghunt'];
+        tools.forEach(async (tool) => {
+            try {
+                const resolved = await resolveToolCommand(tool);
+                console.log(`   - ${tool}: ${resolved.command} ${resolved.viaPython || ''}`);
+                if (resolved.command && resolved.viaPython) {
+                    execFileAsync(resolved.command, ['-c', `import ${resolved.viaPython}; print('ok')`], {
+                        timeout: 8000,
+                        maxBuffer: 1024 * 256,
+                        env: { ...process.env, PYTHONUNBUFFERED: '1', NO_COLOR: '1' }
+                    }).then(() => {
+                        console.log(`   ✅ ${tool}: Import test passed`);
+                    }).catch(() => {
+                        console.log(`   ❌ ${tool}: Import test failed`);
+                    });
+                }
+            } catch {
+                console.log(`   - ${tool}: ❌ Error resolving command`);
             }
-        } catch {
-            console.log(`   - ${tool}: ❌ Error resolving command`);
-        }
+        });
     });
-});
+}
+
+startServer().catch(console.error);
 
 // Tools health check endpoint
 app.get('/api/tools-health', async (req, res) => {
