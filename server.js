@@ -1352,9 +1352,28 @@ function resolveCli(cmd) {
 async function runToolIfAvailable(cmd, args, parseFn) {
     // Try multiple execution methods in order of preference
     const methods = [
-        // Method 1: Direct execution with resolved binary
+        // Method 1: Direct execution with absolute candidate paths
         async () => {
-            const bin = resolveCli(cmd);
+            const home = process.env.HOME || '/opt/render';
+            const cli = cmd;
+            const candidates = [
+                `/opt/render/.local/bin/${cli}`,
+                `${home}/.local/bin/${cli}`,
+                `/usr/local/bin/${cli}`,
+                `/usr/bin/${cli}`
+            ];
+            let bin = null;
+            for (const c of candidates) {
+                try { if (fs.existsSync(c)) { bin = c; break; } } catch {}
+            }
+            // last resort: resolved via which/resolveCli
+            if (!bin) {
+                const resolved = resolveCli(cli);
+                if (resolved && resolved.includes('/') && fs.existsSync(resolved)) {
+                    bin = resolved;
+                }
+            }
+            if (!bin) throw new Error(`${cli} not found in standard locations`);
             console.log(`🔧 Method 1 - Direct: ${bin} ${args.join(' ')}`);
             const { stdout, stderr } = await execFileAsync(bin, args, {
                 timeout: 300000,
@@ -1387,7 +1406,7 @@ async function runToolIfAvailable(cmd, args, parseFn) {
             });
             return { stdout, stderr };
         },
-        // Method 4: Try with python -m for tools that support it
+        // Method 4: Try with python -m for tools that support it (module-level)
         async () => {
             if (['ghunt', 'holehe', 'sherlock', 'maigret'].includes(cmd)) {
                 console.log(`🔧 Method 4 - Python module: python -m ${cmd} ${args.join(' ')}`);
@@ -1413,16 +1432,20 @@ async function runToolIfAvailable(cmd, args, parseFn) {
             }
             throw new Error('Not applicable');
         },
-        // Method 6: Try direct python script execution
+        // Method 6: Try direct python script execution (tool-specific CLI entry modules)
         async () => {
             if (['ghunt', 'holehe', 'sherlock', 'maigret'].includes(cmd)) {
-                console.log(`🔧 Method 6 - Direct python script: python -c "import ${cmd}; ${cmd}.main()" ${args.join(' ')}`);
-                const script = `
-import sys
-import ${cmd}
-sys.argv = ['${cmd}'] + ${JSON.stringify(args)}
-${cmd}.main()
-`;
+                let script;
+                if (cmd === 'holehe') {
+                    script = `import sys\nfrom holehe import cli as m\nsys.argv = ['holehe'] + ${JSON.stringify(args)}\nm.main()`;
+                } else if (cmd === 'maigret') {
+                    script = `import sys\ntry:\n import maigret.__main__ as m\nexcept Exception:\n import maigret as m\nsys.argv = ['maigret'] + ${JSON.stringify(args)}\ngetattr(m,'main', lambda: None)()`;
+                } else if (cmd === 'sherlock') {
+                    script = `import sys\nimport sherlock.__main__ as m\nsys.argv = ['sherlock'] + ${JSON.stringify(args)}\nm.main()`;
+                } else if (cmd === 'ghunt') {
+                    script = `import sys\nimport ghunt.ghunt as m\nsys.argv = ['ghunt'] + ${JSON.stringify(args)}\nm.main()`;
+                }
+                console.log(`🔧 Method 6 - Direct python script via -c for ${cmd}`);
                 const { stdout, stderr } = await execFileAsync('python', ['-c', script], {
                     timeout: 300000,
                     maxBuffer: 1024 * 1024 * 50,
