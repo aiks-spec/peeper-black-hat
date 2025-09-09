@@ -1343,7 +1343,7 @@ async function runToolIfAvailable(cmd, args, parseFn) {
             const resolvedBin = resolveCli(cmd);
             const shellCmd = [resolvedBin, ...args].join(' ');
             const exportPathHome = `${process.env.HOME || '/home/render'}/.local/bin`;
-            const exportPath = `${exportPathHome}:/opt/render/.local/bin:/usr/local/bin:/usr/bin:/bin`;
+            const exportPath = `/opt/render/.local/bin:${exportPathHome}:/usr/local/bin:/usr/bin:/bin`;
             const wrapped = `export PATH="${exportPath}:$PATH"; ${shellCmd}`;
             console.log(`🔁 Retrying via shell: ${[cmd, ...args].join(' ')}`);
             const { stdout: sOut, stderr: sErr } = await execAsync(wrapped, {
