@@ -21,18 +21,30 @@ print('✅ FastAPI modules imported successfully')
     exit 1
 }
 
+# Test minimal FastAPI app
+echo "🧪 Testing minimal FastAPI app..."
+python3 test_minimal_fastapi.py || {
+    echo "❌ Minimal FastAPI test failed"
+    exit 1
+}
+
 # Get the main port from Render
 MAIN_PORT=${PORT:-3000}
 FASTAPI_PORT=8000
 
 # Start FastAPI in background with detailed logging
 echo "🐍 Starting FastAPI on port $FASTAPI_PORT..."
-FASTAPI_PORT=$FASTAPI_PORT python3 main.py > /tmp/fastapi.log 2>&1 &
+echo "🔍 Trying simple FastAPI first..."
+FASTAPI_PORT=$FASTAPI_PORT python3 simple_fastapi.py > /tmp/fastapi.log 2>&1 &
 FASTAPI_PID=$!
 
 # Give FastAPI time to start
 echo "⏳ Waiting for FastAPI to start..."
-sleep 3
+sleep 5
+
+# Show initial FastAPI logs
+echo "📋 Initial FastAPI logs:"
+cat /tmp/fastapi.log 2>/dev/null || echo "No logs yet"
 
 # Wait for FastAPI to be ready
 for i in {1..30}; do
@@ -42,7 +54,11 @@ for i in {1..30}; do
     fi
     echo "   Attempt $i/30: FastAPI not ready yet..."
     echo "   FastAPI logs:"
-    tail -3 /tmp/fastapi.log 2>/dev/null || echo "   No logs yet"
+    tail -10 /tmp/fastapi.log 2>/dev/null || echo "   No logs yet"
+    echo "   Process status:"
+    ps aux | grep python3 | grep -v grep || echo "   No Python processes found"
+    echo "   Port status:"
+    netstat -tlnp | grep $FASTAPI_PORT || echo "   Port $FASTAPI_PORT not in use"
     sleep 2
 done
 
@@ -55,7 +71,12 @@ if ! curl -s http://127.0.0.1:$FASTAPI_PORT/health > /dev/null 2>&1; then
     ps aux | grep python3 || echo "No Python processes found"
     echo "🔍 Checking port $FASTAPI_PORT:"
     netstat -tlnp | grep $FASTAPI_PORT || echo "Port $FASTAPI_PORT not in use"
-    echo "⚠️ Continuing without FastAPI..."
+    echo "⚠️ Continuing without FastAPI - Node.js will run in standalone mode..."
+    
+    # Kill any hanging FastAPI process
+    if [ ! -z "$FASTAPI_PID" ]; then
+        kill $FASTAPI_PID 2>/dev/null || true
+    fi
 fi
 
 # Start Node.js on the main port (what Render expects)
