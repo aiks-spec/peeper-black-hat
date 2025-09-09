@@ -3,6 +3,7 @@ services:
     name: osint-lookup-engine
     env: python
     buildCommand: |
+      echo "🚀 Starting FastAPI OSINT Engine build..."
       echo "🔧 Installing OSINT tools via pipx..."
       pip install --break-system-packages pipx
       pipx ensurepath
@@ -13,14 +14,20 @@ services:
       pipx install ghunt
       echo "📦 Installing Python dependencies..."
       pip install --break-system-packages -r requirements.txt
-      echo "✅ Build completed"
+      echo "🔧 Setting up GHunt authentication..."
+      python setup_ghunt.py || echo "GHunt setup failed, continuing..."
+      echo "🧪 Testing FastAPI setup..."
+      python test_fastapi.py || echo "FastAPI test failed, continuing..."
+      echo "✅ FastAPI build completed"
     startCommand: |
       export PATH="/opt/render/.local/bin:$PATH"
+      echo "🚀 Starting FastAPI OSINT Engine..."
       echo "🔍 Tool availability check:"
       which ghunt || echo "ghunt not found"
       which holehe || echo "holehe not found"
       which sherlock || echo "sherlock not found"
       which maigret || echo "maigret not found"
+      echo "🐍 Starting FastAPI server..."
       python main.py
     envVars:
       - key: NODE_ENV
