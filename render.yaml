@@ -10,6 +10,10 @@ services:
       echo "✅ Build process completed"
     startCommand: |
       export PATH="./tools/bin:/usr/local/bin:/usr/bin:/bin:$PATH"
+      if [ ! -x ./tools/bin/holehe ] || [ ! -x ./tools/bin/sherlock ] || [ ! -x ./tools/bin/maigret ] || [ ! -x ./tools/bin/ghunt ]; then
+        echo "🛠️ Wrappers missing at runtime, running setup_tools.sh again"
+        bash scripts/setup_tools.sh || true
+      fi
       echo "🔍 Tool wrappers available:"
       ls -la ./tools/bin || true
       npm start
