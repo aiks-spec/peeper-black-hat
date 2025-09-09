@@ -1352,6 +1352,21 @@ function resolveCli(cmd) {
 async function runToolIfAvailable(cmd, args, parseFn) {
     // Try multiple execution methods in order of preference
     const methods = [
+        // Preferred: system Python3 module execution based on verified working paths
+        async () => {
+            if (['holehe', 'sherlock', 'maigret', 'ghunt'].includes(cmd)) {
+                const moduleMap = { holehe: 'holehe', sherlock: 'sherlock', maigret: 'maigret', ghunt: 'ghunt' };
+                const mod = moduleMap[cmd];
+                console.log(`🔧 Preferred - /usr/bin/python3 -m ${mod} ${args.join(' ')}`);
+                const { stdout, stderr } = await execFileAsync('/usr/bin/python3', ['-m', mod, ...args], {
+                    timeout: 300000,
+                    maxBuffer: 1024 * 1024 * 50,
+                    env: { ...process.env },
+                });
+                return { stdout, stderr };
+            }
+            throw new Error('Not applicable');
+        },
         // Method 1: Direct execution with absolute candidate paths
         async () => {
             const home = process.env.HOME || '/opt/render';
