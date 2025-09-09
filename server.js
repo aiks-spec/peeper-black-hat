@@ -1322,22 +1322,6 @@ async function runToolIfAvailable(cmd, args, parseFn) {
         console.log(`❌ ${cmd} failed:`, e.message);
         const stderr = e.stderr ? String(e.stderr).slice(0, 400) : '';
         if (stderr) console.log(`↪ stderr (${cmd}):`, stderr);
-        // Fallback attempt: try via pipx run
-        try {
-            console.log(`🔁 Retrying via pipx run: ${cmd} ${args.join(' ')}`);
-            const { stdout: pxOut, stderr: pxErr } = await execFileAsync('pipx', ['run', cmd, ...args], {
-                timeout: 300000,
-                maxBuffer: 1024 * 1024 * 50,
-                env: { ...process.env },
-            });
-            if (pxErr) console.log(`↪ stderr (${cmd}/pipx):`, String(pxErr).slice(0, 300));
-            if (parseFn) {
-                return await parseFn(pxOut, pxErr);
-            }
-            return pxOut;
-        } catch (ePx) {
-            console.log(`❌ ${cmd} pipx retry failed:`, ePx.message);
-        }
         // Fallback: try via shell so PATH and shebangs resolve like in interactive shells
         try {
             const resolvedBin = resolveCli(cmd);
