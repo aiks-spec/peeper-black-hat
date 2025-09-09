@@ -191,4 +191,5 @@ async def scan_full(value: str = Query(..., description="Email or username to sc
     return results
 
 if __name__ == "__main__":
-    uvicorn.run(app, host="0.0.0.0", port=8000)
+    print("🐍 FastAPI starting on 0.0.0.0:8000...")
+    uvicorn.run(app, host="0.0.0.0", port=8000, log_level="info")
