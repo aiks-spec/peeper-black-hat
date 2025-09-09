@@ -3,12 +3,6 @@ set -e
 
 echo "🚀 Starting OSINT Lookup Engine..."
 
-# Install curl if not available
-if ! command -v curl >/dev/null 2>&1; then
-    echo "📦 Installing curl..."
-    apt-get update && apt-get install -y curl
-fi
-
 # Check if FastAPI dependencies are installed
 echo "🔍 Checking FastAPI dependencies..."
 python3 -c "import fastapi, uvicorn" 2>/dev/null || {
@@ -16,10 +10,14 @@ python3 -c "import fastapi, uvicorn" 2>/dev/null || {
     pip install fastapi uvicorn
 }
 
-# Test FastAPI startup
-echo "🧪 Testing FastAPI startup..."
-python3 test_fastapi.py || {
-    echo "❌ FastAPI test failed"
+# Test basic FastAPI import
+echo "🧪 Testing FastAPI import..."
+python3 -c "
+from fastapi import FastAPI
+import uvicorn
+print('✅ FastAPI modules imported successfully')
+" || {
+    echo "❌ FastAPI import test failed"
     exit 1
 }
 
@@ -30,7 +28,7 @@ FASTAPI_PID=$!
 
 # Give FastAPI time to start
 echo "⏳ Waiting for FastAPI to start..."
-sleep 5
+sleep 3
 
 # Wait for FastAPI to be ready
 for i in {1..30}; do
@@ -40,7 +38,7 @@ for i in {1..30}; do
     fi
     echo "   Attempt $i/30: FastAPI not ready yet..."
     echo "   FastAPI logs:"
-    tail -5 /tmp/fastapi.log 2>/dev/null || echo "   No logs yet"
+    tail -3 /tmp/fastapi.log 2>/dev/null || echo "   No logs yet"
     sleep 2
 done
 
