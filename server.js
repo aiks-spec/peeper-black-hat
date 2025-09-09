@@ -1003,8 +1003,54 @@ app.get('/api/test-tools', async (req, res) => {
         success: true,
         tools: results,
         pythonVersion: process.env.PYTHON_VERSION || 'unknown',
-        nodeVersion: process.version
+        nodeVersion: process.version,
+        path: process.env.PATH,
+        home: process.env.HOME
     });
+});
+
+// Simple test endpoint for tool execution
+app.get('/api/test-execution', async (req, res) => {
+    try {
+        const testEmail = 'test@example.com';
+        const results = {};
+        
+        // Test each tool with a simple command
+        const tools = [
+            { name: 'holehe', args: [testEmail] },
+            { name: 'sherlock', args: ['testuser'] },
+            { name: 'maigret', args: ['testuser'] },
+            { name: 'ghunt', args: ['email', testEmail] }
+        ];
+        
+        for (const tool of tools) {
+            try {
+                console.log(`🧪 Testing execution: ${tool.name}`);
+                const output = await runToolIfAvailable(tool.name, tool.args, null);
+                results[tool.name] = {
+                    success: true,
+                    output: output ? output.slice(0, 500) : 'No output',
+                    length: output ? output.length : 0
+                };
+            } catch (error) {
+                results[tool.name] = {
+                    success: false,
+                    error: error.message
+                };
+            }
+        }
+        
+        res.json({
+            success: true,
+            results,
+            timestamp: new Date().toISOString()
+        });
+    } catch (error) {
+        res.status(500).json({
+            success: false,
+            error: error.message
+        });
+    }
 });
 
 // Search history endpoint
@@ -1304,47 +1350,72 @@ function resolveCli(cmd) {
 }
 
 async function runToolIfAvailable(cmd, args, parseFn) {
-    try {
-        const bin = resolveCli(cmd);
-        const fullCmd = [bin, ...args].join(' ');
-        console.log(`🔧 Executing: ${fullCmd}`);
-        const { stdout, stderr } = await execFileAsync(bin, args, {
-            timeout: 300000,
-            maxBuffer: 1024 * 1024 * 50,
-            env: { ...process.env },
-        });
-        if (stderr) console.log(`↪ stderr (${cmd}):`, String(stderr).slice(0, 300));
-        if (parseFn) {
-            return await parseFn(stdout, stderr);
-        }
-        return stdout;
-    } catch (e) {
-        console.log(`❌ ${cmd} failed:`, e.message);
-        const stderr = e.stderr ? String(e.stderr).slice(0, 400) : '';
-        if (stderr) console.log(`↪ stderr (${cmd}):`, stderr);
-        // Fallback: try via shell so PATH and shebangs resolve like in interactive shells
-        try {
-            const resolvedBin = resolveCli(cmd);
-            const shellCmd = [resolvedBin, ...args].join(' ');
-            const exportPathHome = `${process.env.HOME || '/home/render'}/.local/bin`;
-            const exportPath = `/opt/render/.local/bin:${exportPathHome}:/usr/local/bin:/usr/bin:/bin`;
-            const wrapped = `export PATH="${exportPath}:$PATH"; ${shellCmd}`;
-            console.log(`🔁 Retrying via shell: ${[cmd, ...args].join(' ')}`);
-            const { stdout: sOut, stderr: sErr } = await execAsync(wrapped, {
+    // Try multiple execution methods in order of preference
+    const methods = [
+        // Method 1: Direct execution with resolved binary
+        async () => {
+            const bin = resolveCli(cmd);
+            console.log(`🔧 Method 1 - Direct: ${bin} ${args.join(' ')}`);
+            const { stdout, stderr } = await execFileAsync(bin, args, {
+                timeout: 300000,
+                maxBuffer: 1024 * 1024 * 50,
+                env: { ...process.env, PATH: `/opt/render/.local/bin:${process.env.PATH}` },
+            });
+            return { stdout, stderr };
+        },
+        // Method 2: pipx run
+        async () => {
+            console.log(`🔧 Method 2 - pipx run: pipx run ${cmd} ${args.join(' ')}`);
+            const { stdout, stderr } = await execFileAsync('pipx', ['run', cmd, ...args], {
+                timeout: 300000,
+                maxBuffer: 1024 * 1024 * 50,
+                env: { ...process.env, PATH: `/opt/render/.local/bin:${process.env.PATH}` },
+            });
+            return { stdout, stderr };
+        },
+        // Method 3: Shell with absolute paths
+        async () => {
+            const exportPath = `/opt/render/.local/bin:${process.env.HOME || '/home/render'}/.local/bin:/usr/local/bin:/usr/bin:/bin`;
+            const shellCmd = `${cmd} ${args.join(' ')}`;
+            const wrapped = `export PATH="${exportPath}:$PATH" && ${shellCmd}`;
+            console.log(`🔧 Method 3 - Shell: ${shellCmd}`);
+            const { stdout, stderr } = await execAsync(wrapped, {
                 timeout: 300000,
                 maxBuffer: 1024 * 1024 * 50,
                 env: { ...process.env },
                 shell: '/bin/bash'
             });
-            if (sErr) console.log(`↪ stderr (${cmd}/shell):`, String(sErr).slice(0, 300));
-            if (parseFn) {
-                return await parseFn(sOut, sErr);
+            return { stdout, stderr };
+        },
+        // Method 4: Try with python -m for tools that support it
+        async () => {
+            if (['ghunt', 'holehe', 'sherlock', 'maigret'].includes(cmd)) {
+                console.log(`🔧 Method 4 - Python module: python -m ${cmd} ${args.join(' ')}`);
+                const { stdout, stderr } = await execFileAsync('python', ['-m', cmd, ...args], {
+                    timeout: 300000,
+                    maxBuffer: 1024 * 1024 * 50,
+                    env: { ...process.env, PATH: `/opt/render/.local/bin:${process.env.PATH}` },
+                });
+                return { stdout, stderr };
             }
-            return sOut;
-        } catch (e2) {
-            console.log(`❌ ${cmd} shell retry failed:`, e2.message);
-            if (e2.stderr) console.log(`↪ stderr (${cmd}/shell):`, String(e2.stderr).slice(0, 400));
-            return null;
+            throw new Error('Not applicable');
+        }
+    ];
+
+    for (let i = 0; i < methods.length; i++) {
+        try {
+            const { stdout, stderr } = await methods[i]();
+            if (stderr) console.log(`↪ stderr (${cmd}/method${i+1}):`, String(stderr).slice(0, 300));
+            if (parseFn) {
+                return await parseFn(stdout, stderr);
+            }
+            return stdout;
+        } catch (e) {
+            console.log(`❌ Method ${i+1} failed for ${cmd}:`, e.message);
+            if (i === methods.length - 1) {
+                console.log(`❌ All methods failed for ${cmd}`);
+                return null;
+            }
         }
     }
 }
