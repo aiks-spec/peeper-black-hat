@@ -216,9 +216,11 @@ app.use('/terminal', (req, res) => {
 app.post('/tmux/send', async (req, res) => {
     try {
         const cmd = (req.body && typeof req.body.cmd === 'string') ? req.body.cmd : '';
+        console.log('🛰️ /tmux/send received:', JSON.stringify(cmd));
         if (!cmd.trim()) return res.status(400).json({ ok: false, error: 'Missing cmd' });
         const child = spawn('tmux', ['send-keys', '-t', 'osint', cmd, 'Enter']);
-        child.on('error', () => {});
+        child.on('error', (e) => { console.log('❌ tmux send error:', e.message); });
+        child.on('close', (code) => { console.log('✅ tmux send closed with code', code); });
         child.unref();
         return res.json({ ok: true });
     } catch (e) {
