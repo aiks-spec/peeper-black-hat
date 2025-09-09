@@ -23,7 +23,8 @@ export PIP_BREAK_SYSTEM_PACKAGES=1
 echo "[+] Install/upgrade pipx and ensure PATH"
 python -m pip install --upgrade pip pipx --break-system-packages || python3 -m pip install --upgrade pip pipx --break-system-packages || pip3 install --upgrade pip pipx --break-system-packages
 python -m pipx ensurepath || python3 -m pipx ensurepath || pipx ensurepath || true
-export PATH="$PIPX_BIN_DIR:/usr/local/bin:/usr/bin:/bin:$PATH"
+export PATH="$PIPX_BIN_DIR:/opt/render/.local/bin:/usr/local/bin:/usr/bin:/bin:$PATH"
+echo "[+] Current PATH after pipx setup: $PATH"
 
 echo "[+] Install sherlock via pipx"
 python -m pipx install --pip-args="--no-input" sherlock-project || python3 -m pipx install --pip-args="--no-input" sherlock-project || pipx install sherlock-project || true
@@ -110,10 +111,27 @@ echo "[+] Final tool availability:"
 for bin in sherlock maigret holehe ghunt; do
   if command -v $bin >/dev/null 2>&1; then
     echo "[✓] $bin: $(command -v $bin)"
+    # Test that the tool actually works
+    $bin --version >/dev/null 2>&1 && echo "  └─ Version check: OK" || echo "  └─ Version check: FAILED"
   else
     echo "[✗] $bin not found in PATH"
+    # Try to find it manually
+    for search_path in "/opt/render/.local/bin" "$HOME/.local/bin" "/usr/local/bin" "/usr/bin"; do
+      if [ -f "$search_path/$bin" ]; then
+        echo "  └─ Found at: $search_path/$bin"
+        break
+      fi
+    done
   fi
 done
+
+echo "[+] pipx availability:"
+if command -v pipx >/dev/null 2>&1; then
+  echo "[✓] pipx: $(command -v pipx)"
+  pipx list || true
+else
+  echo "[✗] pipx not found"
+fi
 
 echo "[✓] Global tool install finished"
 npm install && npm run build
