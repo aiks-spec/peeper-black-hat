@@ -107,7 +107,6 @@ const isProduction = process.env.NODE_ENV === 'production';
 const isDevelopment = process.env.NODE_ENV === 'development';
 
 // Check if we're running in Docker
-const fs = require('fs');
 try {
     if (fs.existsSync('/app/docker_marker.txt')) {
         console.log('🐳 Running in DOCKER environment');
