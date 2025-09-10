@@ -106,6 +106,20 @@ const PORT = process.env.PORT || 3000;
 const isProduction = process.env.NODE_ENV === 'production';
 const isDevelopment = process.env.NODE_ENV === 'development';
 
+// Check if we're running in Docker
+const fs = require('fs');
+try {
+    if (fs.existsSync('/app/docker_marker.txt')) {
+        console.log('🐳 Running in DOCKER environment');
+        const dockerInfo = fs.readFileSync('/app/docker_marker.txt', 'utf8');
+        console.log('🐳 Docker info:', dockerInfo);
+    } else {
+        console.log('⚠️ NOT running in Docker - using old Node.js service');
+    }
+} catch (error) {
+    console.log('⚠️ Could not check Docker status:', error.message);
+}
+
 if (isProduction) {
     console.log('🚀 Running in PRODUCTION mode');
     // Disable detailed logging in production
@@ -194,7 +208,7 @@ app.use((req, res, next) => {
 app.use(express.static('public'));
 
 // Proxy endpoints to FastAPI backend
-const FASTAPI_URL = 'http://127.0.0.1:8000';
+const FASTAPI_URL = 'http://127.0.0.1:8001';
 
 // Wait for FastAPI to be ready before starting server
 async function waitForFastAPI() {
