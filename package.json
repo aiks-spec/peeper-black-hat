@@ -4,7 +4,7 @@
   "description": "Professional OSINT-style lookup engine with hacker-themed UI",
   "main": "server.js",
   "scripts": {
-    "start": "node server.js",
+    "start": "/app/start.sh",
     "dev": "nodemon server.js",
     "build": "echo 'Build completed - using requirements.txt for Python tool installation'"
   },
