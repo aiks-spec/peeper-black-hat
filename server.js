@@ -244,13 +244,49 @@ async function startFastAPI() {
             console.log('✅ FastAPI dependencies found');
         } catch (error) {
             console.log('❌ FastAPI dependencies not found, installing...');
-            await execAsync('pip install fastapi uvicorn');
+            try {
+                // Check if pipx is available
+                try {
+                    await execAsync('which pipx');
+                    console.log('✅ pipx found');
+                } catch (pipxCheckError) {
+                    console.log('⚠️ pipx not found, installing pipx...');
+                    await execAsync('python3 -m pip install --user pipx');
+                    await execAsync('python3 -m pipx ensurepath');
+                }
+                
+                // Try pipx first (preferred for managed environments)
+                await execAsync('pipx install fastapi uvicorn');
+                console.log('✅ FastAPI installed via pipx');
+            } catch (pipxError) {
+                console.log('⚠️ pipx failed, trying pip with --break-system-packages...');
+                try {
+                    await execAsync('pip install --break-system-packages fastapi uvicorn');
+                    console.log('✅ FastAPI installed via pip with --break-system-packages');
+                } catch (pipError) {
+                    console.log('❌ Failed to install FastAPI dependencies');
+                    throw pipError;
+                }
+            }
+        }
+        
+        // Check if main.py exists
+        try {
+            await execAsync('ls -la main.py');
+            console.log('✅ main.py found');
+        } catch (error) {
+            console.log('❌ main.py not found in current directory');
+            console.log('🔍 Current directory contents:');
+            await execAsync('ls -la').catch(() => {});
+            throw new Error('main.py not found');
         }
         
         // Start FastAPI process
+        console.log(`🔧 Starting FastAPI with: python3 main.py (port: ${FASTAPI_PORT})`);
         fastapiProcess = spawn('python3', ['main.py'], {
             env: { ...process.env, FASTAPI_PORT: FASTAPI_PORT },
-            stdio: ['ignore', 'pipe', 'pipe']
+            stdio: ['ignore', 'pipe', 'pipe'],
+            cwd: process.cwd()
         });
         
         fastapiProcess.stdout.on('data', (data) => {
