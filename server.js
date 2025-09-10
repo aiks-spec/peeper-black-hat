@@ -228,7 +228,54 @@ app.use((req, res, next) => {
 app.use(express.static('public'));
 
 // Proxy endpoints to FastAPI backend
-const FASTAPI_URL = 'http://127.0.0.1:8001';
+const FASTAPI_PORT = process.env.FASTAPI_PORT || 8000;
+const FASTAPI_URL = `http://127.0.0.1:${FASTAPI_PORT}`;
+
+// Start FastAPI as a child process
+let fastapiProcess = null;
+
+async function startFastAPI() {
+    try {
+        console.log('🐍 Starting FastAPI backend...');
+        
+        // Check if FastAPI dependencies are available
+        try {
+            await execAsync('python3 -c "import fastapi, uvicorn"');
+            console.log('✅ FastAPI dependencies found');
+        } catch (error) {
+            console.log('❌ FastAPI dependencies not found, installing...');
+            await execAsync('pip install fastapi uvicorn');
+        }
+        
+        // Start FastAPI process
+        fastapiProcess = spawn('python3', ['main.py'], {
+            env: { ...process.env, FASTAPI_PORT: FASTAPI_PORT },
+            stdio: ['ignore', 'pipe', 'pipe']
+        });
+        
+        fastapiProcess.stdout.on('data', (data) => {
+            console.log(`[FastAPI] ${data.toString().trim()}`);
+        });
+        
+        fastapiProcess.stderr.on('data', (data) => {
+            console.log(`[FastAPI Error] ${data.toString().trim()}`);
+        });
+        
+        fastapiProcess.on('error', (error) => {
+            console.log('❌ FastAPI process error:', error.message);
+        });
+        
+        fastapiProcess.on('exit', (code) => {
+            console.log(`🔚 FastAPI process exited with code ${code}`);
+        });
+        
+        console.log('✅ FastAPI process started');
+        return true;
+    } catch (error) {
+        console.log('❌ Failed to start FastAPI:', error.message);
+        return false;
+    }
+}
 
 // Wait for FastAPI to be ready before starting server
 async function waitForFastAPI() {
@@ -2507,11 +2554,20 @@ app.post('/api/run-osint-script', async (req, res) => {
 
 // Start server after FastAPI is ready
 async function startServer() {
-    console.log('⏳ Waiting for FastAPI backend...');
-    const fastapiReady = await waitForFastAPI();
+    console.log('⏳ Starting FastAPI backend...');
     
-    if (!fastapiReady) {
-        console.log('⚠️ Starting without FastAPI backend (some features may not work)');
+    // Try to start FastAPI first
+    const fastapiStarted = await startFastAPI();
+    
+    if (fastapiStarted) {
+        console.log('⏳ Waiting for FastAPI backend...');
+        const fastapiReady = await waitForFastAPI();
+        
+        if (!fastapiReady) {
+            console.log('⚠️ Starting without FastAPI backend (some features may not work)');
+        }
+    } else {
+        console.log('⚠️ Could not start FastAPI backend (some features may not work)');
     }
 
 app.listen(PORT, () => {
