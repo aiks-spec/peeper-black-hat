@@ -43,6 +43,11 @@ RUN python3 -m pip install --no-cache-dir -r requirements.txt
 # Copy application code
 COPY . .
 
+# Create explicit Docker marker
+RUN echo "Docker environment: active" > /app/docker_marker.txt && \
+    echo "Build timestamp: $(date)" >> /app/docker_marker.txt && \
+    echo "Container: OSINT Lookup Engine" >> /app/docker_marker.txt
+
 # Make start script executable
 RUN chmod +x /app/start.sh
 
