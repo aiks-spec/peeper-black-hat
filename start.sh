@@ -3,10 +3,6 @@ set -e
 
 echo "🚀 Starting OSINT Lookup Engine..."
 
-# Test Docker environment
-echo "🐳 Testing Docker environment..."
-python3 docker_test.py
-
 # Check if FastAPI dependencies are installed
 echo "🔍 Checking FastAPI dependencies..."
 python3 -c "import fastapi, uvicorn" 2>/dev/null || {
@@ -25,37 +21,16 @@ print('✅ FastAPI modules imported successfully')
     exit 1
 }
 
-# Test minimal FastAPI app
-echo "🧪 Testing minimal FastAPI app..."
-python3 test_minimal_fastapi.py || {
-    echo "❌ Minimal FastAPI test failed"
-    exit 1
-}
-
-# Test ultra-simple FastAPI
-echo "🧪 Testing ultra-simple FastAPI..."
-python3 test_fastapi_simple.py || {
-    echo "❌ Ultra-simple FastAPI test failed"
-    exit 1
-}
-
 # Get the main port from Render
 MAIN_PORT=${PORT:-3000}
-FASTAPI_PORT=8001  # Try different port to avoid conflicts
+FASTAPI_PORT=${FASTAPI_PORT:-8000}
 
 # Start FastAPI in background with detailed logging
 echo "🐍 Starting FastAPI on port $FASTAPI_PORT..."
-echo "🔍 Trying simple FastAPI first..."
-
-# Test if we can run the simple FastAPI
-echo "🧪 Testing simple FastAPI startup..."
-timeout 10s python3 simple_fastapi.py &
-TEST_PID=$!
-sleep 3
-kill $TEST_PID 2>/dev/null || true
 
 # Start FastAPI in background
-FASTAPI_PORT=$FASTAPI_PORT python3 simple_fastapi.py > /tmp/fastapi.log 2>&1 &
+echo "🔧 Starting FastAPI with command: FASTAPI_PORT=$FASTAPI_PORT python3 main.py"
+FASTAPI_PORT=$FASTAPI_PORT python3 main.py > /tmp/fastapi.log 2>&1 &
 FASTAPI_PID=$!
 
 # Give FastAPI time to start
@@ -66,25 +41,27 @@ sleep 3
 echo "📋 Initial FastAPI logs:"
 cat /tmp/fastapi.log 2>/dev/null || echo "No logs yet"
 
+# Check if FastAPI process is running
+echo "🔍 FastAPI process status:"
+ps aux | grep "python3 main.py" | grep -v grep || echo "FastAPI process not found"
+
 # Wait for FastAPI to be ready
-for i in {1..30}; do
+for i in {1..10}; do
     if curl -s http://127.0.0.1:$FASTAPI_PORT/health > /dev/null 2>&1; then
         echo "✅ FastAPI is ready!"
         break
     fi
-    echo "   Attempt $i/30: FastAPI not ready yet..."
-    echo "   FastAPI logs:"
-    tail -10 /tmp/fastapi.log 2>/dev/null || echo "   No logs yet"
-    echo "   Process status:"
-    ps aux | grep python3 | grep -v grep || echo "   No Python processes found"
-    echo "   Port status:"
-    netstat -tlnp | grep $FASTAPI_PORT || echo "   Port $FASTAPI_PORT not in use"
+    echo "⏳ Waiting for FastAPI... ($i/10)"
+    if [ $i -eq 5 ]; then
+        echo "📋 FastAPI logs so far:"
+        cat /tmp/fastapi.log 2>/dev/null || echo "No logs yet"
+    fi
     sleep 2
 done
 
 # Check if FastAPI started successfully
 if ! curl -s http://127.0.0.1:$FASTAPI_PORT/health > /dev/null 2>&1; then
-    echo "❌ FastAPI failed to start after 60 seconds"
+    echo "❌ FastAPI failed to start after 20 seconds"
     echo "📋 Full FastAPI logs:"
     cat /tmp/fastapi.log 2>/dev/null || echo "No FastAPI logs found"
     echo "🔍 Checking if FastAPI process is running:"
