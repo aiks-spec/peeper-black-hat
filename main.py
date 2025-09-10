@@ -197,6 +197,22 @@ async def root():
 async def health():
     return {"status": "healthy", "tools": ["ghunt", "holehe", "sherlock", "maigret"]}
 
+@app.get("/test-tool")
+async def test_tool(tool: str = Query(...), value: str = Query(...)):
+    """Test a specific tool with debugging output"""
+    print(f"🧪 Testing {tool} with value: {value}")
+    result = run_cli_tool(tool, [value] if tool != "ghunt" else ["email", value])
+    print(f"🧪 {tool} result: {result}")
+    return {
+        "tool": tool,
+        "value": value,
+        "success": result["success"],
+        "method": result.get("method", "unknown"),
+        "stdout": result["stdout"],
+        "stderr": result["stderr"],
+        "return_code": result["return_code"]
+    }
+
 @app.get("/scan/email")
 async def scan_email(value: str = Query(..., description="Email address to scan")):
     if not value or '@' not in value:
@@ -207,6 +223,8 @@ async def scan_email(value: str = Query(..., description="Email address to scan"
     print(f"🔍 Running holehe on: {value}")
     holehe_result = run_cli_tool("holehe", [value])
     print(f"🔧 Holehe result: success={holehe_result['success']}, method={holehe_result.get('method', 'unknown')}")
+    print(f"🔧 Holehe stdout: {holehe_result['stdout'][:200]}...")
+    print(f"🔧 Holehe stderr: {holehe_result['stderr'][:200]}...")
     if holehe_result["success"]:
         results["holehe"] = parse_holehe_output(holehe_result["stdout"])
     else:
@@ -215,6 +233,8 @@ async def scan_email(value: str = Query(..., description="Email address to scan"
     print(f"🔍 Running ghunt on: {value}")
     ghunt_result = run_cli_tool("ghunt", ["email", value])
     print(f"🔧 Ghunt result: success={ghunt_result['success']}, method={ghunt_result.get('method', 'unknown')}")
+    print(f"🔧 Ghunt stdout: {ghunt_result['stdout'][:200]}...")
+    print(f"🔧 Ghunt stderr: {ghunt_result['stderr'][:200]}...")
     if ghunt_result["success"]:
         results["ghunt"] = parse_ghunt_output(ghunt_result["stdout"])
     else:
@@ -233,6 +253,8 @@ async def scan_username(value: str = Query(..., description="Username to scan"))
     print(f"🔍 Running sherlock on: {value}")
     sherlock_result = run_cli_tool("sherlock", [value])
     print(f"🔧 Sherlock result: success={sherlock_result['success']}, method={sherlock_result.get('method', 'unknown')}")
+    print(f"🔧 Sherlock stdout: {sherlock_result['stdout'][:200]}...")
+    print(f"🔧 Sherlock stderr: {sherlock_result['stderr'][:200]}...")
     if sherlock_result["success"]:
         results["sherlock"] = parse_sherlock_output(sherlock_result["stdout"])
     else:
@@ -241,6 +263,8 @@ async def scan_username(value: str = Query(..., description="Username to scan"))
     print(f"🔍 Running maigret on: {value}")
     maigret_result = run_cli_tool("maigret", [value])
     print(f"🔧 Maigret result: success={maigret_result['success']}, method={maigret_result.get('method', 'unknown')}")
+    print(f"🔧 Maigret stdout: {maigret_result['stdout'][:200]}...")
+    print(f"🔧 Maigret stderr: {maigret_result['stderr'][:200]}...")
     if maigret_result["success"]:
         results["maigret"] = parse_maigret_output(maigret_result["stdout"])
     else:
