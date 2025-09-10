@@ -107,12 +107,33 @@ const isProduction = process.env.NODE_ENV === 'production';
 const isDevelopment = process.env.NODE_ENV === 'development';
 
 // Check if we're running in Docker
+let isDocker = false;
 try {
-    if (fs.existsSync('/app/docker_marker.txt')) {
-        console.log('🐳 Running in DOCKER environment');
-        const dockerInfo = fs.readFileSync('/app/docker_marker.txt', 'utf8');
-        console.log('🐳 Docker info:', dockerInfo);
-    } else {
+    // Check multiple Docker indicators
+    const dockerIndicators = [
+        '/app/docker_marker.txt',
+        '/.dockerenv',
+        '/proc/1/cgroup',
+        'docker_marker.txt' // Also check current directory
+    ];
+    
+    for (const indicator of dockerIndicators) {
+        if (fs.existsSync(indicator)) {
+            isDocker = true;
+            console.log('🐳 Running in DOCKER environment');
+            if (indicator === '/app/docker_marker.txt' || indicator === 'docker_marker.txt') {
+                try {
+                    const dockerInfo = fs.readFileSync(indicator, 'utf8');
+                    console.log('🐳 Docker info:', dockerInfo);
+                } catch (e) {
+                    console.log('🐳 Docker marker found but could not read content');
+                }
+            }
+            break;
+        }
+    }
+    
+    if (!isDocker) {
         console.log('⚠️ NOT running in Docker - using old Node.js service');
     }
 } catch (error) {
