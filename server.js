@@ -234,6 +234,17 @@ const FASTAPI_URL = `http://127.0.0.1:${FASTAPI_PORT}`;
 // Start FastAPI as a child process
 let fastapiProcess = null;
 
+// Function to restart FastAPI
+async function restartFastAPI() {
+    if (fastapiProcess) {
+        console.log('🔄 Restarting FastAPI process...');
+        fastapiProcess.kill();
+        fastapiProcess = null;
+        await new Promise(resolve => setTimeout(resolve, 2000)); // Wait 2 seconds
+    }
+    return await startFastAPI();
+}
+
 async function startFastAPI() {
     try {
         console.log('🐍 Starting FastAPI backend...');
@@ -1139,6 +1150,22 @@ app.get('/api/stats', async (req, res) => {
     } catch (error) {
         console.log('❌ Stats error:', error.message);
         res.status(500).json({ error: 'Database error' });
+    }
+});
+
+// Restart FastAPI endpoint
+app.get('/api/restart-fastapi', async (req, res) => {
+    try {
+        console.log('🔄 Manual FastAPI restart requested...');
+        const success = await restartFastAPI();
+        if (success) {
+            res.json({ message: 'FastAPI restarted successfully', status: 'success' });
+        } else {
+            res.status(500).json({ message: 'Failed to restart FastAPI', status: 'error' });
+        }
+    } catch (error) {
+        console.log('❌ FastAPI restart error:', error.message);
+        res.status(500).json({ error: 'Failed to restart FastAPI' });
     }
 });
 
