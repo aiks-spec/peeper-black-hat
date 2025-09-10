@@ -2,9 +2,9 @@
   "name": "osint-lookup-engine",
   "version": "1.0.0",
   "description": "Professional OSINT-style lookup engine with hacker-themed UI",
-  "main": "server.js",
+  "main": "index.js",
   "scripts": {
-    "start": "/app/start.sh",
+    "start": "node index.js",
     "dev": "nodemon server.js",
     "build": "echo 'Build completed - using requirements.txt for Python tool installation'"
   },
