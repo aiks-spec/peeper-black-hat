@@ -32,19 +32,35 @@ python3 test_minimal_fastapi.py || {
     exit 1
 }
 
+# Test ultra-simple FastAPI
+echo "🧪 Testing ultra-simple FastAPI..."
+python3 test_fastapi_simple.py || {
+    echo "❌ Ultra-simple FastAPI test failed"
+    exit 1
+}
+
 # Get the main port from Render
 MAIN_PORT=${PORT:-3000}
-FASTAPI_PORT=8000
+FASTAPI_PORT=8001  # Try different port to avoid conflicts
 
 # Start FastAPI in background with detailed logging
 echo "🐍 Starting FastAPI on port $FASTAPI_PORT..."
 echo "🔍 Trying simple FastAPI first..."
+
+# Test if we can run the simple FastAPI
+echo "🧪 Testing simple FastAPI startup..."
+timeout 10s python3 simple_fastapi.py &
+TEST_PID=$!
+sleep 3
+kill $TEST_PID 2>/dev/null || true
+
+# Start FastAPI in background
 FASTAPI_PORT=$FASTAPI_PORT python3 simple_fastapi.py > /tmp/fastapi.log 2>&1 &
 FASTAPI_PID=$!
 
 # Give FastAPI time to start
 echo "⏳ Waiting for FastAPI to start..."
-sleep 5
+sleep 3
 
 # Show initial FastAPI logs
 echo "📋 Initial FastAPI logs:"
