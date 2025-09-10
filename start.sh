@@ -3,6 +3,10 @@ set -e
 
 echo "🚀 Starting OSINT Lookup Engine..."
 
+# Test Docker environment
+echo "🐳 Testing Docker environment..."
+python3 docker_test.py
+
 # Check if FastAPI dependencies are installed
 echo "🔍 Checking FastAPI dependencies..."
 python3 -c "import fastapi, uvicorn" 2>/dev/null || {
