@@ -20,9 +20,100 @@ app.add_middleware(
 )
 
 def run_cli_tool(tool: str, args: List[str], timeout: int = 30) -> Dict:
+    """Run CLI tool with multiple fallback methods for Render environment"""
+    
+    # Method 1: Try direct execution with common paths
+    candidates = [
+        f"/opt/render/.local/bin/{tool}",
+        f"/home/render/.local/bin/{tool}",
+        f"/usr/local/bin/{tool}",
+        f"/usr/bin/{tool}",
+        tool  # Try as-is
+    ]
+    
+    for candidate in candidates:
+        try:
+            result = subprocess.run(
+                [candidate] + args,
+                capture_output=True,
+                text=True,
+                timeout=timeout,
+                cwd="/",
+                env={**os.environ, "PATH": "/opt/render/.local/bin:/home/render/.local/bin:/usr/local/bin:/usr/bin:/bin"}
+            )
+            if result.returncode == 0 or result.stdout.strip():
+                return {
+                    "success": result.returncode == 0,
+                    "stdout": result.stdout,
+                    "stderr": result.stderr,
+                    "return_code": result.returncode,
+                    "tool": tool,
+                    "args": args,
+                    "method": f"direct: {candidate}"
+                }
+        except Exception:
+            continue
+    
+    # Method 2: Try pipx run
     try:
         result = subprocess.run(
-            [tool] + args,
+            ["pipx", "run", tool] + args,
+            capture_output=True,
+            text=True,
+            timeout=timeout,
+            cwd="/",
+            env={**os.environ, "PATH": "/opt/render/.local/bin:/home/render/.local/bin:/usr/local/bin:/usr/bin:/bin"}
+        )
+        return {
+            "success": result.returncode == 0,
+            "stdout": result.stdout,
+            "stderr": result.stderr,
+            "return_code": result.returncode,
+            "tool": tool,
+            "args": args,
+            "method": "pipx run"
+        }
+    except Exception:
+        pass
+    
+    # Method 3: Try python -m for Python tools
+    if tool in ["ghunt", "holehe", "sherlock", "maigret"]:
+        module_map = {
+            "ghunt": "ghunt",
+            "holehe": "holehe",
+            "sherlock": "sherlock",
+            "maigret": "maigret"
+        }
+        
+        for python_cmd in ["python3", "python", "/usr/bin/python3"]:
+            try:
+                result = subprocess.run(
+                    [python_cmd, "-m", module_map[tool]] + args,
+                    capture_output=True,
+                    text=True,
+                    timeout=timeout,
+                    cwd="/",
+                    env={**os.environ, "PATH": "/opt/render/.local/bin:/home/render/.local/bin:/usr/local/bin:/usr/bin:/bin"}
+                )
+                if result.returncode == 0 or result.stdout.strip():
+                    return {
+                        "success": result.returncode == 0,
+                        "stdout": result.stdout,
+                        "stderr": result.stderr,
+                        "return_code": result.returncode,
+                        "tool": tool,
+                        "args": args,
+                        "method": f"python -m: {python_cmd}"
+                    }
+            except Exception:
+                continue
+    
+    # Method 4: Try shell execution with PATH
+    try:
+        cmd = f"export PATH='/opt/render/.local/bin:/home/render/.local/bin:/usr/local/bin:/usr/bin:/bin:$PATH' && {tool} {' '.join(args)}"
+        result = subprocess.run(
+            cmd,
+            shell=True,
             capture_output=True,
             text=True,
             timeout=timeout,
@@ -34,17 +125,22 @@ def run_cli_tool(tool: str, args: List[str], timeout: int = 30) -> Dict:
             "stderr": result.stderr,
             "return_code": result.returncode,
             "tool": tool,
-            "args": args
+            "args": args,
+            "method": "shell with PATH"
         }
     except Exception as e:
-        return {
-            "success": False,
-            "stdout": "",
-            "stderr": f"Error running {tool}: {str(e)}",
-            "return_code": -1,
-            "tool": tool,
-            "args": args
-        }
+        pass
+    
+    # All methods failed
+    return {
+        "success": False,
+        "stdout": "",
+        "stderr": f"All execution methods failed for {tool}",
+        "return_code": -1,
+        "tool": tool,
+        "args": args,
+        "method": "none"
+    }
 
 def parse_holehe_output(stdout: str) -> Dict:
     results = []
@@ -108,13 +204,17 @@ async def scan_email(value: str = Query(..., description="Email address to scan"
     
     results = {"email": value, "holehe": None, "ghunt": None, "timestamp": None}
     
+    print(f"🔍 Running holehe on: {value}")
     holehe_result = run_cli_tool("holehe", [value])
+    print(f"🔧 Holehe result: success={holehe_result['success']}, method={holehe_result.get('method', 'unknown')}")
     if holehe_result["success"]:
         results["holehe"] = parse_holehe_output(holehe_result["stdout"])
     else:
         results["holehe"] = {"error": holehe_result["stderr"]}
     
+    print(f"🔍 Running ghunt on: {value}")
     ghunt_result = run_cli_tool("ghunt", ["email", value])
+    print(f"🔧 Ghunt result: success={ghunt_result['success']}, method={ghunt_result.get('method', 'unknown')}")
     if ghunt_result["success"]:
         results["ghunt"] = parse_ghunt_output(ghunt_result["stdout"])
     else:
@@ -130,13 +230,17 @@ async def scan_username(value: str = Query(..., description="Username to scan"))
     
     results = {"username": value, "sherlock": None, "maigret": None, "timestamp": None}
     
+    print(f"🔍 Running sherlock on: {value}")
     sherlock_result = run_cli_tool("sherlock", [value])
+    print(f"🔧 Sherlock result: success={sherlock_result['success']}, method={sherlock_result.get('method', 'unknown')}")
     if sherlock_result["success"]:
         results["sherlock"] = parse_sherlock_output(sherlock_result["stdout"])
     else:
         results["sherlock"] = {"error": sherlock_result["stderr"]}
     
+    print(f"🔍 Running maigret on: {value}")
     maigret_result = run_cli_tool("maigret", [value])
+    print(f"🔧 Maigret result: success={maigret_result['success']}, method={maigret_result.get('method', 'unknown')}")
     if maigret_result["success"]:
         results["maigret"] = parse_maigret_output(maigret_result["stdout"])
     else:
