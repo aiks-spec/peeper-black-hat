@@ -193,6 +193,10 @@ def parse_ghunt_output(stdout: str) -> Dict:
 async def root():
     return {"message": "OSINT Tools API", "status": "running"}
 
+@app.get("/test")
+async def test():
+    return {"message": "FastAPI is working!", "timestamp": "now"}
+
 @app.get("/health")
 async def health():
     return {"status": "healthy", "tools": ["ghunt", "holehe", "sherlock", "maigret"]}
@@ -293,25 +297,41 @@ async def scan_full(value: str = Query(..., description="Email or username to sc
     }
     
     if is_email:
+        print(f"🔍 Running holehe on: {value}")
         holehe_result = run_cli_tool("holehe", [value])
+        print(f"🔧 Holehe result: success={holehe_result['success']}, method={holehe_result.get('method', 'unknown')}")
+        print(f"🔧 Holehe stdout: {holehe_result['stdout'][:200]}...")
+        print(f"🔧 Holehe stderr: {holehe_result['stderr'][:200]}...")
         if holehe_result["success"]:
             results["holehe"] = parse_holehe_output(holehe_result["stdout"])
         else:
             results["holehe"] = {"error": holehe_result["stderr"]}
         
+        print(f"🔍 Running ghunt on: {value}")
         ghunt_result = run_cli_tool("ghunt", ["email", value])
+        print(f"🔧 Ghunt result: success={ghunt_result['success']}, method={ghunt_result.get('method', 'unknown')}")
+        print(f"🔧 Ghunt stdout: {ghunt_result['stdout'][:200]}...")
+        print(f"🔧 Ghunt stderr: {ghunt_result['stderr'][:200]}...")
         if ghunt_result["success"]:
             results["ghunt"] = parse_ghunt_output(ghunt_result["stdout"])
         else:
             results["ghunt"] = {"error": ghunt_result["stderr"]}
     
+    print(f"🔍 Running sherlock on: {username}")
     sherlock_result = run_cli_tool("sherlock", [username])
+    print(f"🔧 Sherlock result: success={sherlock_result['success']}, method={sherlock_result.get('method', 'unknown')}")
+    print(f"🔧 Sherlock stdout: {sherlock_result['stdout'][:200]}...")
+    print(f"🔧 Sherlock stderr: {sherlock_result['stderr'][:200]}...")
     if sherlock_result["success"]:
         results["sherlock"] = parse_sherlock_output(sherlock_result["stdout"])
     else:
         results["sherlock"] = {"error": sherlock_result["stderr"]}
     
+    print(f"🔍 Running maigret on: {username}")
     maigret_result = run_cli_tool("maigret", [username])
+    print(f"🔧 Maigret result: success={maigret_result['success']}, method={maigret_result.get('method', 'unknown')}")
+    print(f"🔧 Maigret stdout: {maigret_result['stdout'][:200]}...")
+    print(f"🔧 Maigret stderr: {maigret_result['stderr'][:200]}...")
     if maigret_result["success"]:
         results["maigret"] = parse_maigret_output(maigret_result["stdout"])
     else:
