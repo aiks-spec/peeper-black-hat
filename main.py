@@ -217,6 +217,52 @@ async def test_tool(tool: str = Query(...), value: str = Query(...)):
         "return_code": result["return_code"]
     }
 
+@app.get("/debug-tools")
+async def debug_tools():
+    """Debug all tools and show what's available"""
+    print("🧪 Running comprehensive tool debug...")
+    
+    # Check which tools are available
+    try:
+        which_result = subprocess.run(["which", "holehe", "ghunt", "sherlock", "maigret"], capture_output=True, text=True)
+        print(f"Available tools: {which_result.stdout}")
+    except Exception as e:
+        print(f"Error checking which: {e}")
+    
+    # Check pipx installations
+    try:
+        pipx_result = subprocess.run(["pipx", "list"], capture_output=True, text=True)
+        print(f"Pipx installations: {pipx_result.stdout}")
+    except Exception as e:
+        print(f"Error checking pipx: {e}")
+    
+    # Test each tool
+    test_results = {}
+    tools_to_test = [
+        ("holehe", ["aikyanaskar2006@gmail.com"]),
+        ("ghunt", ["email", "aikyanaskar2006@gmail.com"]),
+        ("sherlock", ["aikyanaskar2006"]),
+        ("maigret", ["aikyanaskar2006"])
+    ]
+    
+    for tool, args in tools_to_test:
+        print(f"🔍 Testing {tool}...")
+        result = run_cli_tool(tool, args)
+        test_results[tool] = {
+            "success": result["success"],
+            "method": result.get("method", "unknown"),
+            "stdout": result["stdout"][:500],  # Limit output
+            "stderr": result["stderr"][:500],
+            "return_code": result["return_code"]
+        }
+        print(f"  {tool}: success={result['success']}, method={result.get('method', 'unknown')}")
+    
+    return {
+        "message": "Tool debug completed",
+        "test_results": test_results,
+        "timestamp": "now"
+    }
+
 @app.get("/scan/email")
 async def scan_email(value: str = Query(..., description="Email address to scan")):
     if not value or '@' not in value:
