@@ -2,6 +2,14 @@
 set -e
 
 echo "🚀 Starting OSINT Lookup Engine..."
+echo "🔍 Current working directory: $(pwd)"
+echo "🔍 Current user: $(whoami)"
+echo "🔍 Environment variables:"
+echo "  - PORT: $PORT"
+echo "  - FASTAPI_PORT: $FASTAPI_PORT"
+echo "  - NODE_ENV: $NODE_ENV"
+echo "🔍 Available files in /app:"
+ls -la /app/ | head -10
 
 # Check if FastAPI dependencies are installed
 echo "🔍 Checking FastAPI dependencies..."
